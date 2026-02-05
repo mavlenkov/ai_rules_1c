@@ -6,10 +6,10 @@ alwaysApply: false
 ## to get files from infobase to modify it's code or metadata please use following commands:
 commands:
 
-**Step 1 - Load config to base:**
+**Step 1 - Dump config from infobase:**
 
-```powershell
-& 'C:\Program Files\1cv8\8.3.23.1997\bin\1cv8.exe' DESIGNER /F 'C:\Users\filippov.o\Documents\1C\DemoHRMCorp1' /N'Савинская З.Ю. (Системный программист)' /DisableStartupMessages /DumpConfigToFiles E:\AgenticTest -listFile repoobjects.txt -Extension OneAPA /Out E:\Temp\Update.log
+```bash
+/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<INFOBASE_PATH>' /N'<USERNAME>' /DisableStartupMessages /DumpConfigToFiles <PROJECT_ROOT> -listFile repoobjects.txt -Extension OneAPA /Out /tmp/1c_update.log
 ```
 
 Выгружай объекты полностью. Строго в текущий каталог - не создавая нового подкаталога.

@@ -11,7 +11,7 @@ You also use **'docsearch'** to search for built-in functions and methods that y
 If you can't fix Linter errors 2-3 times you don't try again and use **'syntaxcheck'** which does the same syntax checking of the module.
 
 # Project info
-The project is entirely in 1C language (platform 8.3.23) without other programming languages.
+The project is entirely in 1C language (platform 8.3.27) without other programming languages.
 Write code in Russian.
 Answer always in Russian.
 

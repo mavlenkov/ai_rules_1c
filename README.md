@@ -73,7 +73,7 @@
 1. Скопируйте содержимое репозитория в папку `.cursor` вашего проекта 1С
 2. Настройте MCP-серверы согласно инструкциям на [vibecoding1c.ru](https://vibecoding1c.ru/)
 3. Создайте файл `infobasesettings.md` в корне проекта с настройками вашей информационной базы:
-   - Путь подключения к базе (например, `C:\Users\...\InfoBase`)
+   - Путь подключения к базе (например, `/home/user/1c/infobases/MyBase` для Linux или `C:\Users\...\InfoBase` для Windows)
    - URL публикации для тестирования (например, `http://localhost/MyBase/ru/`)
 
 ## MCP-серверы

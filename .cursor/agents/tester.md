@@ -29,7 +29,7 @@ Before testing, ensure:
    - Infobase publish URL (for web testing)
 
 2. If settings file doesn't exist, ask user for:
-   - Connection string (e.g., `C:\Users\...\InfoBase12` for file, or server connection)
+   - Connection string (e.g., `/home/user/1c/infobases/MyBase` for file on Linux, or server connection)
    - Web publish URL (e.g., `http://localhost/TestForms/ru/`)
 
 ## Deployment Process
@@ -38,8 +38,8 @@ Follow the `@new/commands/deploy_and_test.md` command for deployment:
 
 ### Step 1: Load Configuration to Infobase
 
-```powershell
-& 'C:\Program Files\1cv8\8.3.23.1997\bin\1cv8.exe' DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /LoadConfigFromFiles <PROJECT_ROOT> /Out <LOG_PATH>
+```bash
+/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /LoadConfigFromFiles <PROJECT_ROOT> /Out <LOG_PATH>
 ```
 
 **After execution:**
@@ -48,8 +48,8 @@ Follow the `@new/commands/deploy_and_test.md` command for deployment:
 
 ### Step 2: Update Database Structure
 
-```powershell
-& 'C:\Program Files\1cv8\8.3.23.1997\bin\1cv8.exe' DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
+```bash
+/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
 ```
 
 **After execution:**
