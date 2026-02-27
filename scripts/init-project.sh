@@ -344,7 +344,7 @@ echo "=== Готово ==="
 echo ""
 echo "Следующие шаги:"
 echo "  1. Отредактируйте infobasesettings.md — укажите подключение к ИБ"
-echo "  2. Запустите MCP-серверы (https://vibecoding1c.ru/)"
+echo "  2. Запустите MCP-серверы (https://docs.onerpa.ru/mcp-servery-1c)"
 
 for tool in "${TOOL_LIST[@]}"; do
     tool="$(echo "$tool" | xargs)"
