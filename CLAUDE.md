@@ -44,7 +44,7 @@ Root files:
 
 ## MCP Tools
 
-All MCP servers from vibecoding1c.ru are configured for all three tools.
+All [MCP servers](https://docs.onerpa.ru/mcp-servery-1c) are configured for all three tools.
 
 | Tool | Purpose |
 |------|---------|

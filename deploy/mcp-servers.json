@@ -6,6 +6,7 @@
       "port": 8000,
       "path": "/mcp",
       "description": "Метаданные и код конфигурации",
+      "note": "Альтернатива: CloudEmbeddingsServer (тот же порт 8000, облачные эмбеддинги). Используется одно из двух.",
       "cursor_name": "1c-code-metadata-mcp",
       "cursor_connection_id": "1c_metadata_service_001",
       "claude_name": "1c-code-metadata-mcp",
