@@ -1,7 +1,7 @@
 # MCP Integration Specification
 
 ## Purpose
-Обеспечить интеграцию с MCP-серверами vibecoding1c.ru для доступа к документации, поиска кода и проверки качества.
+Обеспечить интеграцию с [MCP-серверами для 1С](https://docs.onerpa.ru/mcp-servery-1c) для доступа к документации, поиска кода и проверки качества.
 
 ## Requirements
 

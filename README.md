@@ -123,7 +123,7 @@ opencode.json    ────────────────────►
 Поддержка: Linux/Windows, файловые и серверные ИБ, автодетект ОС и версии платформы.
 
 ### [MCP-интеграция](openspec/specs/mcp-integration/spec.md)
-Работа с MCP-инструментами vibecoding1c.ru:
+Работа с [MCP-серверами](https://docs.onerpa.ru/mcp-servery-1c) для 1С:
 
 | Инструмент | Назначение |
 |------------|------------|

@@ -11,7 +11,7 @@
 #### Scenario: Cursor IDE подключает MCP-серверы
 - GIVEN проект содержит `.cursor/mcp.json`
 - WHEN разработчик открывает проект в Cursor IDE
-- THEN все 8 MCP-серверов vibecoding1c.ru доступны через URL-based соединение
+- THEN все 8 MCP-серверов доступны через URL-based соединение
 
 #### Scenario: Claude Code подключает MCP-серверы
 - GIVEN проект содержит `.mcp.json` в корне
