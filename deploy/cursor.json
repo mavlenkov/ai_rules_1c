@@ -30,7 +30,8 @@
       "source": ".cursor/mcp.json",
       "target": ".cursor/mcp.json",
       "type": "file",
-      "description": "8 MCP-серверов (URL-based)"
+      "generated": true,
+      "description": "8 MCP-серверов (генерируется из deploy/mcp-servers.json)"
     }
   ]
 }

@@ -1,0 +1,85 @@
+{
+  "host": "localhost",
+  "servers": [
+    {
+      "id": "code-metadata",
+      "port": 8000,
+      "path": "/mcp",
+      "description": "Метаданные и код конфигурации",
+      "cursor_name": "1c-code-metadata-mcp",
+      "cursor_connection_id": "1c_metadata_service_001",
+      "claude_name": "1c-code-metadata-mcp",
+      "opencode_name": "1c-code-metadata"
+    },
+    {
+      "id": "syntax-checker",
+      "port": 8002,
+      "path": "/mcp",
+      "description": "Синтаксический контроль BSL",
+      "cursor_name": "1c-syntax-checker-mcp",
+      "cursor_connection_id": "1c_lsp_service_001",
+      "claude_name": "1c-syntax-checker-mcp",
+      "opencode_name": "1c-syntax-checker"
+    },
+    {
+      "id": "docs",
+      "port": 8003,
+      "path": "/mcp",
+      "description": "Документация платформы 1С",
+      "cursor_name": "1C-docs-mcp",
+      "cursor_connection_id": "1c_docs_service_001",
+      "claude_name": "1c-docs-mcp",
+      "opencode_name": "1c-docs"
+    },
+    {
+      "id": "templates",
+      "port": 8004,
+      "path": "/mcp",
+      "description": "Шаблоны и примеры кода",
+      "cursor_name": "1c-templates-mcp",
+      "cursor_connection_id": "1c_templates_service_001",
+      "claude_name": "1c-templates-mcp",
+      "opencode_name": "1c-templates"
+    },
+    {
+      "id": "graph-metadata",
+      "port": 8006,
+      "path": "/mcp",
+      "description": "Граф метаданных",
+      "cursor_name": "1c-graph-metadata-mcp",
+      "cursor_connection_id": "1c_graph_metadata_service_001",
+      "claude_name": "1c-graph-metadata-mcp",
+      "opencode_name": "1c-graph-metadata"
+    },
+    {
+      "id": "code-check",
+      "port": 8007,
+      "path": "/mcp",
+      "description": "Анализ логики и производительности",
+      "cursor_name": "1c-code-check-mcp",
+      "cursor_connection_id": "1c_code_check_service_001",
+      "claude_name": "1c-code-check-mcp",
+      "opencode_name": "1c-code-check"
+    },
+    {
+      "id": "ssl",
+      "port": 8008,
+      "path": "/mcp",
+      "description": "Функции БСП (SSL)",
+      "cursor_name": "1c-ssl-mcp",
+      "cursor_connection_id": "1c_ssl_service_001",
+      "claude_name": "1c-ssl-mcp",
+      "opencode_name": "1c-ssl"
+    },
+    {
+      "id": "forms",
+      "port": 8011,
+      "path": "/mcp",
+      "description": "Управляемые формы",
+      "cursor_name": "1c-forms-mcp",
+      "cursor_connection_id": "1c_forms_service_001",
+      "claude_name": "1c-forms-mcp",
+      "opencode_name": "1c-forms"
+    }
+  ]
+}

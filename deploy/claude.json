@@ -12,7 +12,8 @@
       "source": ".mcp.json",
       "target": ".mcp.json",
       "type": "file",
-      "description": "8 MCP-серверов (streamable HTTP)"
+      "generated": true,
+      "description": "8 MCP-серверов (генерируется из deploy/mcp-servers.json)"
     },
     {
       "source": ".claude/settings.json",

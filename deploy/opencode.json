@@ -13,7 +13,8 @@
       "source": "opencode.json",
       "target": "opencode.json",
       "type": "file",
-      "description": "MCP-серверы (remote) + ссылки на .cursor/rules/"
+      "generated": true,
+      "description": "MCP-серверы (генерируется из deploy/mcp-servers.json) + instructions"
     }
   ]
 }
