@@ -29,15 +29,37 @@ cd cursor_rules_1c
 3. Создайте `infobasesettings.md` с подключением к ИБ и URL тестирования
 4. Начните работу с агентами: `@1c-developer`, `@1c-architect` и др.
 
-## Поддержка AI-инструментов
+## Развёртывание
 
-| Инструмент | MCP-серверы | Правила | Агенты |
-|------------|-------------|---------|--------|
-| **Cursor IDE** | `.cursor/mcp.json` | `.cursor/rules/*.mdc` | `.cursor/agents/*.md` |
-| **Claude Code** | `.mcp.json` | `CLAUDE.md` | `.claude/agents/` |
-| **OpenCode** | `opencode.json` → `mcp` | `AGENTS.md` + `instructions` | `.opencode/agents/` |
+Каждый инструмент ожидает свои файлы в определённых местах целевого проекта:
 
-Подробнее: [`openspec/specs/multi-tool-support/spec.md`](openspec/specs/multi-tool-support/spec.md)
+```
+Репозиторий                              Целевой проект 1С
+──────────                               ──────────────────
+
+.cursor/agents/  ────────────────────►   .cursor/agents/
+.cursor/rules/   ────────────────────►   .cursor/rules/        ← Cursor IDE
+.cursor/skills/  ────────────────────►   .cursor/skills/
+.cursor/commands/────────────────────►   .cursor/commands/
+.cursor/mcp.json ────────────────────►   .cursor/mcp.json
+
+CLAUDE.md        ────────────────────►   CLAUDE.md
+.mcp.json        ────────────────────►   .mcp.json             ← Claude Code
+.claude/         ────────────────────►   .claude/
+
+AGENTS.md        ────────────────────►   AGENTS.md             ← OpenCode
+opencode.json    ────────────────────►   opencode.json
+
+(скрипт)         ────────────────────►   infobasesettings.md
+```
+
+Скрипт `scripts/init-project.sh` автоматически раскладывает файлы по нужным местам. Посмотреть маппинг без копирования:
+
+```bash
+./scripts/init-project.sh --list
+```
+
+Подробности: [`deploy/README.md`](deploy/README.md) | Спецификация: [`openspec/specs/multi-tool-support/spec.md`](openspec/specs/multi-tool-support/spec.md)
 
 ## Компоненты
 
@@ -111,8 +133,14 @@ openspec/
 ├── specs/           # Спецификации capabilities (source of truth)
 └── changes/         # Change proposals
 
+deploy/
+├── README.md        # Подробный гайд по развёртыванию
+├── cursor.json      # Манифест: что копировать для Cursor
+├── claude.json      # Манифест: что копировать для Claude Code
+└── opencode.json    # Манифест: что копировать для OpenCode
+
 scripts/
-└── init-project.sh  # Инициализация нового проекта
+└── init-project.sh  # Инициализация нового проекта (читает манифесты)
 
 CLAUDE.md            # Инструкции для Claude Code
 AGENTS.md            # Инструкции для OpenCode

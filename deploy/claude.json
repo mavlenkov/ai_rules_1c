@@ -1,0 +1,24 @@
+{
+  "tool": "Claude Code",
+  "description": "Правила и MCP-серверы для Claude Code",
+  "files": [
+    {
+      "source": "CLAUDE.md",
+      "target": "CLAUDE.md",
+      "type": "file",
+      "description": "Правила кодирования, антипаттерны, MCP workflow"
+    },
+    {
+      "source": ".mcp.json",
+      "target": ".mcp.json",
+      "type": "file",
+      "description": "8 MCP-серверов (streamable HTTP)"
+    },
+    {
+      "source": ".claude/settings.json",
+      "target": ".claude/settings.json",
+      "type": "file",
+      "description": "Язык, разрешения, автоодобрение MCP"
+    }
+  ]
+}
