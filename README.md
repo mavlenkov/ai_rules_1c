@@ -11,7 +11,7 @@
 ### Вариант 1 — Автоматическая инициализация
 
 ```bash
-git clone https://github.com/comol/cursor_rules_1c.git
+git clone https://github.com/mavlenkov/cursor_rules_1c.git
 cd cursor_rules_1c
 ./scripts/init-project.sh /path/to/1c-project
 ```
