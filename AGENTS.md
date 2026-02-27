@@ -4,7 +4,7 @@
 
 **Язык общения и кода:** русский
 **Платформа:** 1С:Предприятие 8.3.27
-**MCP-серверы:** https://vibecoding1c.ru/
+**MCP-серверы:** https://docs.onerpa.ru/mcp-servery-1c
 
 ## Persona
 

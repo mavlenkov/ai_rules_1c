@@ -83,7 +83,7 @@ OpenCode ищет конфигурацию в **корне** проекта.
 | БСП | 8008 | `1c-ssl-mcp` / `1c-ssl` |
 | Формы | 8011 | `1c-forms-mcp` / `1c-forms` |
 
-Серверы запускаются через [vibecoding1c.ru](https://vibecoding1c.ru/) и по умолчанию слушают на `localhost`.
+Серверы запускаются через Docker ([документация](https://docs.onerpa.ru/mcp-servery-1c)) и по умолчанию слушают на `localhost`.
 
 ### Единый источник конфигурации
 
@@ -158,7 +158,7 @@ OpenCode ищет конфигурацию в **корне** проекта.
 ## После установки
 
 1. Отредактируйте `infobasesettings.md` — укажите подключение к ИБ
-2. Запустите MCP-серверы через [vibecoding1c.ru](https://vibecoding1c.ru/)
+2. Запустите MCP-серверы ([документация](https://docs.onerpa.ru/mcp-servery-1c))
 3. Откройте проект в выбранном инструменте:
    - **Cursor:** откройте папку проекта в Cursor IDE
    - **Claude Code:** `cd ~/Проекты/МойПроект1С && claude`

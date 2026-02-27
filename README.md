@@ -52,7 +52,7 @@ git clone https://github.com/mavlenkov/cursor_rules_1c.git
 > При нестандартных портах MCP-серверов отредактируйте `.cursor/mcp.json`, `.mcp.json` и `opencode.json` — измените номера портов в URL.
 
 Затем:
-1. Настройте MCP-серверы: [vibecoding1c.ru](https://vibecoding1c.ru/)
+1. Настройте MCP-серверы: [документация](https://docs.onerpa.ru/mcp-servery-1c)
 2. Создайте `infobasesettings.md` с подключением к ИБ и URL тестирования
 3. Начните работу с агентами: `@1c-developer`, `@1c-architect` и др.
 
@@ -198,7 +198,7 @@ opencode.json        # Конфигурация OpenCode + MCP-серверы
 
 - **Основные обсуждения**: [t.me/comol_it_does_matter](https://t.me/comol_it_does_matter)
 - **Дополнительные материалы**: [t.me/yellow_ai_vibe](https://t.me/yellow_ai_vibe)
-- **MCP-серверы**: [vibecoding1c.ru](https://vibecoding1c.ru/)
+- **MCP-серверы**: [docs.onerpa.ru](https://docs.onerpa.ru/mcp-servery-1c)
 
 ## Участие
 

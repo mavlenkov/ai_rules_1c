@@ -8,7 +8,7 @@ This repository contains rules, agents, skills, and commands for AI-assisted 1C 
 
 **Primary Language:** Russian (code and documentation)
 **Platform:** 1C:Enterprise 8.3.27
-**MCP Servers:** https://vibecoding1c.ru/
+**MCP Servers:** https://docs.onerpa.ru/mcp-servery-1c
 
 ## Multi-Tool Support
 
