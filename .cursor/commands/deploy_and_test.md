@@ -1,38 +1,67 @@
 # installation
-**IMPORTANT** if file infobasesettings.md does not exists - create it with following info:
-1) Ask connection for infobase. Example: `/home/user/1c/infobases/MyBase` (Linux) or `C:\Users\user\InfoBase` (Windows)
-2) Ask infobase publish URL. In this file it http://localhost/TestForms/ru/
+**IMPORTANT** if file infobasesettings.md does not exist - create it with following info:
+1) Ask infobase connection type and path:
+   - File infobase: `/F '/path/to/InfoBase'`
+   - Server infobase: `/S 'servername\basename'` (or `/S 'servername:port\basename'`)
+2) Ask infobase publish URL. Example: `http://localhost/MyBase/ru/`
+3) If server or authenticated infobase - ask username and password
 
+# environment detection
+**IMPORTANT** Before running commands, detect the environment automatically:
 
-# setings usage
-1) In commands below replace infobase connection with read from infobasesettings.md. Don't forget to use /S for server infobase and /F for file
-2) replace 'http://localhost/TestForms/ru/' url to url read from infobasesettings.md. If URL not set - just skip testing
-3) /tmp/1c_update.log - just put update log whereever it comfortable
-4) Replace project path with current project root directory
+1) **OS**: run `uname -s` (or check if Windows by the presence of `%PROGRAMFILES%`).
+2) **Platform path**: find the latest installed version of 1C:Enterprise.
+
+| OS | How to detect version | Platform executable | Log path |
+|----|----------------------|---------------------|----------|
+| Linux | `ls /opt/1cv8/x86_64/` | `/opt/1cv8/x86_64/<version>/1cv8` | `/tmp/1c/update.log` |
+| Windows | `dir "%PROGRAMFILES%\1cv8"` | `C:\Program Files\1cv8\<version>\bin\1cv8.exe` | `%TEMP%\1c\update.log` |
+
+Use the highest available version. Store the result as `<V8_PATH>` and `<LOG_PATH>`.
+
+# settings usage
+1) In commands below replace `<V8_PATH>` with detected platform executable
+2) Replace `<LOG_PATH>` with log path for detected OS
+3) Replace `<IB_CONNECTION>` with infobase connection from infobasesettings.md (`/F '...'` or `/S '...'`)
+4) If username/password are specified in infobasesettings.md, add `/N 'UserName' /P 'Password'` after `/DisableStartupMessages`. Omit `/P` if password is empty — otherwise Designer will consume the next parameter as password value
+5) Replace test URL with URL read from infobasesettings.md. If URL not set - just skip testing
+6) Replace source path with current project root directory
 
 
 # testing and deployment
 ## to update infobase before testing use following commands:
 **Step 1 - Load config to base:**
 
-```bash
-/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /LoadConfigFromFiles <PROJECT_ROOT> /Out /tmp/1c_update.log
+File infobase:
+```
+<V8_PATH> DESIGNER /F '/path/to/InfoBase' /DisableStartupMessages /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
 ```
 
-Read `/tmp/1c_update.log` to confirm success.
+Server infobase:
+```
+<V8_PATH> DESIGNER /S 'servername\basename' /DisableStartupMessages /N 'UserName' /P 'Password' /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
+```
+
+Read `<LOG_PATH>` to confirm success.
 
 Wait 5-10 seconds
 
 **Step 2 - Update database structure:**
 
-```bash
-/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out /tmp/1c_update.log
+File infobase:
+```
+<V8_PATH> DESIGNER /F '/path/to/InfoBase' /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
 ```
 
-Read `/tmp/1c_update.log` to confirm success.
+Server infobase:
+```
+<V8_PATH> DESIGNER /S 'servername\basename' /DisableStartupMessages /N 'UserName' /P 'Password' /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
+```
+
+Read `<LOG_PATH>` to confirm success.
 
 ## to test infobase use following URL and rules:
 
-http://localhost/TestForms/ru/
+http://localhost/MyBase/ru/
 **IMPORTANT** ALWAYS USE **human-like typing** simulation with **DELAY** to fill values during testing
 you can use TAB to select form field
