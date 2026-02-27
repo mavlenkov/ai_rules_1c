@@ -4,7 +4,7 @@
 
 ### Предусловия
 - [ ] Python 3 установлен
-- [ ] MCP-серверы vibecoding1c.ru запущены (хотя бы один, например docs на порту 8003)
+- [ ] MCP-серверы запущены (хотя бы один, например docs на порту 8003). [Документация](https://docs.onerpa.ru/mcp-servery-1c)
 - [ ] Установлен Claude Code (`claude --version`)
 - [ ] Установлен OpenCode (`opencode --version`)
 - [ ] Cursor IDE доступен
@@ -203,11 +203,44 @@ print(f'OpenCode: {len(oc[\"mcp\"])} серверов')
 
 ---
 
-## 6. Документация
+## 6. Ручная установка (Windows)
+
+### 6.1 Клонирование и копирование
+```
+git clone https://github.com/mavlenkov/cursor_rules_1c.git
+```
+- [ ] Репозиторий клонируется
+- [ ] README.md содержит таблицу маппинга файлов для ручного копирования
+
+### 6.2 Копирование для Cursor
+- [ ] Скопировать `.cursor/agents/`, `.cursor/rules/`, `.cursor/skills/`, `.cursor/commands/`, `.cursor/mcp.json` в целевой проект
+- [ ] Cursor видит правила и агенты при открытии проекта
+
+### 6.3 Копирование для Claude Code
+- [ ] Скопировать `CLAUDE.md`, `.mcp.json`, `.claude/settings.json` в корень целевого проекта
+- [ ] Claude Code подхватывает правила и MCP-серверы
+
+### 6.4 Копирование для OpenCode
+- [ ] Скопировать `AGENTS.md`, `opencode.json` в корень целевого проекта
+- [ ] OpenCode подхватывает правила и MCP-серверы
+
+### 6.5 Ручное изменение портов
+- [ ] Открыть `.cursor/mcp.json` — заменить порты в URL
+- [ ] Открыть `.mcp.json` — заменить порты в URL
+- [ ] Открыть `opencode.json` → секция `mcp` — заменить порты в URL
+- [ ] Все три инструмента видят серверы на новых портах
+
+---
+
+## 7. Документация
 
 - [ ] `deploy/README.md` — схема развёртывания актуальна
 - [ ] `deploy/README.md` — секции --host и --ports присутствуют
+- [ ] `README.md` — вариант 1 помечен «Linux / macOS / WSL»
+- [ ] `README.md` — вариант 2 содержит таблицу для ручного копирования (все ОС)
 - [ ] `README.md` — быстрый старт с примерами --host/--ports
+- [ ] `README.md` — ссылки на MCP-серверы ведут на docs.onerpa.ru/mcp-servery-1c
+- [ ] `README.md` — git clone ведёт на mavlenkov/cursor_rules_1c
 - [ ] `openspec/specs/multi-tool-support/spec.md` — requirement «Настраиваемые хост и порты»
 - [ ] `scripts/init-project.sh --help` — справка корректна
 
