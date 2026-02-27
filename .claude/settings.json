@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "language": "russian",
+  "permissions": {
+    "allow": [
+      "Read(.cursor/**)",
+      "Read(openspec/**)",
+      "Read(CLAUDE.md)",
+      "Read(AGENTS.md)",
+      "Read(README.md)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(ls *)",
+      "Bash(uname *)"
+    ]
+  },
+  "enableAllProjectMcpServers": true
+}

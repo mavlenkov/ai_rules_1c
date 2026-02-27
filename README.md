@@ -1,15 +1,43 @@
-# Правила и конфигурации Cursor для разработки на 1С
+# AI-правила для разработки на 1С
 
-Набор правил, агентов, навыков и команд для эффективной разработки на платформе 1С:Предприятие 8.3 с использованием Cursor IDE и MCP-серверов.
+Набор правил, агентов, навыков и команд для разработки на платформе 1С:Предприятие 8.3 с использованием AI-инструментов и MCP-серверов.
+
+Поддерживаемые инструменты: **Cursor IDE**, **Claude Code**, **OpenCode**.
 
 > Полная спецификация проекта: [`openspec/specs/`](openspec/specs/)
 
 ## Быстрый старт
 
-1. Скопируйте содержимое репозитория в папку `.cursor` вашего проекта 1С
+### Вариант 1 — Автоматическая инициализация
+
+```bash
+git clone https://github.com/comol/cursor_rules_1c.git
+cd cursor_rules_1c
+./scripts/init-project.sh /path/to/1c-project
+```
+
+С выбором инструментов:
+```bash
+./scripts/init-project.sh /path/to/1c-project --tools cursor,claude
+./scripts/init-project.sh /path/to/1c-project --tools opencode
+```
+
+### Вариант 2 — Ручная установка
+
+1. Скопируйте содержимое репозитория в корень вашего проекта 1С
 2. Настройте MCP-серверы: [vibecoding1c.ru](https://vibecoding1c.ru/)
 3. Создайте `infobasesettings.md` с подключением к ИБ и URL тестирования
 4. Начните работу с агентами: `@1c-developer`, `@1c-architect` и др.
+
+## Поддержка AI-инструментов
+
+| Инструмент | MCP-серверы | Правила | Агенты |
+|------------|-------------|---------|--------|
+| **Cursor IDE** | `.cursor/mcp.json` | `.cursor/rules/*.mdc` | `.cursor/agents/*.md` |
+| **Claude Code** | `.mcp.json` | `CLAUDE.md` | `.claude/agents/` |
+| **OpenCode** | `opencode.json` → `mcp` | `AGENTS.md` + `instructions` | `.opencode/agents/` |
+
+Подробнее: [`openspec/specs/multi-tool-support/spec.md`](openspec/specs/multi-tool-support/spec.md)
 
 ## Компоненты
 
@@ -70,14 +98,26 @@
 
 ```
 .cursor/
-├── agents/          # 12 AI-агентов
+├── agents/          # 12 AI-агентов (Cursor)
 ├── rules/           # 11 правил (2 always-applied, 9 context-dependent)
 ├── skills/          # Навыки (1c-metadata-manage + утилиты)
-└── commands/        # 2 команды (deploy + dump)
+├── commands/        # 2 команды (deploy + dump)
+└── mcp.json         # MCP-серверы (Cursor)
+
+.claude/
+└── settings.json    # Настройки Claude Code
 
 openspec/
 ├── specs/           # Спецификации capabilities (source of truth)
 └── changes/         # Change proposals
+
+scripts/
+└── init-project.sh  # Инициализация нового проекта
+
+CLAUDE.md            # Инструкции для Claude Code
+AGENTS.md            # Инструкции для OpenCode
+.mcp.json            # MCP-серверы (Claude Code)
+opencode.json        # Конфигурация OpenCode + MCP-серверы
 ```
 
 ## Ключевые принципы

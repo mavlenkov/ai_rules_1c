@@ -4,22 +4,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains rules, agents, skills, and commands for AI-assisted 1C Enterprise platform development using Cursor IDE. It is designed to be placed in the `.cursor` folder of a 1C project.
+This repository contains rules, agents, skills, and commands for AI-assisted 1C Enterprise platform development. Supports **Cursor IDE**, **Claude Code**, and **OpenCode**.
 
 **Primary Language:** Russian (code and documentation)
 **Platform:** 1C:Enterprise 8.3.27
 **MCP Servers:** https://vibecoding1c.ru/
 
+## Multi-Tool Support
+
+| Tool | Config | MCP Servers | Rules/Instructions |
+|------|--------|-------------|-------------------|
+| **Cursor IDE** | `.cursor/mcp.json` | URL-based | `.cursor/rules/*.mdc`, `.cursor/agents/*.md` |
+| **Claude Code** | `.mcp.json` | URL-based | `CLAUDE.md`, `.claude/settings.json` |
+| **OpenCode** | `opencode.json` | Remote type | `AGENTS.md`, `instructions` in config |
+
 ## Repository Structure
 
 ```
 .cursor/
-├── agents/           # Specialized AI assistants (11 agents)
-├── rules/            # Standards and guidelines (.mdc format)
-├── skills/           # Deep knowledge on specific topics
-├── commands/         # Deployment and config extraction
-└── mcp.json          # MCP server configurations
+├── agents/           # 12 specialized AI assistants
+├── rules/            # 11 coding standards (.mdc format)
+├── skills/           # Deep knowledge (metadata, forms, queries)
+├── commands/         # Cross-platform deploy/dump commands
+└── mcp.json          # MCP server config (Cursor)
+
+.claude/
+└── settings.json     # Claude Code project settings
+
+openspec/
+├── specs/            # Capability specifications (source of truth)
+└── changes/          # Change proposals
 ```
+
+Root files:
+- `CLAUDE.md` — instructions for Claude Code (this file)
+- `AGENTS.md` — instructions for OpenCode
+- `.mcp.json` — MCP servers for Claude Code
+- `opencode.json` — OpenCode config + MCP servers
+
+## MCP Tools
+
+All MCP servers from vibecoding1c.ru are configured for all three tools.
+
+| Tool | Purpose |
+|------|---------|
+| `docsearch` | 1C platform documentation |
+| `templatesearch` | Code templates and examples |
+| `codesearch` | Search in current configuration |
+| `search_metadata` / `metadatasearch` | Metadata structure validation |
+| `business_search` | Semantic search by description |
+| `syntaxcheck` | BSL syntax check (max 3 times per cycle) |
+| `check_1c_code` | Logic and performance analysis |
+| `ssl_search` | БСП (SSL) functions |
+| `helpsearch` | Metadata object information |
+
+**Workflow:**
+1. `templatesearch` → find examples before writing
+2. `search_metadata` → validate metadata
+3. `docsearch` → verify built-in functions
+4. `codesearch` → find existing patterns
+5. `ssl_search` → find БСП functions
+6. Write code
+7. `syntaxcheck` → check syntax (max 3 iterations)
+8. `check_1c_code` → analyze logic/performance
 
 ## Agents
 
@@ -36,54 +83,9 @@ This repository contains rules, agents, skills, and commands for AI-assisted 1C 
 | **doc-writer** | Technical documentation |
 | **planner** | Task planning and decomposition |
 | **tester** | Test development |
-
-## Rules
-
-**Always applied:**
-- `project_rules.mdc` — 1C coding standards, MCP tool usage, query guidelines
-- `user_rules.mdc` — step-by-step approach, minimal changes
-
-**Context-dependent:**
-- `anti-patterns.mdc` — catalog of anti-patterns with examples
-- `mcp-tools.mdc` — MCP tools reference
-- `sdd-integrations.mdc` — SDD framework integrations (Memory Bank, OpenSpec, Spec Kit, TaskMaster)
-- `form_module_rules.mdc` — form module directives
-- `forms_add.mdc`, `forms_events_add.mdc` — form generation
-
-## Skills
-
-- **1c-query-optimization** — query optimization patterns (temp tables, JOINs, virtual table parameters)
-- **1c-ssl-patterns** — БСП patterns (users, files, print forms, background jobs)
-
-## MCP Tools
-
-| Tool | Purpose |
-|------|---------|
-| `docsearch` | 1C platform documentation |
-| `templatesearch` | Code templates and examples |
-| `codesearch` | Search in current configuration |
-| `search_metadata` | Metadata structure validation |
-| `business_search` | Semantic search by description |
-| `syntaxcheck` | BSL syntax check (max 3 times per cycle) |
-| `check_1c_code` | Logic and performance analysis |
-| `ssl_search` | БСП (SSL) functions |
-| `helpsearch` | Metadata object information |
-
-## Deployment Commands
-
-Located in `.cursor/commands/deploy_and_test.md`:
-
-```bash
-# Load config to infobase (Linux)
-/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<path>' /DisableStartupMessages /LoadConfigFromFiles <repo> /Out <log>
-
-# Update database structure
-/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<path>' /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <log>
-```
+| **metadata-manager** | Metadata objects creation/editing |
 
 ## Critical Anti-Patterns
-
-From `anti-patterns.mdc` — must avoid:
 
 | Anti-Pattern | Severity | Solution |
 |--------------|----------|----------|
@@ -96,20 +98,13 @@ From `anti-patterns.mdc` — must avoid:
 
 ## Coding Guidelines
 
-**Tool workflow:**
-1. `templatesearch` → find examples before writing
-2. `search_metadata` → validate metadata
-3. `docsearch` → verify built-in functions
-4. Write code
-5. `syntaxcheck` → check syntax (max 3 iterations)
-6. `check_1c_code` → analyze logic/performance
-
 **Restrictions:**
-- No `Попытка...Исключение` for DB operations
-- No `ЗаписьЖурналаРегистрации()` unless asked
+- No `Попытка...Исключение` for DB operations without justification
+- No `ЗаписьЖурналаРегистрации()` unless explicitly asked
 - Use `ОбщегоНазначения.СообщитьПользователю` instead of `Сообщить()`
 - No ternary operators `?(Условие, Да, Нет)`
 - No Hungarian notation (`МассивКонтрагентов` → `Контрагенты`)
+- No global context names for variables (`Документы`, `Справочники`, `Метаданные`)
 - Line limit: 120 characters
 
 **Query formatting:**
@@ -125,10 +120,25 @@ From `anti-patterns.mdc` — must avoid:
 
 ## Development Procedure
 
-From `user_rules.mdc`:
-
 1. **Clarify Scope** — plan before coding
 2. **Locate Exact Point** — identify files/lines
 3. **Minimal Changes** — no scope creep
 4. **Double Check** — verify correctness
 5. **Deliver Clearly** — summarize with paths
+
+## Deployment Commands
+
+Cross-platform (Linux/Windows), auto-detect OS and platform version.
+Support both file (`/F`) and server (`/S`) infobases.
+
+```bash
+# Load config to infobase (Linux example)
+<V8_PATH> DESIGNER <IB_CONNECTION> /DisableStartupMessages /LoadConfigFromFiles <repo> /Out <log>
+
+# Update database structure
+<V8_PATH> DESIGNER <IB_CONNECTION> /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <log>
+```
+
+## Specifications
+
+Full project specifications: `openspec/specs/`

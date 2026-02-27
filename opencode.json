@@ -1,0 +1,58 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    ".cursor/rules/anti-patterns.mdc",
+    ".cursor/rules/mcp-tools.mdc"
+  ],
+  "mcp": {
+    "1c-code-metadata": {
+      "type": "remote",
+      "url": "http://localhost:8000/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "1c-syntax-checker": {
+      "type": "remote",
+      "url": "http://localhost:8002/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "1c-docs": {
+      "type": "remote",
+      "url": "http://localhost:8003/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "1c-templates": {
+      "type": "remote",
+      "url": "http://localhost:8004/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "1c-graph-metadata": {
+      "type": "remote",
+      "url": "http://localhost:8006/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "1c-code-check": {
+      "type": "remote",
+      "url": "http://localhost:8007/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "1c-ssl": {
+      "type": "remote",
+      "url": "http://localhost:8008/mcp",
+      "enabled": true,
+      "timeout": 10000
+    },
+    "1c-forms": {
+      "type": "remote",
+      "url": "http://localhost:8011/mcp",
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}
