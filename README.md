@@ -8,7 +8,7 @@
 
 ## Быстрый старт
 
-### Вариант 1 — Автоматическая инициализация
+### Вариант 1 — Автоматическая инициализация (Linux / macOS / WSL)
 
 ```bash
 git clone https://github.com/mavlenkov/cursor_rules_1c.git
@@ -28,12 +28,33 @@ cd cursor_rules_1c
 ./scripts/init-project.sh /path/to/1c-project --host mcp.example.com --ports custom-ports.json
 ```
 
-### Вариант 2 — Ручная установка
+### Вариант 2 — Ручная установка (все ОС, включая Windows)
 
-1. Скопируйте содержимое репозитория в корень вашего проекта 1С
-2. Настройте MCP-серверы: [vibecoding1c.ru](https://vibecoding1c.ru/)
-3. Создайте `infobasesettings.md` с подключением к ИБ и URL тестирования
-4. Начните работу с агентами: `@1c-developer`, `@1c-architect` и др.
+```
+git clone https://github.com/mavlenkov/cursor_rules_1c.git
+```
+
+Скопируйте файлы из клонированного репозитория в целевой проект согласно таблице:
+
+| Что копировать | Куда (относительно корня проекта) | Для какого инструмента |
+|---------------|----------------------------------|----------------------|
+| `.cursor/agents/` | `.cursor/agents/` | Cursor |
+| `.cursor/rules/` | `.cursor/rules/` | Cursor |
+| `.cursor/skills/` | `.cursor/skills/` | Cursor |
+| `.cursor/commands/` | `.cursor/commands/` | Cursor |
+| `.cursor/mcp.json` | `.cursor/mcp.json` | Cursor |
+| `CLAUDE.md` | `CLAUDE.md` | Claude Code |
+| `.mcp.json` | `.mcp.json` | Claude Code |
+| `.claude/settings.json` | `.claude/settings.json` | Claude Code |
+| `AGENTS.md` | `AGENTS.md` | OpenCode |
+| `opencode.json` | `opencode.json` | OpenCode |
+
+> При нестандартных портах MCP-серверов отредактируйте `.cursor/mcp.json`, `.mcp.json` и `opencode.json` — измените номера портов в URL.
+
+Затем:
+1. Настройте MCP-серверы: [vibecoding1c.ru](https://vibecoding1c.ru/)
+2. Создайте `infobasesettings.md` с подключением к ИБ и URL тестирования
+3. Начните работу с агентами: `@1c-developer`, `@1c-architect` и др.
 
 ## Развёртывание
 
