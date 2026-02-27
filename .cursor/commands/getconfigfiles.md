@@ -1,5 +1,76 @@
 # get files from infobase
 
+## mode selection
+
+**Check if 1CFilesConverter is configured** in infobasesettings.md (section "1CFilesConverter").
+
+- If **configured and path exists** → use **Mode 1: 1CFilesConverter** (recommended for full export)
+- If **not configured, path invalid, or selective export needed** → use **Mode 2: Designer fallback**
+
+**Note:** 1CFilesConverter does not support selective export (`-listFile`). For selective dumps, always use Mode 2.
+
+---
+
+# Mode 1: 1CFilesConverter (full export)
+
+Use for complete configuration export when 1CFilesConverter is configured.
+
+## Prerequisites
+
+1) Read path to 1CFilesConverter from infobasesettings.md
+2) Verify `<converter_path>/scripts/conf2xml.sh` exists
+3) Extract: platform version, conversion tool, username, password
+
+## Parameter mapping
+
+From infobasesettings.md to environment variables:
+
+- Infobase connection `/F '...'` or `/S '...'` → strip quotes, format as `/F...` or `/S...` (no space after flag)
+- Platform version → `V8_VERSION`
+- Conversion tool → `V8_CONVERT_TOOL`
+- Username → `V8_IB_USER`
+- Password → `V8_IB_PWD` (empty string if not set)
+
+## Commands
+
+**Export configuration:**
+
+```bash
+cd <project_root>
+V8_VERSION=<version> \
+V8_CONVERT_TOOL=<tool> \
+V8_IB_USER=<user> \
+V8_IB_PWD=<pwd> \
+  <converter_path>/scripts/conf2xml.sh <ib_connection> <project_root>
+```
+
+Example:
+```bash
+V8_VERSION=8.3.27.1859 \
+V8_CONVERT_TOOL=designer \
+V8_IB_USER=Administrator \
+V8_IB_PWD="" \
+  ~/Проекты/1CFilesConverter/scripts/conf2xml.sh /F/tmp/test_ib .
+```
+
+**Export extension:**
+
+```bash
+V8_VERSION=<version> \
+V8_EXT_NAME=<extension_name> \
+V8_IB_USER=<user> \
+V8_IB_PWD=<pwd> \
+  <converter_path>/scripts/ext2xml.sh <ib_connection> <project_root>
+```
+
+Read converter log to confirm success.
+
+---
+
+# Mode 2: Designer fallback (selective or full export)
+
+Use for selective export or when 1CFilesConverter is unavailable.
+
 ## environment detection
 **IMPORTANT** Before running commands, detect the environment automatically:
 

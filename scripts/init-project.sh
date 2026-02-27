@@ -333,6 +333,20 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 
 ## URL тестирования
 <!-- http://localhost/MyBase/ru/ -->
+
+## 1CFilesConverter (опционально)
+<!-- Если установлен 1CFilesConverter (https://github.com/1CFilesConverter), команды проекта -->
+<!-- будут делегировать операции ему. Это даёт расширенные возможности: загрузка расширений, -->
+<!-- сборка бинарных форматов (CF, CFE, EPF/ERF), конвертация в EDT. -->
+
+<!-- Путь к 1CFilesConverter: -->
+<!-- ~/Проекты/1CFilesConverter -->
+
+<!-- Версия платформы 1С: -->
+<!-- 8.3.27.1859 -->
+
+<!-- Инструмент конвертации (designer или ibcmd): -->
+<!-- designer -->
 HEREDOC
     echo "  ✓ infobasesettings.md (шаблон)"
 else

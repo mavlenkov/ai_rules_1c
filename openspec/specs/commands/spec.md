@@ -1,9 +1,27 @@
 # Commands Specification
 
 ## Purpose
-Предоставить кросс-платформенные команды для выполнения операций с информационными базами 1С.
+Предоставить кросс-платформенные команды для выполнения операций с информационными базами 1С с возможностью делегирования расширенных операций внешнему инструменту 1CFilesConverter.
 
 ## Requirements
+
+### Requirement: Делегирование 1CFilesConverter
+Команды должны поддерживать делегирование операций внешнему инструменту 1CFilesConverter при его наличии.
+
+#### Scenario: 1CFilesConverter настроен
+- GIVEN в infobasesettings.md указан путь к 1CFilesConverter
+- WHEN агент выполняет команду развёртывания или выгрузки
+- THEN операция делегируется скриптам 1CFilesConverter (conf2ib, conf2xml, ext2ib, ext2xml)
+
+#### Scenario: 1CFilesConverter не настроен
+- GIVEN путь к 1CFilesConverter отсутствует или невалиден
+- WHEN агент выполняет команду
+- THEN используется прямой вызов Designer (fallback mode)
+
+#### Scenario: Выборочная выгрузка
+- GIVEN требуется выгрузить только определённые объекты (-listFile)
+- WHEN агент выполняет getconfigfiles
+- THEN всегда используется Designer fallback (1CFilesConverter не поддерживает -listFile)
 
 ### Requirement: Автоматическое определение окружения
 Команды должны самостоятельно определять ОС и версию платформы.
@@ -23,25 +41,25 @@
 
 #### Scenario: Загрузка конфигурации в файловую ИБ
 - GIVEN путь к файловой ИБ `/F '/path/to/InfoBase'`
-- WHEN выполняется LoadConfigFromFiles
+- WHEN выполняется LoadConfigFromFiles или conf2ib
 - THEN конфигурация загружается из XML-файлов в указанную базу
 
 #### Scenario: Выгрузка из файловой ИБ
 - GIVEN путь к файловой ИБ `/F '/path/to/InfoBase'`
-- WHEN выполняется DumpConfigToFiles с `-listFile repoobjects.txt`
-- THEN выгружаются только объекты из списка
+- WHEN выполняется DumpConfigToFiles или conf2xml
+- THEN выгружаются объекты конфигурации
 
 ### Requirement: Поддержка серверных информационных баз
 Команды должны работать с серверными ИБ через `/S` с аутентификацией.
 
 #### Scenario: Загрузка конфигурации в серверную ИБ
 - GIVEN подключение `/S 'server\basename'` с `/N 'UserName'` и `/P 'Password'`
-- WHEN выполняется LoadConfigFromFiles
+- WHEN выполняется LoadConfigFromFiles или conf2ib
 - THEN конфигурация загружается через сервер 1С:Предприятие с авторизацией
 
 #### Scenario: Выгрузка из серверной ИБ
 - GIVEN подключение `/S 'server\basename'` с аутентификацией
-- WHEN выполняется DumpConfigToFiles
+- WHEN выполняется DumpConfigToFiles или conf2xml
 - THEN конфигурация выгружается с сервера
 
 ### Requirement: Корректная обработка параметров аутентификации
@@ -56,29 +74,85 @@
 После загрузки конфигурации должно выполняться обновление структуры базы данных.
 
 #### Scenario: Обновление БД после загрузки
-- GIVEN конфигурация загружена через LoadConfigFromFiles
-- WHEN выполняется UpdateDBCfg с `-Dynamic+ -SessionTerminate force`
+- GIVEN конфигурация загружена через LoadConfigFromFiles или conf2ib
+- WHEN выполняется UpdateDBCfg или установлен V8_UPDATE_DB=1
 - THEN структура БД обновляется с закрытием пользовательских сеансов
+
+### Requirement: Операции с расширениями
+Команды должны поддерживать загрузку и выгрузку расширений конфигурации.
+
+#### Scenario: Загрузка расширения в ИБ
+- GIVEN XML или CFE-файл расширения и имя расширения
+- WHEN выполняется ext2ib через 1CFilesConverter
+- THEN расширение загружается в указанную информационную базу
+
+#### Scenario: Выгрузка расширения из ИБ
+- GIVEN информационная база с расширением и имя расширения
+- WHEN выполняется ext2xml или DumpConfigToFiles -Extension
+- THEN расширение выгружается в XML-формат
+
+#### Scenario: Сборка CFE-файла
+- GIVEN XML-файлы расширения
+- WHEN выполняется ext2cfe через 1CFilesConverter
+- THEN создаётся бинарный CFE-файл для распространения
+
+### Requirement: Операции с внешними обработками
+Команды должны поддерживать компиляцию и декомпиляцию внешних обработок и отчётов.
+
+#### Scenario: Сборка EPF/ERF
+- GIVEN XML-файлы обработки и базовая конфигурация
+- WHEN выполняется dp2epf через 1CFilesConverter
+- THEN создаётся бинарный EPF/ERF-файл
+
+#### Scenario: Декомпиляция EPF/ERF
+- GIVEN EPF/ERF-файл и базовая конфигурация
+- WHEN выполняется dp2xml через 1CFilesConverter
+- THEN обработка выгружается в XML-формат
 
 ## Commands List
 
 ### deploy_and_test
 Команды развёртывания и тестирования конфигурации.
 
-| Операция | Назначение |
-|----------|------------|
-| **LoadConfigFromFiles** | Загрузка конфигурации из XML-файлов в ИБ |
-| **UpdateDBCfg** | Обновление структуры базы данных |
-| **Testing** | Открытие веб-клиента для проверки (URL из infobasesettings.md) |
+| Операция | Режим | Назначение |
+|----------|-------|------------|
+| **conf2ib** | 1CFilesConverter | Загрузка конфигурации из XML + обновление БД (одна команда) |
+| **LoadConfigFromFiles** | Designer fallback | Загрузка конфигурации из XML-файлов в ИБ |
+| **UpdateDBCfg** | Designer fallback | Обновление структуры базы данных |
+| **Testing** | Оба режима | Открытие веб-клиента для проверки (URL из infobasesettings.md) |
 
 ### getconfigfiles
 Выгрузка объектов конфигурации из ИБ в репозиторий.
 
-| Операция | Назначение |
-|----------|------------|
-| **DumpConfigToFiles** | Выгрузка конфигурации в XML с `-listFile` для выборочной выгрузки |
-| **Extension dump** | Выгрузка расширения с `-Extension <ExtensionName>` |
-| **Metadata search** | Использование `search_metadata` для получения списка объектов |
+| Операция | Режим | Назначение |
+|----------|-------|------------|
+| **conf2xml** | 1CFilesConverter | Полная выгрузка конфигурации в XML |
+| **ext2xml** | 1CFilesConverter | Полная выгрузка расширения в XML |
+| **DumpConfigToFiles** | Designer fallback | Выгрузка конфигурации в XML с `-listFile` для выборочной выгрузки |
+| **Extension dump** | Designer fallback | Выгрузка расширения с `-Extension <ExtensionName>` |
+| **Metadata search** | Оба режима | Использование `search_metadata` для получения списка объектов |
+
+### extensions (новая команда)
+Расширенные операции с расширениями конфигурации.
+
+| Операция | Режим | Назначение |
+|----------|-------|------------|
+| **ext2ib** | 1CFilesConverter | Загрузка расширения из XML/CFE в ИБ |
+| **ext2xml** | 1CFilesConverter | Выгрузка расширения из ИБ в XML |
+| **ext2cfe** | 1CFilesConverter | Сборка бинарного CFE-файла из XML |
+| **ext2edt** | 1CFilesConverter | Конвертация расширения в формат 1C:EDT |
+| **Designer -Extension** | Fallback | Ручная загрузка через Designer (инструкция) |
+
+### dataprocessors (новая команда)
+Операции с внешними обработками и отчётами.
+
+| Операция | Режим | Назначение |
+|----------|-------|------------|
+| **dp2epf** | 1CFilesConverter | Сборка бинарного EPF/ERF из XML |
+| **dp2xml** | 1CFilesConverter | Декомпиляция EPF/ERF в XML |
+| **dp2edt** | 1CFilesConverter | Конвертация обработки в формат 1C:EDT |
+
+**Примечание:** Операции с обработками требуют базовую конфигурацию (V8_BASE_IB или V8_BASE_CONFIG).
 
 ## Configuration
 
@@ -86,3 +160,15 @@
 1. Тип и путь к ИБ (файловая: `/F '...'`, серверная: `/S '...'`)
 2. URL публикации для тестирования
 3. Имя пользователя и пароль (для серверных ИБ)
+4. **Опционально:** Путь к 1CFilesConverter, версия платформы, инструмент конвертации
+
+### Формат секции 1CFilesConverter
+
+```markdown
+## 1CFilesConverter (опционально)
+- Путь: ~/Проекты/1CFilesConverter
+- Версия платформы: 8.3.27.1859
+- Инструмент конвертации: designer
+```
+
+При наличии этой секции команды делегируют операции 1CFilesConverter вместо прямого вызова Designer.
