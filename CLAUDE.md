@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains rules, agents, skills, and commands for AI-assisted 1C Enterprise platform development. Supports **Cursor IDE**, **Claude Code**, and **OpenCode**.
+Agentic software engineering toolkit for 1C Enterprise platform. Rules, agents, skills, and commands for **Cursor IDE**, **Claude Code**, and **OpenCode**.
 
 **Primary Language:** Russian (code and documentation)
 **Platform:** 1C:Enterprise 8.3.27
