@@ -22,6 +22,12 @@ cd cursor_rules_1c
 ./scripts/init-project.sh /path/to/1c-project --tools opencode
 ```
 
+Нестандартный хост или порты MCP-серверов:
+```bash
+./scripts/init-project.sh /path/to/1c-project --host 192.168.1.100
+./scripts/init-project.sh /path/to/1c-project --host mcp.example.com --ports custom-ports.json
+```
+
 ### Вариант 2 — Ручная установка
 
 1. Скопируйте содержимое репозитория в корень вашего проекта 1С

@@ -60,6 +60,24 @@
 - WHEN выполнен скрипт повторно
 - THEN файлы обновляются, `infobasesettings.md` не перезаписывается
 
+### Requirement: Настраиваемые хост и порты MCP-серверов
+MCP-конфиги должны генерироваться из единого шаблона `deploy/mcp-servers.json` с возможностью переопределения.
+
+#### Scenario: MCP-серверы на удалённой машине
+- GIVEN MCP-серверы запущены на хосте 192.168.1.100
+- WHEN выполнен `scripts/init-project.sh /path --host 192.168.1.100`
+- THEN все три MCP-конфига содержат URL с хостом 192.168.1.100
+
+#### Scenario: Нестандартные порты
+- GIVEN сервер docs слушает на порту 9003 вместо 8003
+- WHEN передан `--ports custom.json` с содержимым `{"docs": 9003}`
+- THEN docs-сервер получает порт 9003, остальные — порты по умолчанию
+
+#### Scenario: Просмотр конфигурации MCP
+- GIVEN пользователь хочет увидеть текущий маппинг серверов
+- WHEN выполнен `scripts/init-project.sh --list`
+- THEN выводится таблица серверов с портами и именами для каждого инструмента
+
 ### Requirement: Совместимость OpenCode с Claude Code
 OpenCode поддерживает файлы Claude Code как fallback.
 
@@ -75,6 +93,8 @@ OpenCode поддерживает файлы Claude Code как fallback.
 
 ## MCP Server Mapping
 
+Единый источник: `deploy/mcp-servers.json`. Порты по умолчанию:
+
 | Сервер | Порт | `.cursor/mcp.json` | `.mcp.json` | `opencode.json` |
 |--------|------|--------------------|--------------|--------------------|
 | code-metadata | 8000 | `1c-code-metadata-mcp` | `1c-code-metadata-mcp` | `1c-code-metadata` |
@@ -85,6 +105,8 @@ OpenCode поддерживает файлы Claude Code как fallback.
 | code-check | 8007 | `1c-code-check-mcp` | `1c-code-check-mcp` | `1c-code-check` |
 | ssl | 8008 | `1c-ssl-mcp` | `1c-ssl-mcp` | `1c-ssl` |
 | forms | 8011 | `1c-forms-mcp` | `1c-forms-mcp` | `1c-forms` |
+
+Хост и порты настраиваются через `--host` и `--ports` при инициализации.
 
 ## File Mapping
 
