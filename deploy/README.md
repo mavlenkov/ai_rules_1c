@@ -12,17 +12,20 @@ cursor_rules_1c/                         Целевой проект 1С/
 .cursor/rules/*.mdc          ──────►     .cursor/rules/*.mdc
 .cursor/skills/              ──────►     .cursor/skills/
 .cursor/commands/            ──────►     .cursor/commands/
-.cursor/mcp.json             ──────►     .cursor/mcp.json
 
 CLAUDE.md                    ──────►     CLAUDE.md
-.mcp.json                    ──────►     .mcp.json
 .claude/settings.json        ──────►     .claude/settings.json
 
 AGENTS.md                    ──────►     AGENTS.md
-opencode.json                ──────►     opencode.json
+
+deploy/mcp-servers.json      ─┬─────►   .cursor/mcp.json      (генерируется)
+                              ├─────►   .mcp.json              (генерируется)
+                              └─────►   opencode.json          (генерируется)
 
 (скрипт создаёт)             ──────►     infobasesettings.md
 ```
+
+> MCP-конфиги не копируются, а **генерируются** из единого шаблона `deploy/mcp-servers.json`. Это позволяет менять хост и порты серверов при установке.
 
 ## Что куда и зачем
 
@@ -80,7 +83,45 @@ OpenCode ищет конфигурацию в **корне** проекта.
 | БСП | 8008 | `1c-ssl-mcp` / `1c-ssl` |
 | Формы | 8011 | `1c-forms-mcp` / `1c-forms` |
 
-Серверы запускаются через [vibecoding1c.ru](https://vibecoding1c.ru/) и слушают на `localhost`.
+Серверы запускаются через [vibecoding1c.ru](https://vibecoding1c.ru/) и по умолчанию слушают на `localhost`.
+
+### Единый источник конфигурации
+
+Все MCP-конфиги генерируются из одного файла — `deploy/mcp-servers.json`. Он содержит:
+- `host` — хост по умолчанию (localhost)
+- `servers` — список серверов с портами, путями и именами для каждого инструмента
+
+### Изменение хоста
+
+Если MCP-серверы запущены на другой машине:
+
+```bash
+./scripts/init-project.sh ~/Проекты/МойПроект1С --host 192.168.1.100
+```
+
+### Изменение портов
+
+Создайте JSON-файл с нужными портами (указывайте только те, что отличаются от стандартных):
+
+```json
+{
+  "docs": 9003,
+  "ssl": 9008,
+  "forms": 9011
+}
+```
+
+Доступные идентификаторы серверов: `code-metadata`, `syntax-checker`, `docs`, `templates`, `graph-metadata`, `code-check`, `ssl`, `forms`.
+
+```bash
+./scripts/init-project.sh ~/Проекты/МойПроект1С --ports my-ports.json
+```
+
+Можно комбинировать:
+
+```bash
+./scripts/init-project.sh ~/Проекты/МойПроект1С --host mcp.example.com --ports custom-ports.json
+```
 
 ## Быстрый старт
 
@@ -126,3 +167,14 @@ OpenCode ищет конфигурацию в **корне** проекта.
 ## Обновление
 
 При выходе новой версии правил повторно запустите скрипт — он перезапишет файлы конфигурации. Файл `infobasesettings.md` не перезаписывается.
+
+## Файлы развёртывания
+
+| Файл | Назначение |
+|------|-----------|
+| `deploy/README.md` | Этот документ |
+| `deploy/mcp-servers.json` | Единый источник конфигурации MCP-серверов (хост, порты, имена) |
+| `deploy/cursor.json` | Манифест: что копировать/генерировать для Cursor |
+| `deploy/claude.json` | Манифест: что копировать/генерировать для Claude Code |
+| `deploy/opencode.json` | Манифест: что копировать/генерировать для OpenCode |
+| `scripts/init-project.sh` | Скрипт инициализации (читает манифесты, генерирует MCP-конфиги) |
