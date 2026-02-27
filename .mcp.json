@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "1c-code-metadata-mcp": {
+      "url": "http://localhost:8000/mcp"
+    },
+    "1c-syntax-checker-mcp": {
+      "url": "http://localhost:8002/mcp"
+    },
+    "1c-docs-mcp": {
+      "url": "http://localhost:8003/mcp"
+    },
+    "1c-templates-mcp": {
+      "url": "http://localhost:8004/mcp"
+    },
+    "1c-graph-metadata-mcp": {
+      "url": "http://localhost:8006/mcp"
+    },
+    "1c-code-check-mcp": {
+      "url": "http://localhost:8007/mcp"
+    },
+    "1c-ssl-mcp": {
+      "url": "http://localhost:8008/mcp"
+    },
+    "1c-forms-mcp": {
+      "url": "http://localhost:8011/mcp"
+    }
+  }
+}
