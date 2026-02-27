@@ -1,0 +1,19 @@
+{
+  "tool": "OpenCode",
+  "description": "Правила и MCP-серверы для OpenCode",
+  "note": "OpenCode через instructions в opencode.json ссылается на .cursor/rules/ — рекомендуется также установить Cursor-компоненты",
+  "files": [
+    {
+      "source": "AGENTS.md",
+      "target": "AGENTS.md",
+      "type": "file",
+      "description": "Правила кодирования (аналог CLAUDE.md)"
+    },
+    {
+      "source": "opencode.json",
+      "target": "opencode.json",
+      "type": "file",
+      "description": "MCP-серверы (remote) + ссылки на .cursor/rules/"
+    }
+  ]
+}

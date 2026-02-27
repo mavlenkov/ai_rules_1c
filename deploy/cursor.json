@@ -1,0 +1,36 @@
+{
+  "tool": "Cursor IDE",
+  "description": "Правила, агенты, навыки и команды для Cursor IDE",
+  "files": [
+    {
+      "source": ".cursor/agents/",
+      "target": ".cursor/agents/",
+      "type": "directory",
+      "description": "12 AI-агентов"
+    },
+    {
+      "source": ".cursor/rules/",
+      "target": ".cursor/rules/",
+      "type": "directory",
+      "description": "11 правил кодирования"
+    },
+    {
+      "source": ".cursor/skills/",
+      "target": ".cursor/skills/",
+      "type": "directory",
+      "description": "Навыки для метаданных, форм, макетов"
+    },
+    {
+      "source": ".cursor/commands/",
+      "target": ".cursor/commands/",
+      "type": "directory",
+      "description": "Команды deploy и dump"
+    },
+    {
+      "source": ".cursor/mcp.json",
+      "target": ".cursor/mcp.json",
+      "type": "file",
+      "description": "8 MCP-серверов (URL-based)"
+    }
+  ]
+}
