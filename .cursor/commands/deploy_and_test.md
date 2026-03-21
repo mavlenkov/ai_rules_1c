@@ -13,7 +13,7 @@
 **Before loading**, check if this project is a configuration extension:
 
 1. Look for `Configuration.xml` in project root
-2. If it contains `ConfigurationExtensionCompatibilityMode` → this is an **extension**
+2. If it contains `ConfigurationExtensionPurpose` → this is an **extension** (NOTE: `ConfigurationExtensionCompatibilityMode` is NOT a reliable marker — it exists in all configurations)
 3. Extract extension name from `<Name>` element in `Configuration.xml`, or from `infobasesettings.md` section "Расширение"
 4. **Notify the user**: "This project is a configuration extension. Extension name: `<ExtName>`. Loading will use ext2ib.sh / -Extension. Please confirm."
 5. **Wait for confirmation** before proceeding. After confirmation, use extension mode automatically.

@@ -9,11 +9,11 @@
 Команды развёртывания ДОЛЖНЫ автоматически определять, является ли проект расширением конфигурации.
 
 #### Scenario: Проект является расширением
-- **WHEN** в корне проекта `Configuration.xml` содержит элемент `ConfigurationExtensionCompatibilityMode`
+- **WHEN** в корне проекта `Configuration.xml` содержит элемент `ConfigurationExtensionPurpose`
 - **THEN** система определяет проект как расширение и извлекает имя из `<Name>` в `Configuration.xml`
 
 #### Scenario: Проект является основной конфигурацией
-- **WHEN** в `Configuration.xml` отсутствует `ConfigurationExtensionCompatibilityMode`
+- **WHEN** в `Configuration.xml` отсутствует `ConfigurationExtensionPurpose`
 - **THEN** система определяет проект как основную конфигурацию и использует стандартный режим загрузки
 
 #### Scenario: Имя расширения из infobasesettings.md
@@ -51,5 +51,5 @@
 - **THEN** шаблон содержит закомментированную секцию «Расширение (если применимо)»
 
 #### Scenario: Автозаполнение имени расширения
-- **WHEN** в целевом проекте `Configuration.xml` содержит `ConfigurationExtensionCompatibilityMode`
+- **WHEN** в целевом проекте `Configuration.xml` содержит `ConfigurationExtensionPurpose`
 - **THEN** секция расширения раскомментирована и заполнена именем из `<Name>`

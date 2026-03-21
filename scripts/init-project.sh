@@ -356,7 +356,7 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 HEREDOC
     # Auto-detect extension from Configuration.xml
     CONFIG_XML="$TARGET_DIR/Configuration.xml"
-    if [ -f "$CONFIG_XML" ] && grep -q "ConfigurationExtensionCompatibilityMode" "$CONFIG_XML"; then
+    if [ -f "$CONFIG_XML" ] && grep -q "ConfigurationExtensionPurpose" "$CONFIG_XML"; then
         EXT_NAME=$(python3 -c "
 import xml.etree.ElementTree as ET
 tree = ET.parse('$CONFIG_XML')
