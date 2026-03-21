@@ -98,6 +98,7 @@ import json, os, sys
 
 template = json.load(open('$MCP_TEMPLATE'))
 host = '${CUSTOM_HOST}' or template.get('host', 'localhost')
+transport = template.get('transport', '')
 ports_file = '${CUSTOM_PORTS}'
 
 port_overrides = {}
@@ -131,9 +132,10 @@ if 'cursor' in tools:
 if 'claude' in tools:
     claude_cfg = {'mcpServers': {}}
     for s in template['servers']:
-        claude_cfg['mcpServers'][s['claude_name']] = {
-            'url': s['url']
-        }
+        entry = {'url': s['url']}
+        if transport:
+            entry['type'] = transport
+        claude_cfg['mcpServers'][s['claude_name']] = entry
     dst = os.path.join(target, '.mcp.json')
     with open(dst, 'w') as f:
         json.dump(claude_cfg, f, indent=2, ensure_ascii=False)
@@ -319,11 +321,11 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 ## Подключение
 <!-- Раскомментируйте нужный вариант -->
 
-<!-- Файловая ИБ: -->
-<!-- /F '/path/to/InfoBase' -->
+<!-- Файловая ИБ (без пробела после /F, без кавычек): -->
+<!-- /F/path/to/InfoBase -->
 
-<!-- Серверная ИБ: -->
-<!-- /S 'server\basename' -->
+<!-- Серверная ИБ (без пробела после /S, без кавычек): -->
+<!-- /Sserver:port\basename -->
 
 ## Аутентификация
 <!-- Имя пользователя: -->
@@ -347,8 +349,39 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 
 <!-- Инструмент конвертации (designer или ibcmd): -->
 <!-- designer -->
+
+## Расширение (если применимо)
+<!-- Имя расширения в ИБ (определяется автоматически по Configuration.xml): -->
+<!-- МоёРасширение -->
 HEREDOC
-    echo "  ✓ infobasesettings.md (шаблон)"
+    # Auto-detect extension from Configuration.xml
+    CONFIG_XML="$TARGET_DIR/Configuration.xml"
+    if [ -f "$CONFIG_XML" ] && grep -q "ConfigurationExtensionCompatibilityMode" "$CONFIG_XML"; then
+        EXT_NAME=$(python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('$CONFIG_XML')
+ns = {'v8': 'http://v8.1c.ru/8.3/MDClasses'}
+name = tree.find('.//v8:Configuration/v8:Properties/v8:Name', ns)
+if name is None:
+    # Try without namespace
+    for elem in tree.iter():
+        if elem.tag.endswith('}Name') or elem.tag == 'Name':
+            if elem.text:
+                print(elem.text)
+                break
+else:
+    print(name.text)
+" 2>/dev/null)
+        if [ -n "$EXT_NAME" ]; then
+            sed -i "s/<!-- Имя расширения в ИБ (определяется автоматически по Configuration.xml): -->/Имя расширения в ИБ:/" "$SETTINGS_FILE"
+            sed -i "s/<!-- МоёРасширение -->/$EXT_NAME/" "$SETTINGS_FILE"
+            echo "  ✓ infobasesettings.md (шаблон, расширение: $EXT_NAME)"
+        else
+            echo "  ✓ infobasesettings.md (шаблон, расширение обнаружено — имя не определено)"
+        fi
+    else
+        echo "  ✓ infobasesettings.md (шаблон)"
+    fi
 else
     echo "  – infobasesettings.md уже существует"
 fi

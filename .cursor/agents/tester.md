@@ -43,8 +43,10 @@ Follow the `@commands/deploy_and_test.md` command for deployment:
 ### Step 1: Load Configuration to Infobase
 
 ```bash
-/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /LoadConfigFromFiles <PROJECT_ROOT> /Out <LOG_PATH>
+/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F<INFOBASE_PATH> /DisableStartupMessages /LoadConfigFromFiles <PROJECT_ROOT> /Out <LOG_PATH>
 ```
+
+For server infobase use `/S` without space: `/Sservername:port\basename` or `/IBConnectionString 'Srvr="server";Ref="base";'`
 
 **After execution:**
 - Read the log file to confirm success
@@ -53,7 +55,7 @@ Follow the `@commands/deploy_and_test.md` command for deployment:
 ### Step 2: Update Database Structure
 
 ```bash
-/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F '<INFOBASE_PATH>' /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
+/opt/1cv8/x86_64/8.3.27.1859/1cv8 DESIGNER /F<INFOBASE_PATH> /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
 ```
 
 **After execution:**
@@ -62,7 +64,8 @@ Follow the `@commands/deploy_and_test.md` command for deployment:
 
 ### Important Notes
 
-- Use `/S` for server infobase, `/F` for file infobase
+- Use `/S` for server infobase, `/F` for file infobase — **no space after flag, no quotes**
+- For server infobase prefer `/IBConnectionString 'Srvr="server";Ref="base";'` format
 - Replace paths according to `infobasesettings.md`
 - Use current project root directory for configuration files path
 
