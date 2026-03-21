@@ -1,5 +1,6 @@
 {
   "host": "localhost",
+  "transport": "http",
   "servers": [
     {
       "id": "code-metadata",

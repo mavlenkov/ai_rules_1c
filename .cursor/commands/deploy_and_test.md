@@ -1,11 +1,24 @@
 # installation
 **IMPORTANT** if file infobasesettings.md does not exist - create it with following info:
 1) Ask infobase connection type and path:
-   - File infobase: `/F '/path/to/InfoBase'`
-   - Server infobase: `/S 'servername\basename'` (or `/S 'servername:port\basename'`)
+   - File infobase: `/F/path/to/InfoBase` (no space after `/F`, no quotes)
+   - Server infobase: `/Sservername\basename` (or `/Sservername:port\basename`) — no space after `/S`, no quotes
+   - **WARNING**: A space after `/S` or `/F` will produce an invalid connection string. Designer will exit with code 0 but fail silently.
 2) Ask infobase publish URL. Example: `http://localhost/MyBase/ru/`
 3) If server or authenticated infobase - ask username and password
 4) Optionally ask about 1CFilesConverter installation (path, platform version, conversion tool)
+
+# extension detection
+
+**Before loading**, check if this project is a configuration extension:
+
+1. Look for `Configuration.xml` in project root
+2. If it contains `ConfigurationExtensionCompatibilityMode` → this is an **extension**
+3. Extract extension name from `<Name>` element in `Configuration.xml`, or from `infobasesettings.md` section "Расширение"
+4. **Notify the user**: "This project is a configuration extension. Extension name: `<ExtName>`. Loading will use ext2ib.sh / -Extension. Please confirm."
+5. **Wait for confirmation** before proceeding. After confirmation, use extension mode automatically.
+
+If user declines auto-detection, ask for manual choice (configuration / extension + name).
 
 # mode selection
 
@@ -39,6 +52,20 @@ From infobasesettings.md to environment variables:
 
 ## Commands
 
+**If project is an extension** (detected in extension detection step), use `ext2ib.sh` instead of `conf2ib.sh`:
+
+```bash
+cd <project_root>
+V8_VERSION=<version> \
+V8_CONVERT_TOOL=<tool> \
+V8_IB_USER=<user> \
+V8_IB_PWD=<pwd> \
+V8_EXT_NAME=<extension_name> \
+  <converter_path>/scripts/ext2ib.sh <project_root> <ib_connection> <extension_name>
+```
+
+**Otherwise (main configuration):**
+
 **Linux (with automatic DB update):**
 
 ```bash
@@ -51,7 +78,7 @@ V8_UPDATE_DB=1 \
   <converter_path>/scripts/conf2ib.sh <project_root> <ib_connection>
 ```
 
-Example:
+Example (file infobase):
 ```bash
 V8_VERSION=8.3.27.1859 \
 V8_CONVERT_TOOL=designer \
@@ -59,6 +86,16 @@ V8_IB_USER=Administrator \
 V8_IB_PWD="" \
 V8_UPDATE_DB=1 \
   ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /F/tmp/test_ib
+```
+
+Example (server infobase):
+```bash
+V8_VERSION=8.3.27.1859 \
+V8_CONVERT_TOOL=designer \
+V8_IB_USER=Администратор \
+V8_IB_PWD="" \
+V8_UPDATE_DB=1 \
+  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /Srigel:1541\Евротест
 ```
 
 **Windows (separate DB update):**
@@ -101,24 +138,32 @@ Use the highest available version. Store the result as `<V8_PATH>` and `<LOG_PAT
 ## settings usage
 1) In commands below replace `<V8_PATH>` with detected platform executable
 2) Replace `<LOG_PATH>` with log path for detected OS
-3) Replace `<IB_CONNECTION>` with infobase connection from infobasesettings.md (`/F '...'` or `/S '...'`)
+3) Replace `<IB_CONNECTION>` with infobase connection from infobasesettings.md (`/F...` or `/S...` — no space after flag, no quotes)
 4) If username/password are specified in infobasesettings.md, add `/N 'UserName' /P 'Password'` after `/DisableStartupMessages`. Omit `/P` if password is empty — otherwise Designer will consume the next parameter as password value
 5) Replace test URL with URL read from infobasesettings.md. If URL not set - just skip testing
 6) Replace source path with current project root directory
 
 
 ## testing and deployment
+
+**If project is an extension**, add `-Extension <ExtName>` to `LoadConfigFromFiles` and `UpdateDBCfg` commands below.
+
 ### to update infobase before testing use following commands:
 **Step 1 - Load config to base:**
 
 File infobase:
 ```
-<V8_PATH> DESIGNER /F '/path/to/InfoBase' /DisableStartupMessages /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
+<V8_PATH> DESIGNER /F/path/to/InfoBase /DisableStartupMessages /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
 ```
 
-Server infobase:
+Server infobase (option A — short format):
 ```
-<V8_PATH> DESIGNER /S 'servername\basename' /DisableStartupMessages /N 'UserName' /P 'Password' /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
+<V8_PATH> DESIGNER /Sservername:port\basename /DisableStartupMessages /N UserName /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
+```
+
+Server infobase (option B — explicit connection string, recommended):
+```
+<V8_PATH> DESIGNER /IBConnectionString 'Srvr="servername";Ref="basename";' /DisableStartupMessages /N UserName /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
 ```
 
 Read `<LOG_PATH>` to confirm success.
@@ -129,15 +174,38 @@ Wait 5-10 seconds
 
 File infobase:
 ```
-<V8_PATH> DESIGNER /F '/path/to/InfoBase' /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
+<V8_PATH> DESIGNER /F/path/to/InfoBase /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
 ```
 
-Server infobase:
+Server infobase (option A — short format):
 ```
-<V8_PATH> DESIGNER /S 'servername\basename' /DisableStartupMessages /N 'UserName' /P 'Password' /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
+<V8_PATH> DESIGNER /Sservername:port\basename /DisableStartupMessages /N UserName /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
+```
+
+Server infobase (option B — explicit connection string, recommended):
+```
+<V8_PATH> DESIGNER /IBConnectionString 'Srvr="servername";Ref="basename";' /DisableStartupMessages /N UserName /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
 ```
 
 Read `<LOG_PATH>` to confirm success.
+
+---
+
+# diagnostics
+
+## Common issues after deployment
+
+| Log message | Meaning | Action |
+|-------------|---------|--------|
+| `Неопределена информационная база` | **Connection error** — invalid `/S` or `/F` format (likely a space after flag or wrong server name) | Fix connection string in infobasesettings.md. No space after `/S` or `/F`. |
+| `Загрузка не должна менять принадлежность` | **Normal warning** for extensions — not an error | Ignore. This is expected when loading extension XML. |
+| `Database configuration updated successfully` but no actual changes | Designer exited with code 0 but did nothing | Check log for `Неопределена информационная база` — this is a silent failure. |
+
+## Important notes
+
+- **Exit code 0 does not guarantee success.** Designer may exit cleanly even when the operation failed. Always read the log file.
+- **1CFilesConverter logs are deleted** after script execution (temp directory cleaned up). For debugging, run with `bash -x` to see the full command trace and log contents.
+- **For extensions:** if you loaded XML without `-Extension <name>`, the code went into the main configuration, not the extension. The extension in the infobase remains unchanged.
 
 ---
 
