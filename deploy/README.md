@@ -36,7 +36,7 @@ Cursor ищет конфигурацию в `.cursor/` целевого прое
 | Источник (репозиторий) | Назначение (целевой проект) | Что содержит |
 |------------------------|----------------------------|-------------|
 | `.cursor/agents/` | `.cursor/agents/` | 12 AI-агентов |
-| `.cursor/rules/` | `.cursor/rules/` | 11 правил кодирования |
+| `.cursor/rules/` | `.cursor/rules/` | 14 правил кодирования |
 | `.cursor/skills/` | `.cursor/skills/` | Навыки для метаданных, форм, макетов |
 | `.cursor/commands/` | `.cursor/commands/` | Команды deploy и dump |
 | `.cursor/mcp.json` | `.cursor/mcp.json` | 8 MCP-серверов (URL-based) |
