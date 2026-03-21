@@ -12,7 +12,7 @@
       "source": ".cursor/rules/",
       "target": ".cursor/rules/",
       "type": "directory",
-      "description": "11 правил кодирования"
+      "description": "14 правил кодирования"
     },
     {
       "source": ".cursor/skills/",
