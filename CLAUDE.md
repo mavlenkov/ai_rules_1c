@@ -23,7 +23,7 @@ Agentic software engineering toolkit for 1C Enterprise platform. Rules, agents, 
 ```
 .cursor/
 ├── agents/           # 12 specialized AI assistants
-├── rules/            # 11 coding standards (.mdc format)
+├── rules/            # 14 coding standards (.mdc format)
 ├── skills/           # Deep knowledge (metadata, forms, queries)
 ├── commands/         # Cross-platform deploy/dump commands
 └── mcp.json          # MCP server config (Cursor)
