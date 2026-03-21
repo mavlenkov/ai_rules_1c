@@ -103,9 +103,10 @@ opencode.json    ────────────────────►
 | **Метаданные** | metadata-manager |
 
 ### [Правила](openspec/specs/rules/spec.md)
-11 правил кодирования и поведения агентов:
+14 правил кодирования и поведения агентов:
 
 - **Always-applied:** `project_rules.mdc`, `user_rules.mdc`
+- **Dev-standards:** `dev-standards-core.mdc`, `dev-standards-architecture.mdc`, `dev-standards-forms.mdc`
 - **Context-dependent:** `anti-patterns.mdc`, `mcp-tools.mdc`, `sdd-integrations.mdc`, `form_module_rules.mdc`, `forms_add.mdc`, `forms_events_add.mdc`, `integrations_add.mdc`, `refactor_add.mdc`, `getconfigfiles.mdc`
 
 ### [Навыки](openspec/specs/skills/spec.md)
@@ -215,11 +216,21 @@ opencode.json    ────────────────────►
 
 ## Установка
 
-1. Скопируйте содержимое репозитория в папку `.cursor` вашего проекта 1С
-2. Настройте MCP-серверы согласно инструкциям на [vibecoding1c.ru](https://vibecoding1c.ru/)
+### Автоматическая (рекомендуется)
+
+```bash
+./scripts/init-project.sh ~/Проекты/МойПроект1С
+```
+
+Подробности: `deploy/README.md`
+
+### Ручная (только Cursor)
+
+1. Скопируйте папку `.cursor/` в корень вашего проекта 1С
+2. Настройте MCP-серверы ([документация](https://docs.onerpa.ru/mcp-servery-1c))
 3. Создайте файл `infobasesettings.md` в корне проекта с настройками вашей информационной базы:
-   - Путь подключения к базе (например, `C:\Users\...\InfoBase`)
-   - URL публикации для тестирования (например, `http://localhost/MyBase/ru/`)
+   - Путь подключения к базе
+   - URL публикации для тестирования
 
 ## MCP-серверы
 
