@@ -150,7 +150,7 @@ if 'opencode' in tools:
     else:
         oc_cfg = {
             '\$schema': 'https://opencode.ai/config.json',
-            'instructions': ['AGENTS.md', '.cursor/rules/anti-patterns.mdc', '.cursor/rules/mcp-tools.mdc']
+            'instructions': ['AGENTS.md', 'infobasesettings.md', '.cursor/rules/anti-patterns.mdc', '.cursor/rules/mcp-tools.mdc']
         }
 
     oc_cfg['mcp'] = {}
