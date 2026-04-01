@@ -53,6 +53,12 @@
       "url": "http://localhost:8011/mcp",
       "enabled": true,
       "timeout": 10000
+    },
+    "1c-data": {
+      "type": "remote",
+      "url": "http://localhost/mcptest/hs/mcp",
+      "enabled": true,
+      "timeout": 10000
     }
   }
 }

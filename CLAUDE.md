@@ -54,9 +54,23 @@ All [MCP servers](https://docs.onerpa.ru/mcp-servery-1c) are configured for all 
 | `search_metadata` / `metadatasearch` | Metadata structure validation |
 | `business_search` | Semantic search by description |
 | `syntaxcheck` | BSL syntax check (max 3 times per cycle) |
-| `check_1c_code` | Logic and performance analysis |
+| `check_1c_code` | Technical check: syntax, logic, performance |
+| `review_1c_code` | Code review: style, ITS standards, naming |
+| `rewrite_1c_code` | AI rewrites code with improvements |
+| `modify_1c_code` | Modify/generate code by instruction |
+| `ask_1c_ai` | Free-form question to 1С:Напарник |
 | `ssl_search` | БСП (SSL) functions |
 | `helpsearch` | Metadata object information |
+| `search_1c_documentation` | Platform docs for specific version |
+| `onec_help` | Platform docs (latest version) |
+| `its_help` | ITS knowledge base (returns IDs for `fetch_its`) |
+| `fetch_its` | Read full ITS document by ID |
+| `diff_1c_documentation_versions` | Compare docs between platform versions |
+| `config_help` | Docs for specific configs (ERP, БП, ЗУП, УТ) |
+| `vcexecutequery` | Execute 1C query in live database |
+| `vcvalidatequery` | Validate 1C query without execution |
+| `vcexecutecode` | Execute BSL code in live database |
+| `vcloggetlasterror` | Last error from event log |
 
 **Workflow:**
 1. `templatesearch` → find examples before writing
@@ -67,6 +81,7 @@ All [MCP servers](https://docs.onerpa.ru/mcp-servery-1c) are configured for all 
 6. Write code
 7. `syntaxcheck` → check syntax (max 3 iterations)
 8. `check_1c_code` → analyze logic/performance
+9. `review_1c_code` → verify style and standards
 
 ## Agents
 

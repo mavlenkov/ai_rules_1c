@@ -82,6 +82,17 @@
       "cursor_connection_id": "1c_forms_service_001",
       "claude_name": "1c-forms-mcp",
       "opencode_name": "1c-forms"
+    },
+    {
+      "id": "data",
+      "port": null,
+      "path": "/mcptest/hs/mcp",
+      "description": "Выполнение кода и запросов в живой базе 1С",
+      "note": "HTTP-сервис в самой 1С. URL вида http://host/base/hs/mcp — настраивается индивидуально.",
+      "cursor_name": "1c-data-mcp",
+      "cursor_connection_id": "1c_demo_mcp_001",
+      "claude_name": "1c-data-mcp",
+      "opencode_name": "1c-data"
     }
   ]
 }
