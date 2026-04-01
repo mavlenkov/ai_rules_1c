@@ -150,7 +150,10 @@ opencode.json    ────────────────────►
 | `search_metadata` | Структура метаданных |
 | `ssl_search` | Функции БСП |
 | `syntaxcheck` | Синтаксический контроль |
-| `check_1c_code` | Анализ логики и производительности |
+| `check_1c_code` | Техническая проверка: синтаксис, логика, производительность |
+| `review_1c_code` | Code review: стиль, стандарты ИТС |
+| `its_help` → `fetch_its` | База знаний ИТС |
+| `vcexecutequery` | Выполнение запросов в живой базе |
 
 ### [SDD-интеграция](openspec/specs/sdd-integration/spec.md)
 Поддержка spec-driven development:
