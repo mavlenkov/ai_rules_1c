@@ -48,8 +48,12 @@ All [MCP servers](https://docs.onerpa.ru/mcp-servery-1c) are configured for all 
 
 | Tool | Purpose |
 |------|---------|
-| `docsearch` | 1C platform documentation |
+| `docsearch` | 1C platform documentation (search by description, hybrid: vector + BM25) |
+| `docinfo` | 1C platform documentation (lookup by exact object/method name) |
 | `templatesearch` | Code templates and examples |
+| `list_templates` | List all templates (id, description) without code |
+| `get_template` | Get full template code by ID |
+| `add_template` | Save new template (description + code, min 10 chars) |
 | `codesearch` | Search in current configuration |
 | `search_metadata` / `metadatasearch` | Metadata structure validation |
 | `business_search` | Semantic search by description |
@@ -71,11 +75,13 @@ All [MCP servers](https://docs.onerpa.ru/mcp-servery-1c) are configured for all 
 | `vcvalidatequery` | Validate 1C query without execution |
 | `vcexecutecode` | Execute BSL code in live database |
 | `vcloggetlasterror` | Last error from event log |
+| `remember` | Save a note to long-term memory (decisions, fixes, facts) |
+| `recall` | Semantic search over saved notes |
 
 **Workflow:**
 1. `templatesearch` → find examples before writing
 2. `search_metadata` → validate metadata
-3. `docsearch` → verify built-in functions
+3. `docinfo` → verify built-in functions by exact name; `docsearch` → search by description
 4. `codesearch` → find existing patterns
 5. `ssl_search` → find БСП functions
 6. Write code

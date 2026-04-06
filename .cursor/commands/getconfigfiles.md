@@ -28,6 +28,7 @@ From infobasesettings.md to environment variables:
 - Infobase connection `/F '...'` or `/S '...'` → strip quotes, format as `/F...` or `/S...` (no space after flag)
 - Platform version → `V8_VERSION`
 - Conversion tool → `V8_CONVERT_TOOL`
+- Path to ibcmd (if specified) → `IBCMD_TOOL`
 - Username → `V8_IB_USER`
 - Password → `V8_IB_PWD` (empty string if not set)
 
