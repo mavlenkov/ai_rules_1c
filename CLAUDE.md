@@ -147,6 +147,18 @@ All [MCP servers](https://docs.onerpa.ru/mcp-servery-1c) are configured for all 
 4. **Double Check** — verify correctness
 5. **Deliver Clearly** — summarize with paths
 
+## MCP Server Setup
+
+MCP configs in the repo use `localhost` as a placeholder. To point them to your actual server:
+
+```bash
+./configure.sh <host>        # e.g. ./configure.sh myserver
+```
+
+This updates `.mcp.json`, `.cursor/mcp.json`, `opencode.json` and sets `git skip-worktree` so local changes don't leak into commits.
+
+To revert: `git update-index --no-skip-worktree <file> && git checkout -- <file>`
+
 ## Deployment Commands
 
 Cross-platform (Linux/Windows), auto-detect OS and platform version.
