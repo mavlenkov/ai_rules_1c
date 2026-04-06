@@ -23,9 +23,18 @@ Use when you need to load an extension from XML or CFE into an infobase.
 - Infobase connection → strip quotes, format as `/F...` or `/S...`
 - Platform version → `V8_VERSION`
 - Conversion tool → `V8_CONVERT_TOOL`
+- Path to ibcmd (if specified) → `IBCMD_TOOL`
 - Extension name → `V8_EXT_NAME`
 - Username → `V8_IB_USER`
 - Password → `V8_IB_PWD`
+- DB server address (if specified) → `V8_DB_SRV_ADDR` (for named MSSQL instances)
+- DB server DBMS type → `V8_DB_SRV_DBMS` (for ibcmd + server infobase)
+- DB server user → `V8_DB_SRV_USR` (for ibcmd + server infobase)
+- DB server password → `V8_DB_SRV_PWD` (for ibcmd + server infobase)
+- Remote ibcmd host (if specified) → `V8_REMOTE_HOST` (for MSSQL on Linux)
+
+Omit `V8_DB_SRV_*` and `V8_REMOTE_*` if not specified in infobasesettings.md.
+See `deploy_and_test.md` → "Tool selection (ibcmd)" for when remote ibcmd is needed.
 
 ## Command
 
@@ -42,13 +51,26 @@ V8_IB_PWD=<pwd> \
 - `<extension_source>` — path to XML folder or CFE file
 - `<ib_connection>` — `/F<path>` or `/Sserver\basename`
 
-**Example:**
+**Example (file infobase):**
 ```bash
 V8_VERSION=8.3.27.1859 \
 V8_EXT_NAME=ExtensionName \
 V8_IB_USER=Administrator \
 V8_IB_PWD="" \
   ~/Проекты/1CFilesConverter/scripts/ext2ib.sh ./extensions/ExtensionName /F/tmp/test_ib
+```
+
+**Example (server infobase, MSSQL on Linux via remote SSH):**
+```bash
+V8_VERSION=8.3.27.1859 \
+V8_CONVERT_TOOL=ibcmd \
+V8_EXT_NAME=МоёРасширение \
+V8_REMOTE_HOST=rigel \
+V8_DB_SRV_DBMS=MSSQLServer \
+V8_DB_SRV_ADDR='RIGEL\SQL2019' \
+V8_DB_SRV_USR=sa \
+V8_DB_SRV_PWD=secretpwd \
+  ~/Проекты/1CFilesConverter/scripts/ext2ib.sh . /Srigel/TEST_CONV МоёРасширение
 ```
 
 ## Fallback (without 1CFilesConverter)

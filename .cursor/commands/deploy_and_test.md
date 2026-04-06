@@ -7,6 +7,7 @@
 2) Ask infobase publish URL. Example: `http://localhost/MyBase/ru/`
 3) If server or authenticated infobase - ask username and password
 4) Optionally ask about 1CFilesConverter installation (path, platform version, conversion tool)
+5) If server infobase with MSSQL on Linux — ask about remote ibcmd host and DB server address
 
 # extension detection
 
@@ -47,8 +48,33 @@ From infobasesettings.md to environment variables:
 - Infobase connection `/F '...'` or `/S '...'` → strip quotes, format as `/F...` or `/S...` (no space after flag)
 - Platform version → `V8_VERSION`
 - Conversion tool → `V8_CONVERT_TOOL`
+- Path to ibcmd (if specified) → `IBCMD_TOOL` (overrides default `/opt/1cv8/x86_64/<version>/ibcmd`)
 - Username → `V8_IB_USER`
 - Password → `V8_IB_PWD` (empty string if not set)
+- DB server address (if specified) → `V8_DB_SRV_ADDR` (for named MSSQL instances like `RIGEL\SQL2019`)
+- DB server DBMS type → `V8_DB_SRV_DBMS` (`MSSQLServer` or `PostgreSQL`, for ibcmd + server infobase)
+- DB server user → `V8_DB_SRV_USR` (for ibcmd + server infobase)
+- DB server password → `V8_DB_SRV_PWD` (for ibcmd + server infobase)
+- Remote ibcmd host (if specified) → `V8_REMOTE_HOST` (SSH host with ibcmd, for MSSQL on Linux)
+- Remote ibcmd path (if specified) → `V8_REMOTE_IBCMD` (default: `C:\Program Files\1cv8\<version>\bin\ibcmd.exe`)
+- Remote temp dir (if specified) → `V8_REMOTE_TEMP` (default: `C:\Temp\1c_conv`)
+
+## Tool selection (ibcmd)
+
+When `V8_CONVERT_TOOL=ibcmd` and server infobase:
+
+```
+OS = Windows → ibcmd locally (any DBMS)
+OS = Linux + DBMS = PostgreSQL → ibcmd locally
+OS = Linux + DBMS = MSSQLServer:
+  V8_REMOTE_HOST set → ibcmd via SSH (remote)
+  V8_REMOTE_HOST not set → ERROR (ibcmd on Linux does not support MSSQL)
+File infobase → ibcmd locally (any OS)
+V8_CONVERT_TOOL=designer → works via cluster, DBMS irrelevant, always local
+```
+
+Omit `IBCMD_TOOL` if not specified in infobasesettings.md (defaults to `/opt/1cv8/x86_64/<version>/ibcmd`).
+Omit `V8_DB_SRV_*` and `V8_REMOTE_*` variables if not specified in infobasesettings.md.
 
 ## Commands
 
@@ -58,6 +84,7 @@ From infobasesettings.md to environment variables:
 cd <project_root>
 V8_VERSION=<version> \
 V8_CONVERT_TOOL=<tool> \
+IBCMD_TOOL=<ibcmd_path> \
 V8_IB_USER=<user> \
 V8_IB_PWD=<pwd> \
 V8_EXT_NAME=<extension_name> \
@@ -72,6 +99,7 @@ V8_EXT_NAME=<extension_name> \
 cd <project_root>
 V8_VERSION=<version> \
 V8_CONVERT_TOOL=<tool> \
+IBCMD_TOOL=<ibcmd_path> \
 V8_IB_USER=<user> \
 V8_IB_PWD=<pwd> \
 V8_UPDATE_DB=1 \
@@ -88,10 +116,35 @@ V8_UPDATE_DB=1 \
   ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /F/tmp/test_ib
 ```
 
-Example (server infobase):
+Example (server infobase, designer):
 ```bash
 V8_VERSION=8.3.27.1859 \
 V8_CONVERT_TOOL=designer \
+V8_IB_USER=Администратор \
+V8_IB_PWD="" \
+V8_UPDATE_DB=1 \
+  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /Srigel:1541\Евротест
+```
+
+Example (server infobase, ibcmd, MSSQL on Linux via remote SSH):
+```bash
+V8_VERSION=8.3.27.1859 \
+V8_CONVERT_TOOL=ibcmd \
+V8_REMOTE_HOST=rigel \
+V8_DB_SRV_DBMS=MSSQLServer \
+V8_DB_SRV_ADDR='RIGEL\SQL2019' \
+V8_DB_SRV_USR=sa \
+V8_DB_SRV_PWD=secretpwd \
+V8_UPDATE_DB=1 \
+  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /Srigel/TEST_CONV
+```
+
+Example (server infobase, ibcmd, PostgreSQL on Linux — local):
+```bash
+V8_VERSION=8.3.27.1859 \
+V8_CONVERT_TOOL=ibcmd \
+IBCMD_TOOL=~/.local/bin/ibcmd \
+V8_DB_SRV_DBMS=PostgreSQL \
 V8_IB_USER=Администратор \
 V8_IB_PWD="" \
 V8_UPDATE_DB=1 \
