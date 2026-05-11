@@ -4,10 +4,11 @@ This document describes the installation, update and migration mechanics of the 
 
 ## Installation channels
 
-`1c-rules` ships with two equivalent channels. They produce the **same** on-disk layout and the **same** `.ai-rules.json` manifest:
+`1c-rules` ships with two equivalent channels — plus a third in this fork. All produce the **same** on-disk layout and the **same** `.ai-rules.json` manifest:
 
 1. **Agent-driven channel (default).** The AI agent reads this document and `adapters/*.yaml`, then places files into the project. No external CLI required. This is the default when the user asks the agent to install rules.
 2. **PowerShell channel (fallback).** `install.ps1` implements the same protocol deterministically through a CLI. Use it when the agent is unavailable, the environment is restricted, or you want a reproducible CI/CD-friendly run.
+3. **Bash channel (fork-only, Linux fallback).** This fork (`mavlenkov/ai_rules_1c`) ships `scripts/install.sh` — a minimal bash+python implementation of the same protocol for Linux/macOS environments where `pwsh` is unavailable. Supports the `cursor`, `claude-code`, and `opencode` tools; adds `--host` to substitute the real MCP server host into `localhost` URLs from `content/mcp-servers.json`. Codex and Kilo Code are intentionally not covered — use `install.ps1` for those.
 
 A project installed by one channel can later be updated by the other.
 

@@ -1,5 +1,7 @@
 # 1c-rules — набор правил и инструментов разработки на 1С для ИИ-агентов
 
+> **Этот форк** (`mavlenkov/ai_rules_1c`) — Linux + 1CFilesConverter edition. Поверх upstream добавлены: bash-установщик `scripts/install.sh` (Linux/CI-сценарии), команды `deploy-and-test` / `extensions` / `dataprocessors` / `getconfigfiles` с поддержкой 1CFilesConverter (Mode 1) и Designer fallback (Mode 2), Linux-синтаксис строк подключения и автодетекция расширений по `<ConfigurationExtensionPurpose>`. Upstream — `comol/ai_rules_1c`.
+
 > **Если ты ИИ-агент** и тебе нужно установить или обновить правила в проекте, перейди к [`AGENT-INSTALL.md`](AGENT-INSTALL.md) и следуй инструкциям оттуда. Текущий файл — обзор для разработчика.
 
 `1c-rules` — это переносимый набор правил, ролей субагентов, on-demand инструкций и интеграций для разработки в `1С:Предприятие 8` (BSL) с помощью ИИ-агентов. Содержимое раскладывается в проект единым установщиком и адаптируется под формат каждого инструмента.
@@ -41,13 +43,24 @@ git clone https://github.com/comol/ai_rules_1c.git $env:TEMP\1c-rules
 
 Команды: `init` / `update` / `add <tool>` / `remove [<tool>]` / `doctor` / `eject`.
 
+### Fallback: Linux/bash-установщик (форк)
+
+Если работаешь под Linux/macOS и нужно поставить детерминированно из CLI — в форке `mavlenkov/ai_rules_1c` есть `scripts/install.sh`. Поддерживает три tools (cursor, claude-code, opencode), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — подставляет реальный хост MCP-серверов в `localhost`-URL'ы из `content/mcp-servers.json`.
+
+```bash
+git clone https://github.com/mavlenkov/ai_rules_1c.git /tmp/1c-rules
+/tmp/1c-rules/scripts/install.sh ~/Проекты/МойПроект1С --host alcor
+```
+
+Если активные tools не указаны (`--tools`), скрипт сам определяет их по detection rules адаптеров (`.cursor/` / `.claude/` / `.opencode/`). Codex и Kilo Code не поддерживаются — для них используй `install.ps1` под `pwsh`.
+
 ## Что внутри
 
 - **Корневой свод правил** — `AGENTS.md`: всегда подгружаемый контекст для ИИ-агента: персона, процедура разработки, принципы, перечень MCP-инструментов и их использование, стандарты кода, дисциплина вызовов инструментов.
 - **Пользовательские правила** — `USER-RULES.md`: пустой по умолчанию файл для команды/проекта. Установщик его не перезаписывает.
 - **Память проекта** — `memory.md`: рабочая память ИИ для долгоживущих фактов, корректировок и проектных особенностей.
 - **Параметры проекта** — `.dev.env.example`: шаблон параметров (`PREFIX`, `COMPANY`, `DEVELOPER`, `PLATFORM_VERSION`, шаблоны комментариев, политика размещения новых объектов). Скопировать в `.dev.env` и заполнить.
-- **Установщик** — `install.ps1`: PowerShell-инсталлятор (команды `init` / `update` / `add` / `remove` / `doctor` / `eject`).
+- **Установщик** — `install.ps1`: PowerShell-инсталлятор (команды `init` / `update` / `add` / `remove` / `doctor` / `eject`). В форке дополнительно есть `scripts/install.sh` для Linux/bash.
 - **Спецификация установщика** — `AGENT-INSTALL.md`: что пишется/обновляется на диске, как происходит миграция и что принадлежит установщику.
 
 ## Структура репозитория
