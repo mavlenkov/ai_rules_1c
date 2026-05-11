@@ -121,6 +121,16 @@ The canonical project context (configuration name, platform version via `Compati
 - Write code in Russian.
 - Answer always in Russian.
 
+## Infobase deployment
+
+The connection to the working infobase (server/file, credentials, publish URL, deploy tooling) is documented in `infobasesettings.md` at the project root. If the file is missing, create it on the first deploy attempt — the relevant slash commands (`deploy-and-test`, `extensions`, `dataprocessors`, `getconfigfiles`) describe the template inline.
+
+**Extension auto-detection.** Before deploying, check `Configuration.xml` at the project root. If it contains `<ConfigurationExtensionPurpose>`, the project is a configuration extension — load it with `-Extension <ExtName>`; the name is in the `<Name>` element of `Configuration.xml`. Note: `<ConfigurationExtensionCompatibilityMode>` is **not** a reliable marker — it exists in every configuration.
+
+**Tooling preference.** If `infobasesettings.md` specifies a `1CFilesConverter` path and that path contains `scripts/conf2ib.sh` / `scripts/ext2ib.sh`, prefer it (Mode 1) — it covers extensions and binary formats (CF/CFE/EPF/ERF) and supports EDT conversion. Fall back to direct `1cv8 DESIGNER` invocation (Mode 2) only when 1CFilesConverter is not configured or its path is invalid.
+
+**Linux specifics.** Designer connection strings on Linux use `/F/path/to/InfoBase` for file infobases and `/Sserver:port\basename` for server infobases — **no space** after `/F` or `/S`, no quotes. A space produces an invalid string; Designer exits with code 0 but silently fails. For MSSQL-backed server infobases running on Linux, see notes in `infobasesettings.md`.
+
 ---
 
 # Tooling
