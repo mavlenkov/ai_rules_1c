@@ -1,6 +1,6 @@
 # 1c-rules — набор правил и инструментов разработки на 1С для ИИ-агентов
 
-> **Этот форк** (`mavlenkov/ai_rules_1c`) — Linux + 1CFilesConverter edition. Поверх upstream добавлены: bash-установщик `scripts/install.sh` (Linux/CI-сценарии), команды `deploy-and-test` / `extensions` / `dataprocessors` / `getconfigfiles` с поддержкой 1CFilesConverter (Mode 1) и Designer fallback (Mode 2), Linux-синтаксис строк подключения и автодетекция расширений по `<ConfigurationExtensionPurpose>`. Upstream — `comol/ai_rules_1c`.
+> **Этот форк** (`mavlenkov/ai_rules_1c`) — Linux + 1CFilesConverter edition. Поверх upstream добавлены: bash-установщик `scripts/install.sh` (Linux/CI-сценарии, флаги `--host` и `--publish-url`); форк-команды `deploy-and-test` / `extensions` / `dataprocessors` / `getconfigfiles` с поддержкой 1CFilesConverter (Mode 1) и Designer fallback (Mode 2), читающие параметры из `.dev.env` (fork-only Раздел 3); кросс-платформенная (Linux-first) адаптация команд upstream `loadfrom1cbase` / `update1cbase` / `doctor` / `checkmcp` / `installmcp` / `updatemcp`; команда `updaterules` обновляет правила из самого форка; Linux-синтаксис строк подключения и автодетекция расширений по `<ConfigurationExtensionPurpose>`. Upstream — `comol/ai_rules_1c`.
 
 > **Если ты ИИ-агент** и тебе нужно установить или обновить правила в проекте, перейди к [`AGENT-INSTALL.md`](AGENT-INSTALL.md) и следуй инструкциям оттуда. Текущий файл — обзор для разработчика.
 
@@ -76,11 +76,11 @@ git clone https://github.com/mavlenkov/ai_rules_1c.git /tmp/1c-rules
 ├── memory.md                # память проекта
 ├── install.ps1              # PowerShell-установщик
 ├── .dev.env.example         # шаблон параметров проекта
-├── adapters/                # адаптеры под инструменты (cursor, claude-code, codex, opencode, kilocode)
+├── adapters/                # адаптеры под инструменты (cursor, claude-code, codex, opencode, kilocode, other)
 ├── content/
 │   ├── rules/               # on-demand правила, подключаемые по задаче
 │   ├── agents/              # описания 13 специализированных субагентов
-│   ├── commands/            # слэш-команды (doctor, deploy-and-test, getconfigfiles, loadfrom1cbase, update1cbase, checkmcp, installmcp, updatemcp, update)
+│   ├── commands/            # слэш-команды (doctor, deploy-and-test, getconfigfiles, loadfrom1cbase, update1cbase, extensions, dataprocessors, checkmcp, installmcp, updatemcp, updaterules)
 │   ├── skills/              # SKILL-пакеты (1c-metadata-manage, mermaid-diagrams и др.)
 │   ├── openspec-bundle/     # снапшот вывода `openspec init` для каждого инструмента
 │   └── mcp-servers.json     # каталог MCP-серверов экосистемы 1С
