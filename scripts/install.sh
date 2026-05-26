@@ -428,6 +428,7 @@ PYEOF
 
 echo ""
 echo "Следующие шаги:"
-echo "  1. Проверь infobasesettings.md (если новый — заполни подключение к ИБ)"
+echo "  1. Скопируй .dev.env.example в .dev.env и заполни подключение к ИБ"
+echo "     (Раздел 2 + fork Раздел 3 для 1CFilesConverter)"
 echo "  2. Запусти MCP-серверы (host=$HOST)"
 echo "  3. Открой проект в нужном AI-инструменте"

@@ -6,14 +6,16 @@ description: Операции с внешними обработками и от
 
 Operations with external data processors and reports (EPF/ERF files).
 
+Fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). Reads all parameters from **`.dev.env`** (the single source of truth — see `.dev.env.example`). If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` and delete the legacy file after a successful migration.
+
 ## Prerequisites
 
-**Requires 1CFilesConverter** configured in infobasesettings.md. Read:
-1) Path to 1CFilesConverter
-2) Platform version
-3) Base infobase or base configuration path
+**Requires 1CFilesConverter** (`CONVERTER_PATH` in `.dev.env`, fork Section 3). Read from `.dev.env`:
+1) `CONVERTER_PATH` — path to 1CFilesConverter
+2) `PLATFORM_PATH` (`V8_VERSION` = `basename(PLATFORM_PATH)`)
+3) `BASE_IB` or `BASE_CONFIG` — base infobase or base configuration path
 
-Verify `<converter_path>/scripts/dp2epf.sh` and `dp2xml.sh` exist.
+Verify `{CONVERTER_PATH}/scripts/dp2epf.sh` and `dp2xml.sh` exist.
 
 **Important:** External data processors/reports require a base configuration context for correct compilation.
 
@@ -29,11 +31,11 @@ You must specify **either**:
 - `V8_BASE_IB` — path to infobase with base configuration (e.g., `/F/tmp/base_ib`)
 - `V8_BASE_CONFIG` — path to CF file with base configuration (e.g., `/path/to/base.cf`)
 
-## Parameter mapping
+## Parameter mapping (`.dev.env` → converter env vars)
 
-- Platform version → `V8_VERSION`
-- Base infobase → `V8_BASE_IB`
-- Base configuration → `V8_BASE_CONFIG`
+- `basename(PLATFORM_PATH)` → `V8_VERSION`
+- `BASE_IB` → `V8_BASE_IB`
+- `BASE_CONFIG` → `V8_BASE_CONFIG`
 
 ## Command
 
@@ -90,6 +92,8 @@ V8_BASE_IB=/F/tmp/base_ib \
 # Convert to EDT
 
 Convert external data processor/report to 1C:EDT project format.
+
+Mapping: `.dev.env` `EDT_VERSION` → `V8_EDT_VERSION` (in addition to `V8_VERSION` = `basename(PLATFORM_PATH)` and `BASE_IB`/`BASE_CONFIG`).
 
 ## Command
 
