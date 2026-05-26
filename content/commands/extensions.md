@@ -6,15 +6,17 @@ description: Операции с расширениями 1С: загрузка,
 
 Operations with 1C:Enterprise extensions (load, dump, binary packaging).
 
+Fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). Reads all parameters from **`.dev.env`** (the single source of truth — see `.dev.env.example`). If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` and delete the legacy file after a successful migration.
+
 ## Prerequisites
 
-**Requires 1CFilesConverter** configured in infobasesettings.md. Read:
-1) Path to 1CFilesConverter
-2) Platform version, conversion tool
-3) Username, password
-4) Extension name
+**Requires 1CFilesConverter** (`CONVERTER_PATH` in `.dev.env`, fork Section 3). Read from `.dev.env`:
+1) `CONVERTER_PATH` — path to 1CFilesConverter
+2) `PLATFORM_PATH` (`V8_VERSION` = `basename(PLATFORM_PATH)`), `CONVERT_TOOL`
+3) `IB_USER`, `IB_PASSWORD`
+4) `EXTENSION_NAME`
 
-Verify `<converter_path>/scripts/ext2ib.sh` and `ext2xml.sh` exist.
+Verify `{CONVERTER_PATH}/scripts/ext2ib.sh` and `ext2xml.sh` exist.
 
 ---
 
@@ -22,23 +24,25 @@ Verify `<converter_path>/scripts/ext2ib.sh` and `ext2xml.sh` exist.
 
 Use when you need to load an extension from XML or CFE into an infobase.
 
-## Parameter mapping
+## Parameter mapping (`.dev.env` → converter env vars)
 
-- Infobase connection → strip quotes, format as `/F...` or `/S...`
-- Platform version → `V8_VERSION`
-- Conversion tool → `V8_CONVERT_TOOL`
-- Path to ibcmd (if specified) → `IBCMD_TOOL`
-- Extension name → `V8_EXT_NAME`
-- Username → `V8_IB_USER`
-- Password → `V8_IB_PWD`
-- DB server address (if specified) → `V8_DB_SRV_ADDR` (for named MSSQL instances)
-- DB server DBMS type → `V8_DB_SRV_DBMS` (for ibcmd + server infobase)
-- DB server user → `V8_DB_SRV_USR` (for ibcmd + server infobase)
-- DB server password → `V8_DB_SRV_PWD` (for ibcmd + server infobase)
-- Remote ibcmd host (if specified) → `V8_REMOTE_HOST` (for MSSQL on Linux)
+- `INFOBASE_KIND` + `INFOBASE_PATH` → `<ib_connection>` (`file` → `/F...`, `server` → `/S...`, no space after flag, no quotes)
+- `basename(PLATFORM_PATH)` → `V8_VERSION`
+- `CONVERT_TOOL` → `V8_CONVERT_TOOL`
+- `IBCMD_TOOL` (if set) → `IBCMD_TOOL`
+- `EXTENSION_NAME` → `V8_EXT_NAME`
+- `IB_USER` → `V8_IB_USER`
+- `IB_PASSWORD` → `V8_IB_PWD`
+- `DB_SRV_ADDR` → `V8_DB_SRV_ADDR` (named MSSQL instances)
+- `DB_SRV_DBMS` → `V8_DB_SRV_DBMS` (ibcmd + server infobase)
+- `DB_SRV_USR` → `V8_DB_SRV_USR` (ibcmd + server infobase)
+- `DB_SRV_PWD` → `V8_DB_SRV_PWD` (ibcmd + server infobase)
+- `REMOTE_HOST` → `V8_REMOTE_HOST` (for MSSQL on Linux)
+- `REMOTE_IBCMD` → `V8_REMOTE_IBCMD` (remote ibcmd.exe path)
+- `REMOTE_TEMP` → `V8_REMOTE_TEMP` (remote temp dir)
 
-Omit `V8_DB_SRV_*` and `V8_REMOTE_*` if not specified in infobasesettings.md.
-See `deploy_and_test.md` → "Tool selection (ibcmd)" for when remote ibcmd is needed.
+Omit `V8_DB_SRV_*` and `V8_REMOTE_*` when the corresponding `.dev.env` keys are empty.
+See `deploy-and-test.md` → "Tool selection (ibcmd)" for when remote ibcmd is needed.
 
 ## Command
 
@@ -145,6 +149,8 @@ Package extension XML to CFE binary format (for distribution or installation).
 # Convert extension to EDT
 
 Convert extension to 1C:EDT project format.
+
+Mapping: `.dev.env` `EDT_VERSION` → `V8_EDT_VERSION`.
 
 ## Command
 

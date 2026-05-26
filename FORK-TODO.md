@@ -6,23 +6,20 @@
 
 ## После мержа upstream «версия 4» (2026-05-25, upstream `5b246bc`)
 
-### 1. Рассинхрон источника параметров ИБ: `.dev.env` (upstream) vs `infobasesettings.md` (форк) — КРУПНЫЙ
-
-Upstream мигрировал весь проект на `.dev.env` как единый источник параметров
-(подключение к ИБ, публикация, платформа). Команды upstream
-(`loadfrom1cbase`, `update1cbase`, `getconfigfiles`, `deploy-and-test`)
-читают `.dev.env`.
+### 1. ✅ РЕШЕНО (2026-05-26): миграция форк-команд на `.dev.env`
 
 Форк-команды (`deploy-and-test`, `extensions`, `dataprocessors`, `getconfigfiles`)
-по-прежнему читают `infobasesettings.md`. При мерже намеренно сохранены
-форк-версии этих команд (Linux + 1CFilesConverter, Mode 1 / Mode 2).
+переведены с `infobasesettings.md` на `.dev.env`. В `.dev.env.example` добавлен
+fork-only **Раздел 3** (Linux + 1CFilesConverter): `CONVERTER_PATH`,
+`CONVERT_TOOL`, `IBCMD_TOOL`, `DB_SRV_*`, `REMOTE_*`, `BASE_IB`/`BASE_CONFIG`,
+`EDT_VERSION`. `V8_VERSION` выводится как `basename(PLATFORM_PATH)`; строка
+подключения `<ib_connection>` строится из `INFOBASE_KIND` + `INFOBASE_PATH`.
+Команды мигрируют legacy `infobasesettings.md` → `.dev.env` при первом запуске.
+`AGENTS.md`/`README.md` приведены в соответствие. Mode 1/Mode 2 логика сохранена.
 
-`AGENTS.md → Project info` описывает `.dev.env`, а форк-подсекция
-`### Infobase deployment (Linux + 1CFilesConverter — fork)` — `infobasesettings.md`.
-
-**Решить:** либо мигрировать форк-команды и Linux/1CFilesConverter-логику на
-`.dev.env` (предпочтительно — единый источник), либо явно зафиксировать
-`infobasesettings.md` как форк-слой и описать маршрутизацию. Сейчас — рассинхрон.
+Остаточный вопрос: `scripts/install.sh` не создаёт `.dev.env` (это делает только
+`install.ps1`). Bash-установка пока не генерирует `.dev.env` с автодетектом —
+пользователь копирует `.dev.env.example` вручную. См. пункт 4.
 
 ### 2. Новые команды upstream — Windows/PowerShell-ориентированы
 
