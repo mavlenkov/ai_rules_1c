@@ -270,6 +270,6 @@ Read `<LOG_PATH>` to confirm success.
 
 ## to test infobase use following URL and rules:
 
-http://localhost/MyBase/ru/
+Use the infobase publish URL from `infobasesettings.md` (e.g. `http://localhost/MyBase/ru/`). If the URL is not set, skip testing.
 **IMPORTANT** ALWAYS USE **human-like typing** simulation with **DELAY** to fill values during testing
 you can use TAB to select form field

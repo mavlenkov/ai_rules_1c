@@ -1,37 +1,33 @@
 ---
-description: when working on form modules (ФормаМодуль, Form.Module.bsl)
-globs: "**/Form.Module.bsl"
+description: Editing form-module code (`Form.Module.bsl` / ФормаМодуль) — client-server interaction, async pointers, form-data conversion. Load from `forms.md` when editing form-module logic.
 alwaysApply: false
 category: forms
 ---
 
 # Form Module Guidelines
 
-## Client-Server Interaction
+This file is intentionally short — it owns only form-module-specific topics that have no other home. Everything else delegates to its single source of truth.
 
-- Minimize client-server round trips in form modules.
-- Group multiple server calls into a single call when possible.
-- Avoid calling server methods in loops on the client side.
+## Client-Server Interaction and Compilation Directives
 
-## Compilation Directives
+Single source of truth — `dev-standards-architecture.md §3 → "Client-Server Interaction"` (mandate of `&НаСервереБезКонтекста`, ban on dialogs on the server) plus `anti-patterns.md §6 → "Excessive Client-Server Calls"` and `§7 → "Using &НаСервере Instead of &НаСервереБезКонтекста"` for examples and severity.
 
-Available compilation directives for form module methods:
-
-| Directive | Context | Use Case |
-|-----------|---------|----------|
-| `&НаКлиенте` | Client-side execution | UI interactions, user input handling |
-| `&НаСервере` | Server-side with form context | When you need to modify form attributes/items |
-| `&НаСервереБезКонтекста` | Server-side without form context | **Preferred** for data operations when form context is not needed (reduces data transfer) |
-| `&НаКлиентеНаСервереБезКонтекста` | Both client and server without context | Shared utility functions |
-
-- Prefer `&НаСервереБезКонтекста` over `&НаСервере` when form context is not required — it reduces network traffic.
+Do not duplicate those rules here. The directive table (`&НаКлиенте`, `&НаСервере`, `&НаСервереБезКонтекста`, `&НаКлиентеНаСервереБезКонтекста`) and the "minimize round trips" guidance are covered there.
 
 ## Async Programming
 
-- Prefer `Асинх` (async) methods over `ОписаниеОповещения` (notification description) when async analogues are available.
-- Use `Ждать` (Await) for cleaner async code flow.
+Patterns, pitfalls, and platform-version mapping (8.3.18+ `Асинх` / `Ждать` vs older `ОписаниеОповещения`) live in `async-methods.md`. Load it before writing client-side async code.
+
+## Reserved Names
+
+`form-reserved-names.md` lists property names forbidden as local variables in form modules (`ПараметрыВыбора`, `СвязиПараметровВыбора`, `СписокВыбора`, `ПараметрыОтбора`, `ОтборСтрок`). Load whenever writing or refactoring server-side form code.
 
 ## Form Data
 
 - Use `ДанныеФормыВЗначение()` / `ЗначениеВДанныеФормы()` to convert between form data and actual objects.
 - Remember that form attributes are not the same as object attributes — they are form-specific representations.
+- Always check methods, functions, procedures, attributes, and elements for availability in the context of the directive when using directives from the directives table (`&НаКлиенте`, `&НаСервере`, `&НаСервереБезКонтекста`, `&НаКлиентеНаСервереБезКонтекста`)
+
+## Module Structure
+
+The 5-region template for form modules (`ОбработчикиСобытийФормы`, `ОбработчикиСобытийЭлементовШапкиФормы`, `ОбработчикиСобытийЭлементовТаблицыФормыИмяТаблицы`, `ОбработчикиКомандФормы`, `СлужебныеПроцедурыИФункции`) — see `module-structure.md → Form Module`. All 5 regions are mandatory even when empty.

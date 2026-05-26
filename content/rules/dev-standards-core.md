@@ -8,27 +8,59 @@ category: development
 
 ## 1. Project Parameters (.dev.env)
 
-**Before starting any code task**, read the `.dev.env` file from the project root. If it does not exist — **stop and request parameters from the user**. Guessing values is PROHIBITED.
+`.dev.env` is the **single source of truth** for project parameters across the whole rules set. There is no `infobasesettings.md`, no separate per-command settings file — all rules, on-demand instructions, slash commands and subagents read from `.dev.env`.
 
-Parameters and their effect on code generation:
+Read `.dev.env` **only when the current task actually depends on a parameter** (prefix / naming, modification comments, platform-version choices, metadata placement, infobase commands, deploy, UI tests). Guessing values is PROHIBITED.
 
-| Parameter | Effect |
-|---|---|
-| `{PREFIX}` | Prefix for ALL new metadata objects, attributes, form elements, roles |
-| `{COMPANY}` | Used in modification comment templates |
-| `{DEVELOPER}` | Used in modification comment templates |
-| `{PLATFORM_VERSION}` | Determines available platform features (e.g. `Асинх` / `Ждать` from 8.3.18 vs `ОписаниеОповещения` callbacks for older versions). See `dev-standards-architecture.md §3 "Async and Modality"` |
-| `{COMMENT_OPEN}` | Opening modification comment template with placeholders `{COMPANY}`, `{DEVELOPER}`, `{DATE}`, `{TASK}` |
-| `{COMMENT_CLOSE}` | Closing modification comment template |
-| `{NEW_OBJECTS_IN}` | Where to place new objects: `main_configuration` (default) or `extension` |
+### Global principle — no field is globally mandatory
 
-Task number `{TASK}` is **only required when modification comment markers are produced** — i.e. when the change touches **typical (standard) configuration code** and the templates `{COMMENT_OPEN}` / `{COMMENT_CLOSE}` reference `{TASK}`. For new objects with `{PREFIX}` (no per-method markers) and for review / analysis / documentation tasks `{TASK}` is **not required** — do not block on it.
+No field in `.dev.env` blocks the entire ruleset. **Every parameter is task-scoped**: missing values matter only when a **specific** scheduled operation cannot proceed without them. Three classes:
+
+- **Advisory** — empty is silently valid; a documented fallback applies. **MUST NOT be asked about**, ever (not at install time per task, not on apply phase, not in subagents).
+- **Highly desirable for a specific operation** — empty does not block unrelated work, but the operation that needs the value cannot complete. Ask the user **only when that operation is in scope of the current task**. Do not gather empties up front "for completeness".
+- **Defaulted** — empty resolves to a documented default; no question, no fallback noise.
+
+### Code-generation parameters
+
+| Parameter | Effect | Class | Behavior when empty |
+|---|---|---|---|
+| `{PREFIX}` | Prefix for ALL new metadata objects, attributes, form elements, roles | Advisory | No prefix on new objects; `{PREFIX}` in templates → empty string |
+| `{COMPANY}` | Used in modification comment templates | Advisory | No modification markers emitted |
+| `{DEVELOPER}` | Used in modification comment templates | Advisory | No modification markers emitted |
+| `{PLATFORM_VERSION}` | Determines available platform features (e.g. `Асинх` / `Ждать` from 8.3.18 vs `ОписаниеОповещения` callbacks for older versions). See `dev-standards-architecture.md §3 → "Async and Modality"` | Highly desirable when generating platform-version-sensitive code | Ask only when the current task actually depends on version-specific behavior; otherwise proceed |
+| `{COMMENT_OPEN}` / `{COMMENT_CLOSE}` | Modification comment templates with `{COMPANY}`, `{DEVELOPER}`, `{DATE}`, `{TASK}` placeholders | Highly desirable when markers are emitted | If `COMPANY` / `DEVELOPER` are also empty — markers are not emitted anyway; otherwise ask once |
+| `{NEW_OBJECTS_IN}` | Where to place new objects: `main_configuration` or `extension` | Defaulted | Defaults to `main_configuration` |
+
+### Advisory parameters — `PREFIX`, `COMPANY`, `DEVELOPER`
+
+Both these parameters and the practices they govern — adding a project prefix to new objects (`PREFIX`) and stamping modification comments with company / developer attribution (`COMPANY`, `DEVELOPER`) — are **recommendations**, not hard requirements. They reflect a project convention; their absence is not a defect, code without a prefix or without modification banners is fully valid. When any of the three is empty in `.dev.env`, do **not** ask the user — apply the fallback below silently and proceed.
+
+- **`PREFIX` is empty** — create new metadata objects, attributes, tabular sections, form elements, roles and subsystems **without a prefix**. Inside templates and examples, the placeholder `{PREFIX}` resolves to an empty string (`{PREFIX}ContractAmount` → `ContractAmount`, `{PREFIX}EventSubscriptions` → `EventSubscriptions`, `{PREFIX}AddedObjects` → `AddedObjects`). All other naming rules in §4 still apply (synonyms, role naming inside subsystems, etc.). Naming collisions with typical metadata become the user's responsibility — flag any collision you notice, but do not invent a prefix to avoid it.
+- **`COMPANY` or `DEVELOPER` is empty** — do **not** emit modification markers (`COMMENT_OPEN` / `COMMENT_CLOSE`) in any module, even when modifying typical (standard) code. Removed typical code is still commented out, not deleted, and new procedures in typical modules are still placed at the end of the relevant region — but without the surrounding `// +++ … / // --- …` banners. The single header block for entirely new (non-typical) modules described in §3 is also skipped when either parameter is empty.
+- **Both fallbacks are independent** — an empty `PREFIX` does not suppress markers, and empty `COMPANY` / `DEVELOPER` does not enable a prefix.
+- **`{TASK}` is irrelevant when markers are not emitted** — do not ask for it.
+
+### Infobase / deployment parameters
+
+Used by `/loadfrom1cbase`, `/update1cbase`, `/getconfigfiles`, `/deploy-and-test` and the `1c-tester` subagent. **Not consulted at all for pure code, review, analysis, or documentation tasks** — pure code work proceeds even when this entire block is empty.
+
+| Parameter | Effect | Class | Behavior when empty |
+|---|---|---|---|
+| `{PLATFORM_PATH}` | 1C platform install dir (must contain `bin\1cv8.exe`); used as the executable for all Designer-mode commands | Highly desirable for any IB-bound command | Ask when an IB-bound command is scheduled; the command cannot run without it |
+| `{INFOBASE_KIND}` | `file` → `/F`, `server` → `/S` flag for Designer | Defaulted | Defaults to `file` (per `.dev.env.example`) |
+| `{INFOBASE_PATH}` | Path to file infobase or connection string of server infobase | **Highly desirable** — критично для обновления / выгрузки конфигурации | Ask only when `/loadfrom1cbase`, `/update1cbase`, `/getconfigfiles`, `/deploy-and-test` is invoked; otherwise stay silent |
+| `{IB_USER}` / `{IB_PASSWORD}` | Optional credentials (`/N`, `/P`); empty values omit the flags | **Highly desirable** if the IB requires authentication | Try the command without credentials first; ask the user only if the command fails with an auth error |
+| `{EXTENSION_NAME}` | Optional `-Extension` argument | Defaulted | Empty = operations apply to main configuration |
+| `{EXPORT_PATH}` | Source-export directory | Defaulted | Empty = current repository root |
+| `{LOG_PATH}` | Designer log file (must be writable) | Highly desirable for any Designer-mode command | Ask when Designer-mode command is scheduled |
+| `{INFOBASE_PUBLISH_URL}` | Web-publish URL of the test infobase for `1c-tester` UI tests | **Highly desirable** — критично для UI-тестирования | Empty = UI tests are silently skipped, the rest of `/deploy-and-test` still runs; only ask if the user explicitly requested UI tests |
+| `{IBCMD_CONFIG}` | Path to standalone-server `config.yml` for `ibcmd`-based ops | Defaulted | Empty = fallback to Designer (per `.dev.env.example`) |
+
+Task number `{TASK}` is **only required when modification comment markers are produced** — i.e. when the change touches **typical (standard) configuration code** and the templates `{COMMENT_OPEN}` / `{COMMENT_CLOSE}` reference `{TASK}`. For new objects with `{PREFIX}` (no per-method markers), review / analysis / documentation tasks, and any task where `COMPANY` / `DEVELOPER` are empty (markers skipped) — `{TASK}` is **not required**. Do not block on it.
 
 When `{TASK}` is required and not provided — ask the user once and reuse the same value across the whole change.
 
-> For tasks without code generation (review, analysis, documentation) — parameters are not blocking.
-
-See `.dev.env.example` for template.
+See `.dev.env.example` for the template.
 
 ## 2. Code Style (single source of truth — referenced from `AGENTS.md`)
 
@@ -62,7 +94,7 @@ Exception: simple `Prefix + Suffix` is acceptable when it reads better.
 - `Попытка ... Исключение` around DB reads/writes is **PROHIBITED**, except for explicit, well-justified transaction control.
 - `ЗаписьЖурналаРегистрации()` is **PROHIBITED** unless explicitly requested by the task.
 - `Сообщить()` for user notifications is **PROHIBITED**. Use `ОбщегоНазначения.СообщитьПользователю` (server) / `ОбщегоНазначенияКлиент.СообщитьПользователю` (client).
-- `Выполнить()` and `Вычислить()` are **PROHIBITED** without extreme necessity (see `dev-standards-architecture.md §3`).
+- `Выполнить()` and `Вычислить()` are **PROHIBITED** without extreme necessity (see `dev-standards-architecture.md §3 → "Security"`).
 - Hardcoded credentials (passwords, tokens, API keys) in code are **PROHIBITED**.
 - `?(Условие, Значение1, Значение2)` ternary operator is **PROHIBITED in any form**, including the simple non-nested case. Use `Если ... Иначе` or extract a small helper function. Rationale: keeps logic visible in step-debugger and code review. **[Project rule — stricter than ITS standard.]**
 - Boolean comparisons against `Истина` / `Ложь` are forbidden — use the boolean expression directly.
@@ -97,7 +129,7 @@ Exception: simple `Prefix + Suffix` is acceptable when it reads better.
 
 ## 3. Modification Comments
 
-Modification markers are used **only when modifying typical (standard) code** in typical configuration modules.
+Modification markers are used **only when modifying typical (standard) code** in typical configuration modules **and only when both `COMPANY` and `DEVELOPER` are set in `.dev.env`**. If either parameter is empty — skip markers entirely (see §1 → "Advisory parameters"); removed typical code is still commented out instead of deleted, but without the `// +++ … / // --- …` banners.
 
 ### Format
 - Opening comment: value of `{COMMENT_OPEN}` from `.dev.env`
@@ -144,6 +176,8 @@ In modules of new objects (with `{PREFIX}`) — markers per method are **NOT NEE
 | Subsystems | `{PREFIX}AddedObjects` and `{PREFIX}ModifiedObjects` |
 | Attributes of typical objects | Prefix `{PREFIX}` |
 | Form elements on typical forms | Prefix `{PREFIX}` |
+
+**When `PREFIX` is empty in `.dev.env`** — the placeholder `{PREFIX}` resolves to an empty string in every rule above (e.g. `{PREFIX}ContractAmount` → `ContractAmount`, `{PREFIX}AddedObjects` → `AddedObjects`). The `({COMPANY})` synonym disambiguator also disappears if `COMPANY` is empty. See §1 → "Advisory parameters".
 
 **Inside non-typical (new) objects** (name already has `{PREFIX}`):
 - Attributes, tabular sections, form elements, commands, procedures — **WITHOUT prefix**
@@ -196,7 +230,7 @@ These rules apply only to 1C code artifacts: modules, in-module comments, identi
 
 ## 7. Comments — OK / NOT OK Examples
 
-Goal: cut LLM noise and keep only useful comments. See also `AGENTS.md → Comments` for the headline rule.
+Goal: cut LLM noise and keep only useful comments. See also `content/rules/coding-standards.md § Comments` for the headline rule (anchor from `AGENTS.md → Coding Standards`).
 
 ### NOT OK — code paraphrase and noise
 
