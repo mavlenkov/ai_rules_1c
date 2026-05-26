@@ -8,6 +8,15 @@ This command updates already installed 1C MCP servers. It re-downloads the lates
 
 Use `/installmcp` for the very first installation (no existing containers, fresh `config.env`). Use `/checkmcp` to inspect the current state at any point.
 
+## Platform note (Linux — fork)
+
+This fork runs on Linux. The PowerShell blocks below are the Windows reference; on Linux apply the same substitutions as `/installmcp` → "Platform note (Linux)":
+
+- **Tilda download** — use the bash `curl` + `jq` pipeline from `/installmcp` (steps 1.1.b–1.1.e); the result is the same Yandex Disk archive.
+- **Paths** — existing/staging dirs under `~` (e.g. `~/mcp_distr` and `~/mcp_distr.new_<stamp>`); temp `/tmp`; not `C:\Work` / `$env:TEMP`.
+- **Unpack** — `unzip archive.zip -d "$staging"` (not `Expand-Archive`).
+- **Docker** — daemon checked via `docker info` (no Docker Desktop); `docker compose` (v2) for the GraphMetadata stack; `docker pull` / `docker stop` / `docker rename` / `docker logs` are identical across OSes. Volume host paths are POSIX.
+
 ## Steps
 
 ### 1. Locate the existing installation

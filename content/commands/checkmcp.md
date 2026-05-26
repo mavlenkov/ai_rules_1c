@@ -8,6 +8,17 @@ This command checks that all MCP servers from the project catalog (`content/mcp-
 
 The source of truth for images, ports, and environment variables is [docs.onerpa.ru/mcp-servery-1c](https://docs.onerpa.ru/mcp-servery-1c) and [vibecoding1c.ru/mcp_server](https://vibecoding1c.ru/mcp_server).
 
+## Platform note (Linux — fork)
+
+This fork runs on Linux. Docker commands (`docker ps`, `docker start`, `docker logs`, `docker pull`) are identical across OSes; the differences are paths, the HTTP probe, and the Docker engine:
+
+- **Docker engine** — Linux runs the daemon directly (no Docker Desktop). Check with `docker info`; start/enable with `sudo systemctl start docker` (or `service docker start`). `docker compose` (v2 plugin) replaces `docker-compose` on most Linux installs.
+- **Volume paths** — use POSIX paths on the host side: `-v "{DATA_ROOT}/mcp_<id>:/app/chroma_db"` (e.g. `DATA_ROOT=~/bases/mcp`), not `E:\bases\...`. Container-side paths (`/app/...`, `/1c_docs`) are unchanged.
+- **Platform bin** for `1C-docs-mcp` — Linux: `/opt/1cv8/x86_64/<version>` (mount as `-v "/opt/1cv8/x86_64/<version>:/1c_docs"`).
+- **HTTP probe** — use the bash/`curl` snippet in Step 3 instead of PowerShell `Invoke-WebRequest`.
+- **MCP config paths** — `~/.cursor/mcp.json`, `~/.codex/config.toml`, project-local `.mcp.json` / `.opencode/opencode.json` (no `%USERPROFILE%`).
+- **Web server restart** for `1c-data-mcp` (`default.vrd` edits) — `systemctl restart apache2` / `httpd` (no `iisreset`).
+
 ## Target server catalog
 
 | id | Port | Docker image | Purpose | Requires data |
@@ -83,7 +94,19 @@ foreach ($s in $servers) {
 }
 ```
 
-Any HTTP response (even `405`/`400`/`406`) means a container is listening on the port — status **HTTP_OK**. Full timeout / `Connection refused` means **HTTP_DOWN**.
+**Linux (bash + `curl`):**
+
+```bash
+for entry in 1c-code-metadata-mcp:8000 1c-syntax-checker-mcp:8002 1C-docs-mcp:8003 \
+             1c-templates-mcp:8004 1c-graph-metadata-mcp:8006 1c-code-check-mcp:8007 1c-ssl-mcp:8008; do
+    id="${entry%%:*}"; port="${entry##*:}"
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://localhost:$port/mcp")
+    if [ -z "$code" ] || [ "$code" = "000" ]; then code=down; fi
+    printf '%-26s %-5s %s\n' "$id" "$port" "$code"
+done
+```
+
+Any HTTP response (even `405`/`400`/`406`) means a container is listening on the port — status **HTTP_OK**. `down` (timeout, connection refused — `curl` prints `000`) means **HTTP_DOWN**.
 
 For `1c-data-mcp` (HTTP service on the infobase, no docker container), check the URL rendered by the installer into the active client's MCP config:
 
@@ -115,6 +138,22 @@ if (-not $infobasePublishUrl) {
         '^404$' { Write-Warning "1c-data-mcp ответил HTTP 404 — HTTP-сервис `mcp` не опубликован на ИБ (либо не указано publishByDefault=`"true`" в default.vrd)." }
     }
 }
+```
+
+**Linux (bash) for `1c-data-mcp`:**
+
+```bash
+base=$(grep -E '^INFOBASE_PUBLISH_URL=' .dev.env | head -1 | cut -d= -f2- | sed 's:/*$::')
+# strip a trailing locale segment (/ru, /en, /uk, …), mirroring the installer
+base=$(echo "$base" | sed -E 's:/(ru|en|uk|kk|be|de|fr|es|it|pl|tr|zh|ja|ko|ar)$::')
+if [ -z "$base" ]; then
+    echo "1c-data-mcp — INFOBASE_PUBLISH_URL пуст в .dev.env; пропустите проверку"
+else
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$base/hs/mcp")
+    if [ -z "$code" ] || [ "$code" = "000" ]; then code=down; fi
+    printf '%-26s %-5s %s\n' 1c-data-mcp - "$code"
+    # 401/403 → publication needs anonymous access (see default.vrd note); 404 → mcp service not published
+fi
 ```
 
 For `1c-data-mcp`:

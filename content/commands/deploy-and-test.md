@@ -149,7 +149,7 @@ V8_CONVERT_TOOL=designer \
 V8_IB_USER=Администратор \
 V8_IB_PWD="" \
 V8_UPDATE_DB=1 \
-  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /Srigel:1541\Евротест
+  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . '/Srigel:1541\Евротест'
 ```
 
 Example (server infobase, ibcmd, MSSQL on Linux via remote SSH):
@@ -162,7 +162,7 @@ V8_DB_SRV_ADDR='RIGEL\SQL2019' \
 V8_DB_SRV_USR=sa \
 V8_DB_SRV_PWD=secretpwd \
 V8_UPDATE_DB=1 \
-  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /Srigel/TEST_CONV
+  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . '/Srigel/TEST_CONV'
 ```
 
 Example (server infobase, ibcmd, PostgreSQL on Linux — local):
@@ -174,7 +174,7 @@ V8_DB_SRV_DBMS=PostgreSQL \
 V8_IB_USER=Администратор \
 V8_IB_PWD="" \
 V8_UPDATE_DB=1 \
-  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /Srigel:1541\Евротест
+  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . '/Srigel:1541\Евротест'
 ```
 
 **Windows (separate DB update):**
