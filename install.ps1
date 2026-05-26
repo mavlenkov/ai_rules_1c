@@ -90,7 +90,9 @@ $script:ManifestFileName = '.ai-rules.json'
 $script:AgentsMdFileName = 'AGENTS.md'
 $script:UserRulesFileName = 'USER-RULES.md'
 $script:MemoryFileName = 'memory.md'
-$script:SupportedTools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode')
+$script:DevEnvFileName = '.dev.env'
+$script:DevEnvExampleName = '.dev.env.example'
+$script:SupportedTools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode', 'other')
 $script:ManagedBlocks = @('core', 'user-defined', 'openspec')
 $script:LastChannel = 'powershell'
 $script:Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -654,6 +656,104 @@ function Read-McpServers {
     return $obj.servers
 }
 
+# Known UI locale codes that may appear as the trailing path segment of
+# INFOBASE_PUBLISH_URL (the web-publication URL is typically
+# `http://host/<infobase>/<locale>/`). The HTTP-service endpoint is served
+# under `<host>/<infobase>/hs/<service>` — without the locale subpath — so the
+# locale must be stripped before substituting into MCP server URL templates.
+$script:KnownInfobaseLocales = @(
+    'ru', 'en', 'uk', 'kk', 'be', 'de', 'fr', 'es', 'it', 'pl', 'tr',
+    'vi', 'zh', 'ja', 'ka', 'lt', 'lv', 'hu', 'bg', 'ro', 'sk', 'cs',
+    'sl', 'hr', 'sr', 'et', 'fi', 'sv', 'no', 'da', 'nl', 'pt', 'el',
+    'az', 'hy', 'mn', 'mk', 'th', 'ko', 'ar', 'he'
+)
+
+function Get-InfobasePublishUrlBase {
+    # Reads INFOBASE_PUBLISH_URL from `.dev.env` in the project root and
+    # normalizes it for use as the base URL of HTTP services published on the
+    # infobase:
+    #   1) trim whitespace, strip the trailing slash;
+    #   2) strip the trailing `/<locale>` segment when it matches a known
+    #      1C UI locale code from $script:KnownInfobaseLocales — HTTP services
+    #      live at `<base>/hs/<service>`, not under the locale subpath.
+    # Returns an empty string when `.dev.env` is missing, the key is absent,
+    # or the value is empty.
+    param([string]$Root)
+
+    $envPath = Join-Path $Root $script:DevEnvFileName
+    if (-not (Test-Path $envPath)) { return '' }
+
+    $keys = Read-DevEnvKeys -Path $envPath
+    if (-not $keys.Contains('INFOBASE_PUBLISH_URL')) { return '' }
+
+    $raw = [string]$keys['INFOBASE_PUBLISH_URL']
+    if ([string]::IsNullOrWhiteSpace($raw)) { return '' }
+
+    $url = $raw.Trim().TrimEnd('/')
+    if ($url -match '/([a-z]{2,3})$') {
+        if ($script:KnownInfobaseLocales -contains $Matches[1]) {
+            $url = $url.Substring(0, $url.LastIndexOf('/'))
+        }
+    }
+    return $url
+}
+
+function Resolve-McpServerPlaceholders {
+    # Substitutes {INFOBASE_PUBLISH_URL} in the `url` field of every server
+    # entry that contains it. Mutates the input collection. Returns the list
+    # of server ids whose placeholder could not be resolved because
+    # INFOBASE_PUBLISH_URL was empty / `.dev.env` was missing — the caller
+    # uses this to warn the user.
+    param(
+        [array]$Servers,
+        [string]$InfobaseBase
+    )
+    $unresolved = @()
+    foreach ($s in $Servers) {
+        if (-not $s.url) { continue }
+        if ($s.url -notmatch '\{INFOBASE_PUBLISH_URL\}') { continue }
+        if ($InfobaseBase) {
+            $s.url = $s.url.Replace('{INFOBASE_PUBLISH_URL}', $InfobaseBase)
+        }
+        else {
+            $unresolved += $s.id
+        }
+    }
+    return , $unresolved
+}
+
+function Test-McpHttpEndpoint {
+    # Probes an HTTP endpoint with a short timeout. Used to detect whether a
+    # 1C HTTP-service-based MCP server (`1c-data-mcp`) is reachable AND
+    # whether the publication allows anonymous access (no Basic auth) — the
+    # MCP client does not pass credentials, so HTTP 401 / 403 means the user
+    # must reconfigure the publication.
+    #
+    # Returns a hashtable:
+    #   Code      — HTTP status code (int) when the server responded with one,
+    #               or the string 'down' when the connection was refused /
+    #               timed out, or 'error' on any other client-side failure.
+    #   Reachable — $true if any HTTP response was received (even 4xx / 5xx).
+    param(
+        [string]$Url,
+        [int]$TimeoutSec = 3
+    )
+    try {
+        $r = Invoke-WebRequest -Uri $Url -Method Get -TimeoutSec $TimeoutSec -UseBasicParsing -ErrorAction Stop
+        return @{ Code = [int]$r.StatusCode; Reachable = $true }
+    }
+    catch {
+        if ($_.Exception -and $_.Exception.Response) {
+            try { return @{ Code = [int]$_.Exception.Response.StatusCode; Reachable = $true } } catch { }
+        }
+        # No HTTP response was received — the server is not listening, the
+        # name does not resolve, or the request timed out. From the
+        # installer's point of view all three are equivalent ("endpoint not
+        # reachable, not blocking install"), so report a single 'down' code.
+        return @{ Code = 'down'; Reachable = $false }
+    }
+}
+
 function ConvertTo-McpServersJsonDict {
     param([array]$Servers)
     $dict = [ordered]@{}
@@ -682,6 +782,16 @@ function New-McpConfig-ClaudeCode {
 }
 
 function New-McpConfig-Kilocode {
+    param([array]$Servers)
+    return New-McpConfig-Cursor $Servers
+}
+
+function New-McpConfig-Other {
+    # Universal fallback adapter — uses the standard `mcpServers` JSON
+    # dictionary schema (same shape as Cursor / Claude Code / Kilo Code), so
+    # reuse the same renderer. The output is written to `.ai-agent/mcp.json`
+    # per `adapters/other.yaml` and is consumable by any AI client that
+    # supports the de-facto `mcpServers` JSON convention.
     param([array]$Servers)
     return New-McpConfig-Cursor $Servers
 }
@@ -737,6 +847,7 @@ function New-McpConfig {
         'codex' { return (New-McpConfig-Codex $Servers) }
         'opencode' { return (New-McpConfig-OpenCode $Servers) }
         'kilocode' { return (New-McpConfig-Kilocode $Servers) }
+        'other' { return (New-McpConfig-Other $Servers) }
         default { throw "Unknown tool id: $ToolId" }
     }
 }
@@ -823,7 +934,9 @@ function Get-ToolDetectionSignals {
         'claude-code' = @((Test-Path (Join-Path $Root '.claude')), (Test-Path (Join-Path $Root 'CLAUDE.md')))
         'codex'       = @((Test-Path (Join-Path $Root '.codex')))
         'opencode'    = @((Test-Path (Join-Path $Root '.opencode')), (Test-Path (Join-Path $Root 'opencode.json')))
-        'kilocode'    = @((Test-Path (Join-Path $Root '.kilocode')))
+        'kilocode'    = @((Test-Path (Join-Path $Root '.kilo')), (Test-Path (Join-Path $Root '.kilocode')))
+        # 'other' is a manual-only fallback — never auto-detected.
+        'other'       = @()
     }
     $detected = @()
     foreach ($t in $script:SupportedTools) {
@@ -872,6 +985,29 @@ function Invoke-Detection {
     $list = @($ans -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     if ($list.Count -eq 0) { return $detectedArr }
     return $list
+}
+
+# Return the canonical primary directory for a tool — the leading top-level
+# segment of the first defined `<section>.copyTo` (rules → agents → commands
+# → skills). Used purely for human-readable progress messages so the user
+# sees the real install location (e.g. `.kilo` for Kilo Code, `.ai-agent`
+# for the universal `other` fallback) instead of a heuristic `.<tool-id>`
+# guess that is wrong for those two adapters.
+function Get-AdapterPrimaryDir {
+    param([System.Collections.IDictionary]$Adapter)
+    if (-not $Adapter) { return '' }
+    foreach ($section in @('rules', 'agents', 'commands', 'skills')) {
+        if (-not $Adapter.Contains($section)) { continue }
+        $copyTo = [string]$Adapter[$section].copyTo
+        if (-not $copyTo) { continue }
+        # Skip user-scope paths like `~/.codex/prompts/...` — they are not
+        # representative of the project-local install location.
+        if ($copyTo.StartsWith('~/') -or $copyTo.StartsWith('~\')) { continue }
+        $normalized = $copyTo.Replace('\', '/').TrimStart('/')
+        $firstSeg = ($normalized -split '/', 2)[0]
+        if ($firstSeg) { return $firstSeg }
+    }
+    return ''
 }
 
 function Get-AdapterTargetDirs {
@@ -1421,6 +1557,22 @@ function Resolve-CopyToPath {
     return $p
 }
 
+# Resolve a manifest key (relative or already-absolute) to an absolute filesystem
+# path. Manifest keys for adapters whose `copyTo` starts with `~/` (currently
+# codex `commands`) are stored as absolute paths by `Invoke-PlaceArtifactFile`;
+# every other key is project-relative. Iteration over `$manifest.files.Keys`
+# must go through this helper instead of `Join-Path $Root $rel`, otherwise
+# absolute keys turn into garbage like `C:\Project\C:\Users\...` and Test-Path
+# falsely reports the files as missing.
+function Resolve-ManifestPath {
+    param(
+        [string]$Root,
+        [string]$Rel
+    )
+    if ([System.IO.Path]::IsPathRooted($Rel)) { return $Rel }
+    return (Join-Path $Root $Rel)
+}
+
 function Invoke-PlaceArtifactFile {
     param(
         [string]$Root,
@@ -1603,8 +1755,11 @@ function Invoke-PlacePhase {
 
 # Priority order for choosing the "canonical" rules directory referenced by
 # AGENTS.md. Lower index = higher priority. The first active tool in this
-# order whose adapter defines a `rules.copyTo` wins.
-$script:RulesDirPriority = @('cursor', 'claude-code', 'kilocode', 'opencode', 'codex')
+# order whose adapter defines a `rules.copyTo` wins. The universal fallback
+# `other` is intentionally last: when combined with any "real" tool the real
+# tool's rules dir wins; `.ai-agent/rules/` becomes canonical only when
+# `other` is the only active tool.
+$script:RulesDirPriority = @('cursor', 'claude-code', 'kilocode', 'opencode', 'codex', 'other')
 
 function Resolve-CanonicalRulesLayout {
     # Returns @{ Dir = <path>; Ext = <ext-without-dot> } for the highest-priority
@@ -1613,19 +1768,114 @@ function Resolve-CanonicalRulesLayout {
         [string[]]$ActiveTools,
         [hashtable]$Adapters
     )
-    foreach ($tool in $script:RulesDirPriority) {
-        if ($ActiveTools -notcontains $tool) { continue }
-        $adapter = $Adapters[$tool]
-        if (-not $adapter -or -not $adapter.Contains('rules')) { continue }
-        $copyTo = [string]$adapter.rules.copyTo
-        if (-not $copyTo) { continue }
-        $dir = $copyTo -replace '\{name\}.*$', ''
-        $dir = $dir.TrimEnd('/', '\')
-        $ext = ''
-        if ($copyTo -match '\{name\}\.([A-Za-z0-9]+)$') { $ext = $Matches[1] }
-        if ($dir) { return @{ Dir = $dir; Ext = $ext } }
+    $layouts = Resolve-CanonicalArtifactLayouts -ActiveTools $ActiveTools -Adapters $Adapters
+    if ($layouts -and $layouts.Contains('rules')) {
+        return @{ Dir = [string]$layouts['rules'].Dir; Ext = [string]$layouts['rules'].Ext }
     }
     return $null
+}
+
+# Compute the canonical installed location for every artefact section (rules,
+# agents, commands, skills) by walking the same priority order as
+# Resolve-CanonicalRulesLayout and picking, per section, the highest-priority
+# active tool whose adapter declares `<section>.copyTo`. Returns an ordered
+# hashtable `{ rules = @{Dir=..; Ext=..}; agents = ...; commands = ...; skills = ... }`.
+# Sections without a defined canonical layout are simply omitted.
+#
+# Used by Update-AgentsMd to rewrite `content/<section>/...` paths in the
+# source AGENTS.md to the per-section installed paths so the agent reading
+# AGENTS.md from the project root can resolve every link to an existing file.
+function Resolve-CanonicalArtifactLayouts {
+    param(
+        [string[]]$ActiveTools,
+        [hashtable]$Adapters
+    )
+    $layouts = [ordered]@{}
+    foreach ($section in @('rules', 'agents', 'commands', 'skills')) {
+        foreach ($tool in $script:RulesDirPriority) {
+            if ($ActiveTools -notcontains $tool) { continue }
+            $adapter = $Adapters[$tool]
+            if (-not $adapter -or -not $adapter.Contains($section)) { continue }
+            $copyTo = [string]$adapter[$section].copyTo
+            if (-not $copyTo) { continue }
+            $dir = $copyTo -replace '\{name\}.*$', ''
+            $dir = $dir.TrimEnd('/', '\')
+            if (-not $dir) { continue }
+            $ext = ''
+            if ($copyTo -match '\{name\}\.([A-Za-z0-9]+)$') { $ext = $Matches[1] }
+            $layouts[$section] = [ordered]@{ Dir = $dir; Ext = $ext; Tool = $tool }
+            break
+        }
+    }
+    return $layouts
+}
+
+# Rewrite source-repo paths (`content/<section>/<name>.md`,
+# `content/skills/<rest>`) to the per-section canonical installed paths. The
+# source AGENTS.md is maintained with readable repo-relative paths; the
+# installer substitutes them so that the file copied into the project root
+# points at files that actually exist on disk for the active tool(s).
+#
+# Substitutions performed (when the corresponding section layout is known):
+#   content/rules/<name>.md     -> <rulesDir>/<name>.<rulesExt>
+#   content/agents/<name>.md    -> <agentsDir>/<name>.<agentsExt>
+#   content/commands/<name>.md  -> <commandsDir>/<name>.<commandsExt>
+#   content/skills/<rest>       -> <skillsDir>/<rest>      (verbatim subpath)
+#
+# The name regex accepts `<` and `>` so placeholder paths like
+# `content/agents/<name>.md` in prose are also rewritten to the installed
+# directory but keep the literal `<name>` token.
+function Convert-AgentsMdPaths {
+    param(
+        [string]$Text,
+        [System.Collections.IDictionary]$Layouts
+    )
+    if ([string]::IsNullOrEmpty($Text)) { return $Text }
+    if ($null -eq $Layouts -or $Layouts.Count -eq 0) { return $Text }
+
+    $result = $Text
+    $sectionRegexes = @(
+        @{ Section = 'rules';    Pattern = 'content/rules/([\w\-<>]+)\.md' },
+        @{ Section = 'agents';   Pattern = 'content/agents/([\w\-<>]+)\.md' },
+        @{ Section = 'commands'; Pattern = 'content/commands/([\w\-<>]+)\.md' }
+    )
+    foreach ($entry in $sectionRegexes) {
+        $section = $entry.Section
+        if (-not $Layouts.Contains($section)) { continue }
+        $dir = [string]$Layouts[$section].Dir
+        if (-not $dir) { continue }
+        $ext = [string]$Layouts[$section].Ext
+        if (-not $ext) { $ext = 'md' }
+        # Closure capture for callback
+        $captureDir = $dir
+        $captureExt = $ext
+        # Pass 1: file references — both directory and extension are rewritten
+        # (the extension swap matters for Cursor's `.mdc` rules and Codex's
+        # `.toml` agents).
+        $result = [regex]::Replace($result, $entry.Pattern, {
+            param($m)
+            $name = $m.Groups[1].Value
+            return "$captureDir/$name.$captureExt"
+        })
+        # Pass 2: bare directory references like `content/rules/` (used in the
+        # source-language policy bullet, etc.). Substring replace is sufficient
+        # because pass 1 already consumed all preceding file references.
+        $result = $result.Replace("content/$section/", "$captureDir/")
+    }
+
+    if ($Layouts.Contains('skills')) {
+        $skillsDir = [string]$Layouts['skills'].Dir
+        if ($skillsDir) {
+            # Skills are copied verbatim — anything after `content/skills/`
+            # (SKILL.md, docs/<file>.md, tools/<…>) is preserved by the
+            # place phase, so a single prefix swap covers both file
+            # references (`content/skills/<name>/SKILL.md`) and bare
+            # directory references (`content/skills/`).
+            $result = $result.Replace('content/skills/', "$skillsDir/")
+        }
+    }
+
+    return $result
 }
 
 # ============================================================================
@@ -1641,6 +1891,63 @@ function Invoke-McpPhase {
         [System.Collections.IDictionary]$Manifest
     )
     $servers = Read-McpServers -Root $SourceRoot
+
+    # Substitute {INFOBASE_PUBLISH_URL} placeholders in server URLs from the
+    # project's .dev.env (Place-DevEnv runs earlier in the pipeline so the
+    # file is in place by now). Servers whose placeholder cannot be resolved
+    # keep the literal placeholder in the rendered config — the user sees a
+    # clear TODO marker and a warning telling them what to fill in.
+    $infobaseBase = Get-InfobasePublishUrlBase -Root $Root
+    $unresolved = Resolve-McpServerPlaceholders -Servers $servers -InfobaseBase $infobaseBase
+    if ($unresolved.Count -gt 0) {
+        Write-Warn ("  MCP config: следующие серверы используют плейсхолдер {INFOBASE_PUBLISH_URL}, но INFOBASE_PUBLISH_URL в .dev.env пуст: " + ($unresolved -join ', ') + '.')
+        Write-Warn '  Заполните INFOBASE_PUBLISH_URL в .dev.env (URL веб-публикации ИБ, напр. http://localhost/<infobase_name>/ru/) и запустите установщик повторно — MCP-конфиг будет перерендерен с подставленным URL.'
+    }
+
+    # Probe HTTP-service-based MCP servers (1c-data-mcp). The MCP HTTP client
+    # does not pass any Authorization header to /hs/<service>, so the 1C
+    # publication MUST allow anonymous access to the endpoint — otherwise the
+    # server returns HTTP 401 / 403 and the MCP tools simply do not appear in
+    # the agent's session. We probe right after substitution so the user is
+    # told at install time, not later when they wonder why `1c-data-mcp` is
+    # missing from the tool list.
+    foreach ($s in $servers) {
+        if (-not $s.url) { continue }
+        if ($s.url -match '\{INFOBASE_PUBLISH_URL\}') { continue }  # already warned above
+        if ($s.url -notmatch '/hs/') { continue }                   # only HTTP-service URLs
+        $probe = Test-McpHttpEndpoint -Url $s.url -TimeoutSec 3
+        switch -Regex ([string]$probe.Code) {
+            '^401$' {
+                Write-Warn ("  MCP config: " + $s.id + " — endpoint " + $s.url + " вернул HTTP 401 (требуется Basic-аутентификация).")
+                Write-Warn '  MCP-клиент НЕ передаёт логин/пароль на /hs/<service> — публикация ИБ должна разрешать анонимный доступ к этому HTTP-сервису:'
+                Write-Warn '    1. В default.vrd публикации укажите технического пользователя без пароля для HTTP-сервиса:'
+                Write-Warn '         <ws publishByDefault="true"/>'
+                Write-Warn '         <usr name="МCPПользователь" pwd=""/>   (или <usr name="" pwd=""/> для анонимного доступа, если в ИБ разрешены пустые пароли).'
+                Write-Warn '    2. Либо в админке кластера 1С разрешите пустые пароли и заведите пользователя ИБ без пароля с ролью, позволяющей вызов HTTP-сервиса mcp.'
+                Write-Warn '    3. После изменения публикации перезапустите веб-сервер (IIS / Apache) и повторите проверку: Invoke-WebRequest "' + $s.url + '" -Method Get -UseBasicParsing.'
+            }
+            '^403$' {
+                Write-Warn ("  MCP config: " + $s.id + " — endpoint " + $s.url + " вернул HTTP 403 (пользователь по умолчанию не имеет прав на HTTP-сервис).")
+                Write-Warn '  У пользователя, заданного в публикации (default.vrd → <usr name=...>), должны быть права на роль, разрешающую вызов HTTP-сервиса mcp.'
+            }
+            '^(200|201|204|405|406|400)$' {
+                Write-Info ("  MCP config: " + $s.id + " — endpoint " + $s.url + " отвечает анонимно (HTTP " + $probe.Code + '), OK.')
+            }
+            '^4\d{2}$' {
+                Write-Info ("  MCP config: " + $s.id + " — endpoint " + $s.url + " ответил HTTP " + $probe.Code + '. Проверьте, что HTTP-сервис `mcp` опубликован и не требует аутентификации.')
+            }
+            '^5\d{2}$' {
+                Write-Info ("  MCP config: " + $s.id + " — endpoint " + $s.url + " ответил HTTP " + $probe.Code + ' (ошибка сервера). Проверьте журнал веб-сервера и состояние ИБ.')
+            }
+            'down' {
+                Write-Info ("  MCP config: " + $s.id + " — endpoint " + $s.url + " не отвечает (веб-публикация не запущена или недоступна). Это не блокирует установку: повторите проверку через /checkmcp после старта публикации.")
+            }
+            default {
+                Write-Info ("  MCP config: " + $s.id + " — не удалось проверить endpoint " + $s.url + " (status=" + $probe.Code + '). Это не блокирует установку.')
+            }
+        }
+    }
+
     $installedIds = @($servers | ForEach-Object { $_.id })
     $Manifest.mcpServers = @($installedIds)
 
@@ -1661,13 +1968,21 @@ function Invoke-McpPhase {
 }
 
 # ============================================================================
-# SECTION 12: AGENTS.MD (STATIC COPY)
+# SECTION 12: AGENTS.MD (READABLE COPY + PATH REWRITER)
 # ============================================================================
 #
-# AGENTS.md is shipped as a fully static file in the source repository. The
-# installer only copies it into the project root and refreshes it on update
-# when the user has not modified it. No dynamic blocks, no @-imports injected
-# for foreign files or SDD integrations - the installer records those in the
+# AGENTS.md is shipped as a fully readable file in the source repository,
+# using repo-relative paths (`content/rules/<name>.md`, `content/agents/...`,
+# `content/skills/...`). The installer copies it into the project root and,
+# in the same step, rewrites every `content/<section>/...` path to the
+# per-section canonical installed path resolved from the active tool set
+# (see Resolve-CanonicalArtifactLayouts + Convert-AgentsMdPaths). The result
+# is that every path in the project-root AGENTS.md resolves to an existing
+# file for the active tool(s) — no broken links.
+#
+# Refresh on update is gated on `userModified` (manifest hash match), so user
+# edits are preserved. There are no dynamic blocks and no @-imports injected
+# for foreign files or SDD integrations — the installer records those in the
 # manifest (`foreignFiles`, `integrations`) for bookkeeping only, and the
 # shipped `AGENTS.md` documents how the user can link them manually.
 
@@ -1684,24 +1999,29 @@ function Update-AgentsMd {
 
     if (-not (Test-Path $sourceAgentsPath)) { return }
 
-    # Render: read source template and substitute the {{ rulesDir }} and
-    # {{ rulesExt }} placeholders with the canonical rules directory and file
-    # extension of the highest-priority active tool. Substitution is always
-    # done from the source template (idempotent on repeated updates even if
-    # active tools change).
-    $layout = Resolve-CanonicalRulesLayout -ActiveTools $ActiveTools -Adapters $Adapters
-    if (-not $layout) {
-        Write-Warn 'No active tool defines a rules directory; AGENTS.md placeholders will be left as-is.'
+    # Resolve the canonical installed location for every artefact section
+    # (rules / agents / commands / skills) so the readable source AGENTS.md
+    # can be rewritten into a project-local file with no broken links.
+    $layouts = Resolve-CanonicalArtifactLayouts -ActiveTools $ActiveTools -Adapters $Adapters
+
+    if (-not $layouts -or -not $layouts.Contains('rules')) {
+        Write-Warn 'No active tool defines a rules directory; AGENTS.md content/<section>/ paths will not be rewritten.'
         $rulesDir = '{{ rulesDir }}'
         $rulesExt = '{{ rulesExt }}'
     }
     else {
-        $rulesDir = [string]$layout.Dir
-        $rulesExt = [string]$layout.Ext
+        $rulesDir = [string]$layouts['rules'].Dir
+        $rulesExt = [string]$layouts['rules'].Ext
         if (-not $rulesExt) { $rulesExt = 'md' }
     }
+
     $sourceText = Read-TextFile $sourceAgentsPath
-    $rendered = $sourceText.Replace('{{ rulesDir }}', $rulesDir).Replace('{{ rulesExt }}', $rulesExt)
+    # 1) Rewrite content/<section>/... → <canonical installed dir>/...
+    $rendered = Convert-AgentsMdPaths -Text $sourceText -Layouts $layouts
+    # 2) Backward-compat: still substitute the legacy {{ rulesDir }} /
+    #    {{ rulesExt }} placeholders for source revisions that pre-date the
+    #    rewriter (no-op when the source already uses content/<section>/ paths).
+    $rendered = $rendered.Replace('{{ rulesDir }}', $rulesDir).Replace('{{ rulesExt }}', $rulesExt)
 
     # Copy or refresh only when safe: the file does not exist locally, or it
     # was installed by us previously and has not been user-modified since.
@@ -1771,6 +2091,202 @@ function Place-RootTemplates {
             installedHash = (Get-FileSha256 $target)
         }
         Write-Info "  placed (template, will not be overwritten on update): $name"
+    }
+}
+
+# ============================================================================
+# SECTION 12b: .dev.env BOOTSTRAP
+# ============================================================================
+#
+# .dev.env is the single source of truth for project parameters used by
+# all rules / commands / subagents (code-generation params + infobase
+# connection params + web-publish URL for tests).
+#
+# Behaviour:
+#   - If the file already exists in the project root — DO NOT overwrite.
+#     Just register it in the manifest so future updates know it is present.
+#   - If missing — render from the source `.dev.env.example` template,
+#     auto-fill what we can detect (PLATFORM_VERSION from Configuration.xml,
+#     PLATFORM_PATH from C:\Program Files\1cv8\, PREFIX from extension's
+#     NamePrefix), and either prompt the user for the rest (interactive
+#     mode) or leave them empty with a console WARNING (non-interactive).
+#
+# Critical fields (treated as blocking for IB-related commands when empty):
+#   PREFIX, COMPANY, DEVELOPER, PLATFORM_VERSION, PLATFORM_PATH,
+#   INFOBASE_PATH.
+# Recommended fields (warned about, but not blocking):
+#   IB_USER, INFOBASE_PUBLISH_URL, LOG_PATH.
+
+function Find-PlatformPath {
+    # Returns the path to the most recent installed 1C platform under
+    # `C:\Program Files\1cv8\<version>\bin\1cv8.exe` or its (x86) sibling,
+    # or empty string when nothing is found.
+    param([string]$PreferredVersion)
+
+    $roots = @()
+    foreach ($pf in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if (-not $pf) { continue }
+        $r = Join-Path $pf '1cv8'
+        if (Test-Path $r) { $roots += $r }
+    }
+    if ($roots.Count -eq 0) { return '' }
+
+    $candidates = @()
+    foreach ($r in $roots) {
+        $dirs = Get-ChildItem -Directory -Path $r -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^\d+(\.\d+){2,3}$' -and (Test-Path (Join-Path $_.FullName 'bin\1cv8.exe')) }
+        foreach ($d in $dirs) {
+            $verParts = ($d.Name -split '\.') | ForEach-Object { [int]$_ }
+            while ($verParts.Count -lt 4) { $verParts += 0 }
+            $candidates += [PSCustomObject]@{
+                Path     = $d.FullName
+                Version  = $d.Name
+                SortKey  = ($verParts[0] * 1000000000L) + ($verParts[1] * 1000000L) + ($verParts[2] * 1000L) + $verParts[3]
+            }
+        }
+    }
+    if ($candidates.Count -eq 0) { return '' }
+
+    if ($PreferredVersion -and $PreferredVersion -match '^\d+(\.\d+){1,3}$') {
+        $prefMatch = $candidates | Where-Object { $_.Version.StartsWith($PreferredVersion + '.') -or $_.Version -eq $PreferredVersion } |
+            Sort-Object SortKey -Descending | Select-Object -First 1
+        if ($prefMatch) { return $prefMatch.Path }
+    }
+    return ($candidates | Sort-Object SortKey -Descending | Select-Object -First 1).Path
+}
+
+function Read-DevEnvKeys {
+    # Parses a .dev.env file and returns an ordered hashtable of keys → values
+    # for the lines that look like KEY=VALUE (no comments, no blanks).
+    param([string]$Path)
+
+    $result = [ordered]@{}
+    if (-not (Test-Path $Path)) { return $result }
+    foreach ($line in (Get-Content -Path $Path -Encoding UTF8 -ErrorAction SilentlyContinue)) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $trim = $line.TrimStart()
+        if ($trim.StartsWith('#')) { continue }
+        if ($trim -match '^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$') {
+            $result[$Matches[1]] = $Matches[2]
+        }
+    }
+    return $result
+}
+
+function Set-DevEnvValue {
+    # In-place rewrite of a single KEY= line in the rendered template text.
+    # Idempotent: only the first occurrence of `<Key>=...` at line start is
+    # touched. If the key is not present, the text is returned unchanged.
+    param(
+        [string]$Text,
+        [string]$Key,
+        [string]$Value
+    )
+    if (-not $Text) { return $Text }
+    $pattern = '(?m)^' + [regex]::Escape($Key) + '=.*$'
+    $escVal = $Value -replace '\$', '$$$$'
+    return [regex]::Replace($Text, $pattern, ($Key + '=' + $escVal), 1)
+}
+
+function Read-Required {
+    # Asks the user for a value. Empty input returns empty string and lets the
+    # caller decide whether to leave the field blank.
+    param(
+        [string]$Prompt,
+        [string]$DefaultValue
+    )
+    if ($NonInteractive) { return $DefaultValue }
+    $hint = if ($DefaultValue) { " [$DefaultValue]" } else { '' }
+    $ans = Read-Host "$Prompt$hint"
+    if ([string]::IsNullOrWhiteSpace($ans)) { return $DefaultValue }
+    return $ans.Trim()
+}
+
+function Place-DevEnv {
+    param(
+        [string]$Root,
+        [string]$SourceRoot,
+        [System.Collections.IDictionary]$Manifest
+    )
+    $target = Join-Path $Root $script:DevEnvFileName
+    $source = Join-Path $SourceRoot $script:DevEnvExampleName
+
+    if (-not (Test-Path $source)) {
+        Write-Warn "Template not found in source: $script:DevEnvExampleName"
+        return
+    }
+
+    if (Test-Path $target) {
+        if (-not $Manifest.files.Contains($script:DevEnvFileName)) {
+            $Manifest.files[$script:DevEnvFileName] = [ordered]@{
+                source        = $script:DevEnvExampleName
+                template      = $true
+                installedHash = (Get-FileSha256 $target)
+            }
+        }
+        Write-Info "  .dev.env: already exists, leaving user values untouched"
+        return
+    }
+
+    # Detect what we can without asking
+    $info = Get-1cProjectInfo -Root $Root
+    $detectedVersion = if ($info.PlatformVersion) { $info.PlatformVersion } else { '' }
+    $detectedPath    = Find-PlatformPath -PreferredVersion $detectedVersion
+    $detectedPrefix  = if ($info.NamePrefix) { $info.NamePrefix } else { '' }
+
+    $text = Read-TextFile $source
+
+    # Prefill auto-detected values
+    if ($detectedVersion) { $text = Set-DevEnvValue -Text $text -Key 'PLATFORM_VERSION' -Value $detectedVersion }
+    if ($detectedPath)    { $text = Set-DevEnvValue -Text $text -Key 'PLATFORM_PATH'    -Value $detectedPath }
+    if ($detectedPrefix)  { $text = Set-DevEnvValue -Text $text -Key 'PREFIX'           -Value $detectedPrefix }
+
+    # Interactive prompts for the human-only fields
+    if (-not $NonInteractive) {
+        Write-Info ''
+        Write-Info '  Заполнение .dev.env (Enter — оставить поле пустым/значением по умолчанию):'
+        if (-not $detectedPrefix)  { $val = Read-Required 'PREFIX (префикс новых объектов, напр. рлф)' '';                                     if ($val) { $text = Set-DevEnvValue -Text $text -Key 'PREFIX'              -Value $val } }
+        $val = Read-Required 'COMPANY (название компании/проекта для комментариев)' '';                                                       if ($val) { $text = Set-DevEnvValue -Text $text -Key 'COMPANY'             -Value $val }
+        $val = Read-Required 'DEVELOPER (идентификатор разработчика)'                ''; if (-not $val) { $val = $env:USERNAME };             if ($val) { $text = Set-DevEnvValue -Text $text -Key 'DEVELOPER'           -Value $val }
+        if (-not $detectedVersion) { $val = Read-Required 'PLATFORM_VERSION (мин. совместимость, напр. 8.3.23)' '';                            if ($val) { $text = Set-DevEnvValue -Text $text -Key 'PLATFORM_VERSION'    -Value $val } }
+        if (-not $detectedPath)    { $val = Read-Required 'PLATFORM_PATH (каталог установки 1С, содержит bin\1cv8.exe)' '';                    if ($val) { $text = Set-DevEnvValue -Text $text -Key 'PLATFORM_PATH'       -Value $val } }
+        $kindAns = Read-Choice 'INFOBASE_KIND' @('file', 'server') 'file';                                                                     $text = Set-DevEnvValue -Text $text -Key 'INFOBASE_KIND' -Value $kindAns
+        $val = Read-Required 'INFOBASE_PATH (путь к файловой ИБ или строка подключения)'  '';                                                  if ($val) { $text = Set-DevEnvValue -Text $text -Key 'INFOBASE_PATH'       -Value $val }
+        $val = Read-Required 'IB_USER (пусто — без аутентификации)'                       '';                                                  if ($val) { $text = Set-DevEnvValue -Text $text -Key 'IB_USER'             -Value $val }
+        $val = Read-Required 'IB_PASSWORD (пусто — без пароля; не храните прод-пароли)'   '';                                                  if ($val) { $text = Set-DevEnvValue -Text $text -Key 'IB_PASSWORD'         -Value $val }
+        $val = Read-Required 'LOG_PATH (файл лога Designer''а, напр. E:\Temp\1cv8.log)' '';                                                   if ($val) { $text = Set-DevEnvValue -Text $text -Key 'LOG_PATH'            -Value $val }
+        $val = Read-Required 'INFOBASE_PUBLISH_URL (URL веб-публикации для UI-тестов; пусто — UI-тесты пропускаются)' '';                      if ($val) { $text = Set-DevEnvValue -Text $text -Key 'INFOBASE_PUBLISH_URL' -Value $val }
+    }
+
+    Write-TextFile -Path $target -Content $text
+    $Manifest.files[$script:DevEnvFileName] = [ordered]@{
+        source        = $script:DevEnvExampleName
+        template      = $true
+        installedHash = (Get-FileSha256 $target)
+    }
+
+    Write-Info "  placed: .dev.env (single source of truth for project parameters)"
+    if ($detectedVersion) { Write-Info "    autodetected PLATFORM_VERSION = $detectedVersion" }
+    if ($detectedPath)    { Write-Info "    autodetected PLATFORM_PATH    = $detectedPath" }
+    if ($detectedPrefix)  { Write-Info "    autodetected PREFIX           = $detectedPrefix" }
+
+    # Final sanity check: warn loudly about empty critical fields so the user
+    # knows the file still needs hand-editing before code-gen / IB commands run.
+    $values = Read-DevEnvKeys -Path $target
+    $criticalEmpty = @()
+    foreach ($k in @('PREFIX', 'COMPANY', 'DEVELOPER', 'PLATFORM_VERSION', 'PLATFORM_PATH', 'INFOBASE_PATH')) {
+        if (-not $values.Contains($k) -or [string]::IsNullOrWhiteSpace($values[$k])) { $criticalEmpty += $k }
+    }
+    $recommendedEmpty = @()
+    foreach ($k in @('LOG_PATH', 'INFOBASE_PUBLISH_URL')) {
+        if (-not $values.Contains($k) -or [string]::IsNullOrWhiteSpace($values[$k])) { $recommendedEmpty += $k }
+    }
+    if ($criticalEmpty.Count -gt 0) {
+        Write-Warn ("  .dev.env: незаполнены критичные поля: " + ($criticalEmpty -join ', '))
+        Write-Warn '  Заполните их вручную перед запуском задач генерации кода / работы с ИБ.'
+    }
+    if ($recommendedEmpty.Count -gt 0) {
+        Write-Info ("  .dev.env: рекомендуется также заполнить: " + ($recommendedEmpty -join ', '))
     }
 }
 
@@ -1899,7 +2415,13 @@ function Invoke-Init {
     if ($integrations.Contains('openspec')) { Write-Info "  integration: openspec ($($integrations.openspec.files.Count) files)" }
 
     Write-Section 'Phase 4: Plan'
-    Write-Info "Will write per-tool files into: .$($activeTools -join ', .')"
+    $planDirs = @()
+    foreach ($t in $activeTools) {
+        $primary = Get-AdapterPrimaryDir $adapters[$t]
+        if (-not $primary) { $primary = ".$t" }
+        $planDirs += "$t -> $primary/"
+    }
+    Write-Info ("Will write per-tool files into: " + ($planDirs -join ', '))
     Write-Info "MCP servers will be added to each tool's MCP config."
     if (-not $AssumeYes -and -not $NonInteractive) {
         if (-not (Read-YesNo 'Proceed with installation?' $true)) { return }
@@ -1934,13 +2456,20 @@ function Invoke-Init {
     Write-Section 'Phase 6d: OpenSpec project.md (1C autodetect)'
     Invoke-OpenSpecProjectMd -Root $Root -Manifest $manifest
 
-    Write-Section 'Phase 7: MCP'
+    # .dev.env must be placed BEFORE the MCP phase because some MCP server
+    # URLs in `content/mcp-servers.json` reference {INFOBASE_PUBLISH_URL} —
+    # the installer substitutes that placeholder from the freshly-written
+    # .dev.env when rendering per-tool MCP configs.
+    Write-Section 'Phase 7: .dev.env (project parameters, single source of truth)'
+    Place-DevEnv -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
+
+    Write-Section 'Phase 8: MCP'
     Invoke-McpPhase -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Adapters $adapters -Manifest $manifest
 
-    Write-Section 'Phase 8: AGENTS.md'
+    Write-Section 'Phase 8b: AGENTS.md'
     Update-AgentsMd -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Adapters $adapters -Manifest $manifest
 
-    Write-Section 'Phase 8b: Root templates (USER-RULES.md, memory.md)'
+    Write-Section 'Phase 8c: Root templates (USER-RULES.md, memory.md)'
     Place-RootTemplates -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
 
     Write-Section 'Phase 9: Manifest'
@@ -1974,7 +2503,7 @@ function Invoke-Verify {
     $mismatches = @()
     $count = 0
     foreach ($rel in $Manifest.files.Keys) {
-        $abs = Join-Path $Root $rel
+        $abs = Resolve-ManifestPath -Root $Root -Rel $rel
         if (-not (Test-Path $abs)) { $mismatches += "missing: $rel"; continue }
         $count++
         $actual = Get-FileSha256 $abs
@@ -2047,7 +2576,7 @@ function Invoke-Update {
     Write-Section 'Detecting user-modified files'
     $dirty = @()
     foreach ($rel in @($manifest.files.Keys)) {
-        $abs = Join-Path $Root $rel
+        $abs = Resolve-ManifestPath -Root $Root -Rel $rel
         if (-not (Test-Path $abs)) { continue }
         $actual = Get-FileSha256 $abs
         $expected = $manifest.files[$rel].installedHash
@@ -2111,6 +2640,12 @@ function Invoke-Update {
     Write-Section 'OpenSpec project.md (update / 1C autodetect)'
     Invoke-OpenSpecProjectMd -Root $Root -Manifest $manifest
 
+    # .dev.env runs before MCP so that {INFOBASE_PUBLISH_URL} placeholders in
+    # `content/mcp-servers.json` resolve against the actual project value
+    # when MCP configs are re-rendered.
+    Write-Section '.dev.env (update — placed only if missing)'
+    Place-DevEnv -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
+
     Write-Section 'MCP (update)'
     Invoke-McpPhase -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Adapters $adapters -Manifest $manifest
 
@@ -2155,6 +2690,11 @@ function Invoke-Add {
     Write-Section "Placing files for tool: $NewTool"
     Invoke-PlacePhase -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Adapters $adapters -Manifest $manifest
     Invoke-OpenSpecArtifacts -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Manifest $manifest
+
+    # Place .dev.env BEFORE the MCP phase so {INFOBASE_PUBLISH_URL}
+    # placeholders in `content/mcp-servers.json` substitute against the
+    # actual project value when rendering the newly-added tool's MCP config.
+    Place-DevEnv -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
     Invoke-McpPhase -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Adapters $adapters -Manifest $manifest
 
     # Merge foreign files for this tool into manifest
@@ -2194,8 +2734,9 @@ function Invoke-Remove {
             'claude-code' { $toolPrefixes = @('.claude/', 'CLAUDE.md', '.mcp.json') }
             'codex'       { $toolPrefixes = @('.codex/') }
             'opencode'    { $toolPrefixes = @('.opencode/', 'opencode.json') }
-            'kilocode'    { $toolPrefixes = @('.kilocode/') }
+            'kilocode'    { $toolPrefixes = @('.kilo/', '.kilocode/') }
             'cursor'      { $toolPrefixes = @('.cursor/') }
+            'other'       { $toolPrefixes = @('.ai-agent/') }
         }
         $toRemove = @()
         foreach ($rel in @($manifest.files.Keys)) {
@@ -2234,7 +2775,10 @@ function Invoke-Remove {
         Remove-Item -Force (Join-Path $Root $script:ManifestFileName) -ErrorAction SilentlyContinue
         # Clean up empty per-tool directories
         $cleanupDirs = @('.ai-rules')
-        foreach ($t in $manifest.tools) { $cleanupDirs += ".$t" }
+        foreach ($t in $manifest.tools) {
+            if ($t -eq 'other') { $cleanupDirs += '.ai-agent' }
+            else { $cleanupDirs += ".$t" }
+        }
         foreach ($rel in $cleanupDirs) {
             $dir = Join-Path $Root $rel
             if (Test-Path $dir) {

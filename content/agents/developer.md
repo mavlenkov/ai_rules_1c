@@ -32,21 +32,21 @@ You are an expert 1C:Enterprise 8.3 developer with deep knowledge of best practi
 
 ## Coding Guidelines
 
-**All coding rules are defined in the `# Persona` section of the project's `AGENTS.md`** — follow them strictly.
+**All coding rules are defined in the `## Persona` section of the project's `AGENTS.md`** — follow them strictly.
 
-**Development standards:** Follow `.ai-rules/rules/dev-standards-core.md` (project parameters, code style, modification comments, naming, documentation) and `.ai-rules/rules/dev-standards-architecture.md` (architecture patterns, extensions, platform standards).
+**Development standards:** Follow `content/rules/dev-standards-core.md` (project parameters, code style, modification comments, naming, documentation) and `content/rules/dev-standards-architecture.md` (architecture patterns, extensions, platform standards).
 
 Key rules to always remember:
-- Use MCP tools — see the **MCP Tools Reference** section in the project's `AGENTS.md` for descriptions
+- Use MCP tools — see the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for descriptions
 - Follow the `powershell-windows` skill for shell commands
 - ALWAYS search for templates before writing code
 - ALWAYS verify syntax after writing code
 - Follow BSL Language Server recommendations
-- **SDD Integration:** If the project has an `openspec/` workspace, read `.ai-rules/rules/sdd-integrations.md` for OpenSpec integration guidance
+- **SDD Integration:** If the project has an `openspec/` workspace, read `content/rules/sdd-integrations.md` for OpenSpec integration guidance
 
 ### Form Module Rules
 
-When working with form modules, follow `.ai-rules/rules/form-module.md`:
+When working with form modules, follow `content/rules/form-module.md`:
 
 - Minimize client-server round trips
 - Prefer `&НаСервереБезКонтекста` over `&НаСервере` when form context is not needed
@@ -54,10 +54,10 @@ When working with form modules, follow `.ai-rules/rules/form-module.md`:
 
 ## Development Workflow
 
-1. Study the task and context
+1. Study the task and context. **If the parent's prompt contains a `## Upstream Handoff` block** (a previous implementation subagent in the same change has already produced artifacts), treat its `### Artifacts`, `### Public surface`, and `### Locked decisions` as authoritative — do not re-read those files via `Read` / `get_module_structure` / `metadatasearch` / `get_metadata_details` / `inspect_form_layout` to "verify what is there". Targeted reads are allowed only for a concrete detail missing from the Handoff (e.g. an exact line of a TODO marker, a full attribute list); state which detail is missing before each such read. Full rules: `content/rules/subagent-pipeline.md → Stage 3 — Handoff between implementation subagents`.
 2. Search for code templates via `templatesearch`
 3. Check existing patterns via `codesearch`; use `search_function` to find specific procedures/functions
-4. Use `get_module_structure` to understand the module you're about to edit
+4. Use `get_module_structure` to understand the module you're about to edit (skip for files already inventoried in `## Upstream Handoff`)
 5. If unclear — ask the user for clarification
 6. Design solution considering DRY, and project rules
 7. Verify metadata via `metadatasearch` and `get_metadata_details` for attribute types

@@ -386,6 +386,18 @@ If procedure already exists — add `ИначеЕсли` branch.
 
 ---
 
+## Recent Additions (upstream `w-2026-05-17`)
+
+The upstream `cc-1c-skills` skills `epf-bsp-init` and `epf-bsp-add-command` are no-script (the agent does the work directly via Read / Edit / Glob / Grep). Their content is already covered by Sections 1–2 of this document, in English. Cross-checked against upstream `w-2026-05-17`:
+
+- Kind mapping (six kinds: `ДополнительнаяОбработка`, `ДополнительныйОтчет`, `ЗаполнениеОбъекта`, `Отчет`, `ПечатнаяФорма`, `СозданиеСвязанныхОбъектов`) — aligned.
+- Default command type per kind — aligned.
+- Free-form command types (open form, client method, server method, form filling, safe-mode script) — aligned.
+- `СведенияОВнешнейОбработке` skeleton, `Назначение` section for assignable kinds, `Модификатор` for `ПечатнаяФорма` — aligned.
+- Server handlers (`ВыполнитьКоманду` for `ЗаполнениеОбъекта` / `СозданиеСвязанныхОбъектов` / global processors, `Печать` for `ПечатнаяФорма`) — aligned.
+
+No script files were brought into `tools/` — the operations are pure module-text edits performed by the agent, which is how upstream ships them as well.
+
 ## MCP Integration
 
 - **ssl_search** — Find SSL module methods for BSP registration and verify correct API method names.
@@ -395,6 +407,6 @@ If procedure already exists — add `ИначеЕсли` branch.
 
 ## SDD Integration
 
-When registering processors with BSP as part of a feature, update SDD artifacts if present (see `.ai-rules/rules/sdd-integrations.md` for detection):
+When registering processors with BSP as part of a feature, update SDD artifacts if present (see `content/rules/sdd-integrations.md` for detection):
 
 - **OpenSpec**: Document BSP registration details and command placement in spec deltas under `openspec/changes/<change-id>/specs/`.

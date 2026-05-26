@@ -6,7 +6,19 @@ category: tooling
 
 # Tool Usage by Task — Playbooks
 
-The overall server priority (`graph → code-metadata → Grep`) and the tool descriptors live in `AGENTS.md → Tooling`.
+The MCP server catalog, fallback order (`graph → code-metadata → grep=true retry → Grep` for project-source search), and per-server tool descriptors live in the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`, `docs/<server>.md`). `AGENTS.md` only defines the short obligation rules and points here.
+
+## Minimum Evidence Matrix
+
+Use the smallest set that closes the real context gaps. Do not promote a task to a heavier path just to satisfy a generic checklist.
+
+| Task shape | Required before edit | Required after edit |
+|---|---|---|
+| **Quick-fix BSL** (single procedure, no metadata / transaction / public API impact) | Read the target module / procedure and any directly referenced helper needed to understand the bug | `syntaxcheck` on the touched module |
+| **Full-cycle BSL** | `templatesearch` when a reusable pattern may exist; `search_code` / `codesearch` for local patterns; `get_object_dossier` / `metadatasearch` when metadata shape affects the code; platform / БСП / ITS docs only when versioned API or standard behaviour matters | `syntaxcheck` → `check_1c_code` → `review_1c_code`; impact analysis when public surface or metadata usage changed |
+| **Metadata XML / forms** | Similar object/form examples, metadata lookup, `get_xsd_schema`; prefer `1c-metadata-manage` over hand edits | `verify_xml`; metadata validation / form compilation where applicable |
+| **Integrations / platform APIs** | Existing integrations, templates, relevant БСП APIs, platform docs for exact API names / version availability, security requirements | `syntaxcheck` → `check_1c_code` → `review_1c_code`; ITS check when relying on an ITS standard |
+| **Markdown / rules / docs** | Read affected docs and referenced files needed for consistency | Structural checks only: paths, links, anchors, duplicate / conflicting wording |
 
 ## Writing New Code
 
@@ -22,6 +34,7 @@ The overall server priority (`graph → code-metadata → Grep`) and the tool de
 10. **syntaxcheck** — verify syntax after writing.
 11. **check_1c_code** — find logic and performance defects.
 12. **review_1c_code** — verify style and ITS standards compliance.
+13. **validatequery** (`1c-data-mcp`, if available) — when the change introduces a new / non-trivial query string (module code, DCS data set, dynamic list), parse-check it against the live IB before delivery. Especially important after non-deterministic AI generation (`rewrite_1c_code` / `modify_1c_code` / `ask_1c_ai`).
 
 ## Code Review
 
@@ -48,15 +61,19 @@ The overall server priority (`graph → code-metadata → Grep`) and the tool de
 
 ## Error Fixing
 
-1. **syntaxcheck** — syntax errors.
-2. **check_1c_code** — logic and performance issues.
-3. **search_function** — locate the failing procedure/function.
-4. **search_code** → **codesearch** — related patterns (`detail_level="L0"` for the full body of a specific routine).
-5. **get_module_structure** — module context around the error.
-6. **trace_call_chain** → **get_method_call_hierarchy** — how the error propagates through the call chain.
-7. **docinfo** — verify function/method names; **docsearch** — fallback by description.
-8. **metadatasearch** / **get_metadata_details** — verify metadata names and attributes.
-9. **modify_1c_code** — targeted AI fix (treat output as a draft, re-validate).
+1. **vcloggetlasterror** (`1c-data-mcp`, if available) — fetch the exact text, timestamp and affected metadata of the last error from the live IB before forming hypotheses. Avoids guessing what the user "probably saw". Skip when the failing scenario is not yet reproduced in the connected IB.
+2. **syntaxcheck** — syntax errors.
+3. **check_1c_code** — logic and performance issues.
+4. **search_function** — locate the failing procedure/function.
+5. **search_code** → **codesearch** — related patterns (`detail_level="L0"` for the full body of a specific routine).
+6. **get_module_structure** — module context around the error.
+7. **trace_call_chain** → **get_method_call_hierarchy** — how the error propagates through the call chain.
+8. **docinfo** — verify function/method names; **docsearch** — fallback by description.
+9. **metadatasearch** / **get_metadata_details** — verify metadata names and attributes.
+10. **validatequery** (`1c-data-mcp`, if available) — when the suspect path is a query string, parse-check it before deeper investigation.
+11. **vcexecutequery** (`1c-data-mcp`, if available) — read-only query against the live IB to confirm a data-state hypothesis without changing production code.
+12. **vcexecutecode** (`1c-data-mcp`, if available) — run a small read-only BSL fragment in the live IB to verify a platform-version-specific behaviour. Default to read-only; **never** wrap a mutation without explicit user consent (see `docs/1c-data-mcp.md → Safety`).
+13. **modify_1c_code** — targeted AI fix (treat output as a draft, re-validate).
 
 ## Performance Optimization
 
@@ -68,6 +85,7 @@ The overall server priority (`graph → code-metadata → Grep`) and the tool de
 6. **rewrite_1c_code** — AI optimization (`goal: optimize`); re-validate with `check_1c_code` and `syntaxcheck`.
 7. **templatesearch** — optimized templates.
 8. **its_help** → **fetch_its** — ITS performance standards.
+9. **validatequery** → **vcexecutequery** (`1c-data-mcp`, if available) — parse-check the rewritten query, then run it read-only against the live IB to compare row counts / spot Cartesian explosions / confirm a virtual-table state. Use only on a test or copy IB when production data volumes matter.
 
 ## Refactoring
 
