@@ -18,6 +18,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TARGET=""
 TOOLS=""
 HOST="localhost"
+PUBLISH_URL=""
 
 usage() {
     cat <<EOF
@@ -31,20 +32,28 @@ Options:
                    Default: auto-detect by adapter detection rules.
   --host <host>    MCP server host (substitutes 'localhost' in content/mcp-servers.json).
                    Default: localhost.
+  --publish-url <url>
+                   Infobase web-publish URL (INFOBASE_PUBLISH_URL). Substituted
+                   into the 1c-data-mcp server URL ({INFOBASE_PUBLISH_URL}/hs/mcp),
+                   stripped of a trailing '/' and a trailing locale segment
+                   (/ru, /en, …). If omitted, the literal placeholder is kept
+                   and a warning is printed.
   --help, -h       This help.
 
 Examples:
   $0 ~/Проекты/MyProject1C
   $0 ~/Проекты/MyProject1C --host alcor
   $0 ~/Проекты/MyProject1C --tools claude-code --host alcor
+  $0 ~/Проекты/MyProject1C --host alcor --publish-url 'http://localhost/MyBase/ru/'
 EOF
     exit 1
 }
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --tools) shift; TOOLS="${1:-}" ;;
-        --host)  shift; HOST="${1:-}"  ;;
+        --tools) shift; [ $# -ge 1 ] || { echo "Ошибка: --tools требует значение"; usage; }; TOOLS="$1" ;;
+        --host)  shift; [ $# -ge 1 ] || { echo "Ошибка: --host требует значение"; usage; }; HOST="$1" ;;
+        --publish-url) shift; [ $# -ge 1 ] || { echo "Ошибка: --publish-url требует значение"; usage; }; PUBLISH_URL="$1" ;;
         --help|-h) usage ;;
         *)
             if [ -z "$TARGET" ]; then TARGET="$1"
@@ -65,13 +74,14 @@ echo "  Source: $REPO_DIR"
 echo "  Target: $TARGET"
 echo "  Host:   $HOST"
 echo "  Tools:  ${TOOLS:-<auto-detect>}"
+echo "  Publish URL: ${PUBLISH_URL:-<none, 1c-data-mcp placeholder kept>}"
 echo ""
 
-python3 - "$REPO_DIR" "$TARGET" "$HOST" "$TOOLS" <<'PYEOF'
+python3 - "$REPO_DIR" "$TARGET" "$HOST" "$TOOLS" "$PUBLISH_URL" <<'PYEOF'
 import json, os, re, shutil, sys
 from pathlib import Path
 
-REPO, TARGET, HOST, TOOLS_ARG = sys.argv[1:5]
+REPO, TARGET, HOST, TOOLS_ARG, PUBLISH_URL = sys.argv[1:6]
 REPO, TARGET = Path(REPO), Path(TARGET)
 
 # --- Минимальный YAML-парсер для адаптеров ---------------------------------
@@ -261,13 +271,38 @@ def place_section(adapter, section, src_dir):
 
 # --- MCP rendering --------------------------------------------------------
 
-def render_mcp(adapter, host):
+# Locale segments stripped from INFOBASE_PUBLISH_URL (mirrors install.ps1).
+_LOCALES = {'ru','en','uk','kk','be','de','fr','es','it','pl','tr','vi','zh','ja',
+            'ka','lt','lv','hu','bg','ro','sk','cs','sl','hr','sr','et','fi','sv',
+            'no','da','nl','pt','el','az','hy','mn','mk','th','ko','ar','he'}
+
+def strip_publish_url(url):
+    """Strip trailing '/' and a trailing locale segment, like install.ps1."""
+    url = url.strip().rstrip('/')
+    m = re.search(r'/([a-z]{2,3})$', url)
+    if m and m.group(1) in _LOCALES:
+        url = url[:url.rfind('/')]
+    return url
+
+# Collects warnings to surface after rendering (e.g. unresolved placeholders).
+MCP_WARNINGS = []
+
+def render_mcp(adapter, host, publish_url):
     src = json.loads((REPO / 'content/mcp-servers.json').read_text(encoding='utf-8'))
     servers = src['servers']
-    if host != 'localhost':
-        for s in servers:
-            if 'url' in s:
-                s['url'] = s['url'].replace('localhost', host)
+    base = strip_publish_url(publish_url) if publish_url else ''
+    for s in servers:
+        if 'url' not in s:
+            continue
+        if host != 'localhost':
+            s['url'] = s['url'].replace('localhost', host)
+        if '{INFOBASE_PUBLISH_URL}' in s['url']:
+            if base:
+                s['url'] = s['url'].replace('{INFOBASE_PUBLISH_URL}', base)
+            else:
+                MCP_WARNINGS.append(
+                    f"{s['id']}: URL содержит плейсхолдер {{INFOBASE_PUBLISH_URL}} — "
+                    f"запусти с --publish-url <URL> или отредактируй MCP-конфиг вручную")
 
     schema = adapter['mcp']['schema']
     if schema == 'mcpServers':
@@ -345,7 +380,7 @@ for tool, adapter in adapters.items():
     if mcp_cfg:
         dst = TARGET / mcp_cfg['target']
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_text(render_mcp(adapter, HOST), encoding='utf-8')
+        dst.write_text(render_mcp(adapter, HOST, PUBLISH_URL), encoding='utf-8')
         print(f"  mcp: {mcp_cfg['target']} (host={HOST})")
         manifest_files.append({'path': mcp_cfg['target'], 'tool': tool, 'section': 'mcp'})
     entry = adapter.get('entry')
@@ -423,6 +458,12 @@ manifest = {
     json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8'
 )
 print(f"\nМанифест .ai-rules.json: {len(manifest_files)} файлов записано")
+
+if MCP_WARNINGS:
+    print("\n⚠ MCP warnings:")
+    for w in dict.fromkeys(MCP_WARNINGS):  # dedupe, keep order
+        print(f"  - {w}")
+
 print(f"\n=== Готово ===")
 PYEOF
 

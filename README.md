@@ -48,11 +48,11 @@ git clone https://github.com/comol/ai_rules_1c.git $env:TEMP\1c-rules
 
 ### Fallback: Linux/bash-установщик (форк)
 
-Если работаешь под Linux/macOS и нужно поставить детерминированно из CLI — в форке `mavlenkov/ai_rules_1c` есть `scripts/install.sh`. Поддерживает три tools (cursor, claude-code, opencode), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — подставляет реальный хост MCP-серверов в `localhost`-URL'ы из `content/mcp-servers.json`.
+Если работаешь под Linux/macOS и нужно поставить детерминированно из CLI — в форке `mavlenkov/ai_rules_1c` есть `scripts/install.sh`. Поддерживает три tools (cursor, claude-code, opencode), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — подставляет реальный хост docker-MCP-серверов в `localhost`-URL'ы из `content/mcp-servers.json`; и `--publish-url` — подставляет URL веб-публикации ИБ в сервер `1c-data-mcp` (`{INFOBASE_PUBLISH_URL}/hs/mcp`, с обрезкой концевого `/` и сегмента локали `/ru`). Без `--publish-url` плейсхолдер сохраняется и выводится предупреждение.
 
 ```bash
 git clone https://github.com/mavlenkov/ai_rules_1c.git /tmp/1c-rules
-/tmp/1c-rules/scripts/install.sh ~/Проекты/МойПроект1С --host alcor
+/tmp/1c-rules/scripts/install.sh ~/Проекты/МойПроект1С --host alcor --publish-url 'http://localhost/МойПроект1С/ru/'
 ```
 
 Если активные tools не указаны (`--tools`), скрипт сам определяет их по detection rules адаптеров (`.cursor/` / `.claude/` / `.opencode/`). Codex и Kilo Code не поддерживаются — для них используй `install.ps1` под `pwsh`.
