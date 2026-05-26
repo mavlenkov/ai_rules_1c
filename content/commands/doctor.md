@@ -31,7 +31,7 @@ After the table, list only actionable fixes. Do not include secret values from `
    - managed files listed in the manifest still exist;
    - the canonical rules directory referenced by the manifest exists.
 5. If `.ai-rules.json` is missing:
-   - in an installed project, report **FAIL** and recommend `install.ps1 init`;
+   - in an installed project, report **FAIL** and recommend `install.ps1 init` (Windows) / `scripts/install.sh` (Linux);
    - in the source repository of `1c-rules`, report **WARN** and continue with source-layout checks.
 6. Verify that the current tool has the files it can actually load:
    - Cursor: `.cursor/rules/`, `.cursor/commands/`, `.cursor/mcp.json` when installed;
@@ -74,7 +74,7 @@ Also check:
    - `LOG_PATH`;
    - `EXPORT_PATH` when the repository root is not the configuration source directory;
    - `PLATFORM_VERSION` when platform-version-specific docs or checks are needed.
-4. Verify that `PLATFORM_PATH` contains `bin\1cv8.exe`.
+4. Verify the platform executable exists at `PLATFORM_PATH`: `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows). Detect OS via `uname -s` / `%PROGRAMFILES%`.
 5. Verify that `INFOBASE_KIND` is `file` or `server`.
 6. Never print `IB_PASSWORD`, tokens, license keys, or full connection strings. Report only whether they are set.
 
@@ -149,7 +149,7 @@ Classify the project:
 
 For **Not ready**, provide the shortest safe repair path, for example:
 
-1. Run `install.ps1 init` or `/updaterules`.
+1. Run `install.ps1 init` (Windows) / `scripts/install.sh` (Linux), or `/updaterules`.
 2. Fill `.dev.env` critical fields.
 3. Fix Markdown integrity findings from Check 7.
 4. Generate or refresh `openspec/project.md`.

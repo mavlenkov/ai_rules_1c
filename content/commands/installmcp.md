@@ -27,6 +27,42 @@ MCP_Distr/
 
 Use `/checkmcp` to inspect already installed servers. Use `/updatemcp` to update an already installed set (and to re-fetch a newer distribution + new license keys).
 
+## Platform note (Linux — fork)
+
+This fork runs on Linux. The PowerShell blocks below are the Windows reference; on Linux apply these substitutions:
+
+- **Paths** — target dir e.g. `~/mcp_distr` (not `C:\Work\MCP_Distr`); temp `/tmp` (not `$env:TEMP`); MCP config `~/.cursor/mcp.json` / `~/.codex/config.toml` (not `%USERPROFILE%`); `PATH_1C_BIN=/opt/1cv8/x86_64/<version>`.
+- **Docker** — Linux runs the daemon directly: check `docker info`, start with `sudo systemctl start docker`; no Docker Desktop / `winget` / WSL. Install via the distro package manager (`docker.io` / `docker-ce` + `docker-compose-plugin`). Use `docker compose` (v2) where the files say `docker-compose`. Volume host paths are POSIX: `-v "$DATA_ROOT/mcp_<id>:/app/chroma_db"`.
+- **Unpack** — `unzip archive.zip -d "$target"` (or `tar`), not `Expand-Archive`.
+- **Tilda download (headless, bash + curl + jq)** — Linux equivalent of steps 1.1.b–1.1.e:
+
+```bash
+# 1.1.b — projectid / pageid from the Tilda stub
+stub=$(curl -s 'https://vibecoding1c.ru/mcpserver')
+projectid=$(grep -oP 'data-tilda-project-id="\K\d+' <<<"$stub" | head -1)
+pageid=$(grep -oP 'data-tilda-page-id="\K\d+'   <<<"$stub" | head -1)
+H=(-H 'Origin: https://vibecoding1c.ru' -H 'Referer: https://vibecoding1c.ru/members/login' \
+   -H 'Content-Type: application/json; charset=UTF-8' -H 'User-Agent: Mozilla/5.0')
+# 1.1.c — login → token (Origin/Referer headers are mandatory)
+token=$(curl -s "${H[@]}" -X POST 'https://members.tildaapi.com/api/login/' \
+  -d "$(jq -nc --arg l "$TILDA_LOGIN" --arg p "$TILDA_PASSWORD" --arg pid "$projectid" \
+        '{login:$l,password:$p,projectid:$pid,pageurl:"https://vibecoding1c.ru/members/login?redirecturl=mcpserver"}')" \
+  | jq -r '.data.token // empty')
+[ -z "$token" ] && { echo "Tilda login failed — see step 1.1.f (browser fallback)"; exit 1; }
+# 1.1.d — rendered page → Yandex Disk public link
+html=$(curl -s "${H[@]}" -H 'Referer: https://vibecoding1c.ru/mcpserver' -X POST 'https://members.tildaapi.com/api/getpage/' \
+  -d "$(jq -nc --arg pid "$projectid" --arg t "$token" --arg pg "$pageid" \
+        '{projectid:$pid,token:$t,tzoffset:0,pageurl:"https://vibecoding1c.ru/mcpserver",pageid:$pg}')" \
+  | jq -r '.data.html // empty')
+public=$(grep -oE 'https?://(disk\.yandex\.[a-z]+|yadi\.sk)/d/[A-Za-z0-9_-]+' <<<"$html" | head -1)
+# 1.1.e — resolve direct URL via the Yandex Disk Public API and download
+enc=$(jq -rn --arg u "$public" '$u|@uri')
+direct=$(curl -s "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=$enc" | jq -r '.href')
+curl -L "$direct" -o /tmp/MCP_Distr.zip
+```
+
+Requires `curl` and `jq`. If the headless flow fails (captcha, `login_blocked`, API change), use the browser-automation MCP fallback (step 1.1.f) or ask the user for the Yandex Disk URL manually.
+
 ## Steps
 
 ### 1. Choose the target directory and download the distribution
