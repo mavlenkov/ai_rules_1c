@@ -6,6 +6,24 @@
 
 ## После мержа upstream «версия 4» (2026-05-25, upstream `5b246bc`)
 
+### 0. ✅ РЕШЕНО (2026-05-26): OpenCode adapter — формат `tools`
+
+При раскатке на проекты выяснилось: OpenCode (1.15.10) валидирует frontmatter
+агентов/команд и требует `tools` как **object** (`{read: true, …}`), а не массив.
+`content/agents/*.md` и `content/commands/*.md` хранят `tools`/`allowedTools`
+списком (верно для Cursor / Claude Code), и adapter opencode копировал их как
+массив → OpenCode падал с `Configuration is invalid` и **не грузил весь конфиг**
+(ни MCP, ни агентов). Фикс в `adapters/opencode.yaml`: `tools` убран из `keep`
+агентов (+ в `drop`), у команд убран `allowedTools → tools` rename. Агенты/команды
+opencode теперь без явного `tools` (дефолтный набор инструментов). Проверено:
+`opencode mcp list` грузится, серверы connected. **Это баг и в upstream.**
+
+Отдельно (эмпирически, OpenCode 1.15.10): OpenCode **мержит** корневой
+`opencode.json` И `.opencode/opencode.json` (документация утверждает только
+корневой). Поэтому adapter target `.opencode/opencode.json` РАБОТАЕТ. Но старые
+корневые `opencode.json` v1-генерации в проектах дают дубли серверов + битый
+`1c-data` URL — чистятся в проектах при раскатке, не в форке.
+
 ### 1. ✅ РЕШЕНО (2026-05-26): миграция форк-команд на `.dev.env`
 
 Форк-команды (`deploy-and-test`, `extensions`, `dataprocessors`, `getconfigfiles`)
