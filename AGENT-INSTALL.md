@@ -15,6 +15,19 @@ A project installed by one channel can later be updated by the other.
 
 If the user asks you to install or update `1c-rules`, follow this protocol from the **project root** (the directory where `AGENTS.md` should live).
 
+### Project root is mandatory — no global installs
+
+`1c-rules` is a **project-scoped** toolkit. Every supported tool (Cursor, Claude Code, Codex, OpenCode, Kilo Code, `other`) reads its always-on context from the project root, and every on-demand rule / agent / command / skill lands under a project-local tool directory (`.cursor/`, `.claude/`, `.kilo/`, `.codex/`, `.opencode/`, `.ai-agent/`). Installing into a tool's **global CLI configuration directory** (`~/.config/kilo/`, `~/.codex/`, `~/.claude/`, `~/.opencode/`, `%APPDATA%\…\<tool>\`, etc.) is **not supported and is forbidden**: such directories are owned by the CLI itself, the adapter targets (`.kilo/commands/`, `.kilo/agents/`, …) do not match what the CLI looks up globally, `AGENTS.md` path rewriting yields broken links, and `.dev.env` / OpenSpec / `.ai-rules.json` have no project to bind to. A "global" install is always wrong, even when the user has not opened a project — there is nothing meaningful for the rules to attach to.
+
+Before doing **any** filesystem operation, resolve the project root:
+
+1. Use the working directory the agent was launched in if it is plausibly a project root (contains `Configuration.xml`, `ConfigurationExtension.xml`, a `src/` / `cf/` source dump, a `.cursor/` / `.claude/` / `.kilo/` / `.codex/` / `.opencode/` / `.ai-agent/` directory, a `.git/`, or an existing `AGENTS.md` / `.ai-rules.json`).
+2. If the working directory **is** a tool CLI config directory (path matches `~/.config/<tool>`, `~/.codex`, `~/.claude`, `~/.opencode`, `%APPDATA%\…\<tool>`, or contains the CLI's own marker files such as `kilo.jsonc`, `config.toml` next to `prompts/`, `package.json` with `@kilocode/plugin` / `@openai/codex` / etc., or `bun.lock` / `package-lock.json` shipped by the CLI installer) — **STOP**. Do not install there.
+3. If the working directory is anonymous (user's home, `Documents`, `Desktop`, `Downloads`, `/tmp`, `$env:TEMP`) — **STOP**.
+4. When stopping, ask the user once: *"Установить правила в текущий каталог `<path>` — это похоже на конфиг-каталог Kilo CLI / Codex CLI / домашнюю папку, а правила ставятся per-project. Укажите путь к корню 1C-проекта, в который ставить правила."* Do not proceed with a guessed path, do not "install globally as a workaround", do not create a synthetic project folder.
+
+The same rule applies to the PowerShell fallback: `install.ps1` requires being run from the project root. If a user pipes the installer into a global config directory, refuse with the same message.
+
 ### Defaults — no questions when the answer is obvious
 
 - **Channel** — agent-driven by default. Do not ask the user to choose between the agent and PowerShell channels. If you cannot perform filesystem operations, fall back to PowerShell silently.
@@ -104,6 +117,18 @@ The legacy `infobasesettings.md` file (used by earlier versions of `/loadfrom1cb
 - **Update** — re-read the source clone, re-place all managed files, refresh `AGENTS.md` (template substitution against the current active tool set, idempotent on repeated updates). Files marked `userModified` in the existing `.ai-rules.json` are preserved. As part of update, **migrate** any legacy `.ai-rules/rules/*` entries (from earlier installer versions): delete those files and remove them from the manifest. If the user modified any of them, ask before deleting.
 - **Add `<tool>`** — same as init but for one additional tool only; merge into the existing manifest. After adding, refresh `AGENTS.md` against the **full** active tool set — the canonical rules dir may shift if the new tool has higher priority.
 - **Remove `[<tool>]`** — delete files this tool owns according to the manifest. With no tool argument — delete every managed file and the manifest itself (the user keeps `USER-RULES.md`, `memory.md`, OpenSpec content, and any `*.bak.md`).
+
+### Anti-patterns observed in the wild — do not repeat
+
+Failures from past agent-driven installs that the protocol explicitly forbids:
+
+- **Installing into the CLI's global config directory.** Symptom: files copied to `~/.config/<tool>/`, `~/.codex/`, `~/.claude/`, `~/.opencode/` or `%APPDATA%\…\<tool>\`. See *Project root is mandatory — no global installs* above.
+- **Inventing directory names instead of reading the adapter.** The on-disk layout per tool is **only** what `adapters/<tool>.yaml` declares under `rules.copyTo`, `agents.copyTo`, `commands.copyTo`, `skills.copyTo`, `mcp.target`. Do not paraphrase: Kilo uses `.kilo/commands/` and `.kilo/agents/` (plural) — never `.kilo/command/` / `.kilo/agent/` (singular). The strings `commands`, `agents` are part of the targeted CLI's lookup contract.
+- **Dumping the whole `1c-rules` repo into the project as a vendor subfolder.** Symptom: `./1c-rules/AGENTS.md`, `./1c-rules/content/...` appearing under the project / config directory and being referenced from the tool's entry config. The protocol places files **per section** at the adapter's `copyTo` targets; the source clone is only a staging area outside the project. Vendoring the source tree leaves `AGENTS.md` with unrewritten `content/...` paths and the tool with no skill discovery.
+- **Hand-rolling frontmatter transforms with `node -e` / inline scripts.** Symptom: ad-hoc one-liners that only convert `modelHint → model` and forget `frontmatter.drop` / `addIf` rules. Use the adapter operations as a whole (read the YAML once, apply `keep` / `drop` / `rename` / `addIf` in one pass, write back) or run `install.ps1`, which already implements them.
+- **Hooking up the tool entry config (`kilo.jsonc`, `.codex/config.toml`, `claude_desktop_config.json`, …) by hand.** The tool entry is whatever the adapter declares (e.g. `AGENTS.md` at the project root for tools that read it, the rendered MCP file at `mcp.target`). Do not add custom `instructions` / `skills.paths` arrays pointing at the staging clone — they bypass adapter-rewritten paths.
+- **Skipping `AGENTS.md` rewriting, `.dev.env` bootstrap, OpenSpec scaffold, or `.ai-rules.json` manifest.** All four are mandatory steps of the lean sequence. An install that completes without them is incomplete and will fail later updates / diagnostics.
+- **Using `Invoke-Expression` on the raw `install.ps1` URL** — see *Do NOT pipe `install.ps1` into `Invoke-Expression`* below.
 
 ### Confirm before destructive actions
 
