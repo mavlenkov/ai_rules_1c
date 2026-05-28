@@ -28,6 +28,23 @@
 #     otherwise `mode: all`.
 #   - Detection accepts both `.kilo/` (new) and `.kilocode/` (legacy) so
 #     existing projects keep working without re-installing.
+#
+# Anti-patterns observed in past agent installs (do NOT repeat):
+#   - Installing into `~/.config/kilo/` (or `%APPDATA%\kilo\`) — that path is
+#     the Kilo CLI's OWN global configuration directory, not a project root.
+#     Installing there leaves AGENTS.md with unrewritten `content/...` paths,
+#     `.dev.env` / OpenSpec / `.ai-rules.json` with nothing to bind to, and
+#     the CLI does not look up rules / agents / commands / skills from its
+#     own config dir. The protocol is project-scoped — see AGENT-INSTALL.md
+#     `## Agent protocol > Project root is mandatory — no global installs`.
+#   - Using singular directory names `.kilo/command/` / `.kilo/agent/`.
+#     The CLI's lookup contract is plural — `.kilo/commands/` and
+#     `.kilo/agents/`. The `copyTo` strings below are the ground truth; do
+#     not paraphrase them.
+#   - Dumping the whole `1c-rules` repo into the project as a `1c-rules/`
+#     vendor subfolder and pointing `kilo.jsonc` at it. The protocol places
+#     per-section files at the targets below; the source clone stays
+#     outside the project.
 
 tool: kilocode
 schemaVersion: 1
