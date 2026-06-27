@@ -1,4 +1,4 @@
-# 1c-rules — набор правил и инструментов разработки на 1С для ИИ-агентов
+# 1c-rules — набор правил и инструментов разработки на 1С для ИИ-агентов · Linux + 1CFilesConverter edition
 
 > **Этот форк** (`mavlenkov/ai_rules_1c`) — Linux + 1CFilesConverter edition. Поверх upstream добавлены: bash-установщик `scripts/install.sh` (Linux/CI-сценарии, флаги `--host` и `--publish-url`); форк-команды `deploy-and-test` / `extensions` / `dataprocessors` / `getconfigfiles` с поддержкой 1CFilesConverter (Mode 1) и Designer fallback (Mode 2), читающие параметры из `.dev.env` (fork-only Раздел 3); кросс-платформенная (Linux-first) адаптация команд upstream `loadfrom1cbase` / `update1cbase` / `doctor` / `checkmcp` / `installmcp` / `updatemcp`; команда `updaterules` обновляет правила из самого форка; Linux-синтаксис строк подключения и автодетекция расширений по `<ConfigurationExtensionPurpose>`; трёхъярусная схема моделей субагентов (`reasoning` — исследование/спеки/архитектура → `coding` — реализация → `light` — мелкие задачи) вместо upstream-двух ярусов; bash-установщик реализует OpenCode `permission`-объект и подстановку моделей по ярусам наравне с `install.ps1`; из набора скиллов исключён `transcribe` (Gemini, расшифровка аудио/видео — не используется). Upstream — `comol/ai_rules_1c`.
 
@@ -23,16 +23,27 @@
 
 Установка спроектирована как протокол, который выполняет сам ИИ-агент. Откройте проект в любимом ИИ-агенте (Cursor / Claude Code / Codex / OpenCode / Kilo Code) и отправьте сообщение:
 
-> Установи правила из `https://github.com/comol/ai_rules_1c` по `AGENT-INSTALL.md`.
+> Установи правила из `https://github.com/mavlenkov/ai_rules_1c` по `AGENT-INSTALL.md`.
 
 Всё. Остальное — клонирование репозитория, определение активных инструментов, миграция существующих `AGENTS.md` / `CLAUDE.md`, запросы перед разрушительными действиями — описано в [`AGENT-INSTALL.md`](AGENT-INSTALL.md), который агент прочитает сам.
 
-### Fallback: PowerShell-установщик
+### Fallback: Linux/bash-установщик (основной CLI этого форка)
 
-Если агент не справляется (ограниченная среда, нет FS-доступа, нужен детерминированный CI-запуск) — тот же протокол реализован как PowerShell-скрипт `install.ps1`:
+Под Linux/macOS детерминированный CLI-путь этого форка — `scripts/install.sh`. Поддерживает три tools (cursor, claude-code, opencode), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — подставляет реальный хост docker-MCP-серверов в `localhost`-URL'ы из `content/mcp-servers.json`; и `--publish-url` — подставляет URL веб-публикации ИБ в сервер `1c-data-mcp` (`{INFOBASE_PUBLISH_URL}/hs/mcp`, с обрезкой концевого `/` и сегмента локали `/ru`). Без `--publish-url` плейсхолдер сохраняется и выводится предупреждение.
+
+```bash
+git clone https://github.com/mavlenkov/ai_rules_1c.git /tmp/1c-rules
+/tmp/1c-rules/scripts/install.sh ~/Проекты/МойПроект1С --host alcor --publish-url 'http://localhost/МойПроект1С/ru/'
+```
+
+Если активные tools не указаны (`--tools`), скрипт сам определяет их по detection rules адаптеров (`.cursor/` / `.claude/` / `.opencode/`). Реализует те же frontmatter-операции, что и `install.ps1` (включая OpenCode `permission` и подстановку моделей субагентов по ярусам). Codex и Kilo Code не поддерживаются — для них используй `install.ps1` под `pwsh`.
+
+### Fallback: PowerShell-установщик (Windows; Codex / Kilo Code на любой ОС)
+
+На Windows, либо когда нужны не покрытые bash-скриптом инструменты (Codex, Kilo Code), — тот же протокол реализован как PowerShell-скрипт `install.ps1` (работает и под `pwsh` на Linux):
 
 ```powershell
-git clone https://github.com/comol/ai_rules_1c.git $env:TEMP\1c-rules
+git clone https://github.com/mavlenkov/ai_rules_1c.git $env:TEMP\1c-rules
 & $env:TEMP\1c-rules\install.ps1 init -Source $env:TEMP\1c-rules
 ```
 
@@ -41,21 +52,10 @@ git clone https://github.com/comol/ai_rules_1c.git $env:TEMP\1c-rules
 Параметр `-Source` также принимает URL напрямую — в этом случае установщик сам делает shallow-clone в кэш под `$env:TEMP` (ключ кэша — хэш URL) и переиспользует его при повторных запусках; требует `git` в `PATH`:
 
 ```powershell
-.\install.ps1 init -Source https://github.com/comol/ai_rules_1c
+.\install.ps1 init -Source https://github.com/mavlenkov/ai_rules_1c
 ```
 
 Команды: `init` / `update` / `add <tool>` / `remove [<tool>]` / `doctor` / `eject`.
-
-### Fallback: Linux/bash-установщик (форк)
-
-Если работаешь под Linux/macOS и нужно поставить детерминированно из CLI — в форке `mavlenkov/ai_rules_1c` есть `scripts/install.sh`. Поддерживает три tools (cursor, claude-code, opencode), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — подставляет реальный хост docker-MCP-серверов в `localhost`-URL'ы из `content/mcp-servers.json`; и `--publish-url` — подставляет URL веб-публикации ИБ в сервер `1c-data-mcp` (`{INFOBASE_PUBLISH_URL}/hs/mcp`, с обрезкой концевого `/` и сегмента локали `/ru`). Без `--publish-url` плейсхолдер сохраняется и выводится предупреждение.
-
-```bash
-git clone https://github.com/mavlenkov/ai_rules_1c.git /tmp/1c-rules
-/tmp/1c-rules/scripts/install.sh ~/Проекты/МойПроект1С --host alcor --publish-url 'http://localhost/МойПроект1С/ru/'
-```
-
-Если активные tools не указаны (`--tools`), скрипт сам определяет их по detection rules адаптеров (`.cursor/` / `.claude/` / `.opencode/`). Codex и Kilo Code не поддерживаются — для них используй `install.ps1` под `pwsh`.
 
 ### Совместимость с мультипроектной установкой MCP (INSTALL.md, режим 3)
 
