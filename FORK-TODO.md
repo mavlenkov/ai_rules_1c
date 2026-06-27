@@ -13,29 +13,33 @@
 спрашивать»; модели субагентов по ярусам; новый `permission`-механизм OpenCode;
 секция про мультипроектную MCP-установку). Новые техдолги:
 
-### 5. `scripts/install.sh` — не реализует `toolsToPermission` (OpenCode `permission`)
+### 5. ✅ РЕШЕНО (2026-06-27): `scripts/install.sh` реализует `toolsToPermission`
 
 Upstream доработал `adapters/opencode.yaml`: вместо «дропнуть массив `tools`»
-он теперь ТРАНСФОРМИРУЕТ список инструментов в объект `permission`
+он ТРАНСФОРМИРУЕТ список инструментов в объект `permission`
 (`toolsToPermission`: Read→read, Write/Edit→edit, Grep→grep, Glob→glob,
 Shell→bash; не выданное = `deny`), чтобы read-only субагенты (`explorer`,
-`code-reviewer`, `arch-reviewer`) не могли писать/звать shell. Наш
-`apply_frontmatter_ops()` в `scripts/install.sh` знает только
-`keep`/`drop`/`rename`/`addIf` — директиву `toolsToPermission` он игнорирует.
-Проверено эмпирически: opencode-агенты, разложенные через install.sh, выходят
-БЕЗ `permission` и без `tools` (дефолтный toolset). **Конфиг не ломается**
-(массив не пишется), но read-only ограничения не применяются. Установка через
-`install.ps1` корректна. Фикс: реализовать `toolsToPermission` в install.sh.
+`code-reviewer`, `arch-reviewer`) не могли писать/звать shell. Раньше наш
+`apply_frontmatter_ops()` знал только `keep`/`drop`/`rename`/`addIf`.
+**Фикс:** в `apply_frontmatter_ops()` добавлена Phase 0 (построение `permission`
+из `tools` до keep/drop), повторяющая `Invoke-FrontmatterOps` Phase 0 из
+`install.ps1`; `fm_to_text()` научился сериализовать вложенный dict block-style
+(как `Format-FrontmatterEntry`). Проверено: `developer` → всё `allow`,
+`code-reviewer` (Read+MCP) → `edit`/`grep`/`glob`/`bash: deny`, MCP не маппится.
 
-### 6. `scripts/install.sh` — не подставляет модель по `modelTier`
+### 6. ✅ РЕШЕНО (2026-06-27): `scripts/install.sh` подставляет модель по `modelTier`
 
 Upstream убрал `modelHint` из `content/agents/*.md` и ввёл `modelTier`
 (`coding` / `light`) + параметры `.dev.env` `SUBAGENT_MODEL_CODING` /
 `SUBAGENT_MODEL_LIGHT`; установщик подставляет модель в файл субагента по ярусу.
-`install.ps1` это умеет, наш `install.sh` — нет (`modelTier` не в `keep` →
-дропается, поле модели не появляется). Агенты выходят на дефолтной модели
-AI-клиента. Не ломает установку, но `.dev.env`-параметры моделей через bash-канал
-не действуют. Фикс: читать `SUBAGENT_MODEL_*` из `.dev.env` и маппить `modelTier`.
+**Фикс:** добавлены `resolve_model_tiers()` (читает `SUBAGENT_MODEL_*` из
+`TARGET/.dev.env`, кэш на прогон) и `resolve_agent_model_tier()` (заменяет
+`modelTier` → `modelHint` до frontmatter-ops; нет модели → ключ удаляется),
+вызывается в `place_section` для `section == 'agents'`. Зеркалит
+`Resolve-ModelTiers` / `Resolve-AgentModelTier` из `install.ps1`. install.sh
+неинтерактивен: без `.dev.env`/ключа модель не эмитится (дефолт AI-клиента).
+Проверено: с `.dev.env` `coding=opus` → `model: opus`; без `.dev.env` — нет
+поля модели, `modelTier` удалён.
 
 ## После мержа upstream «версия 4» (2026-05-25, upstream `5b246bc`)
 
