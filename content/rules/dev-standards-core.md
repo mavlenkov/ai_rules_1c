@@ -49,12 +49,21 @@ Used by `/loadfrom1cbase`, `/update1cbase`, `/getconfigfiles`, `/deploy-and-test
 | `{PLATFORM_PATH}` | 1C platform install dir (must contain `bin\1cv8.exe`); used as the executable for all Designer-mode commands | Highly desirable for any IB-bound command | Ask when an IB-bound command is scheduled; the command cannot run without it |
 | `{INFOBASE_KIND}` | `file` → `/F`, `server` → `/S` flag for Designer | Defaulted | Defaults to `file` (per `.dev.env.example`) |
 | `{INFOBASE_PATH}` | Path to file infobase or connection string of server infobase | **Highly desirable** — критично для обновления / выгрузки конфигурации | Ask only when `/loadfrom1cbase`, `/update1cbase`, `/getconfigfiles`, `/deploy-and-test` is invoked; otherwise stay silent |
-| `{IB_USER}` / `{IB_PASSWORD}` | Optional credentials (`/N`, `/P`); empty values omit the flags | **Highly desirable** if the IB requires authentication | Try the command without credentials first; ask the user only if the command fails with an auth error |
+| `{IB_USER}` / `{IB_PASSWORD}` | Optional credentials (`/N`, `/P`); empty values omit the flags | Defaulted | Empty = no credentials, the `/N` / `/P` (or `--user` / `--password`) flags are omitted. **Never ask up front.** Re-ask only if the command itself fails with an authentication error from the platform. An empty password is a fully valid configuration for dev / test infobases. |
 | `{EXTENSION_NAME}` | Optional `-Extension` argument | Defaulted | Empty = operations apply to main configuration |
 | `{EXPORT_PATH}` | Source-export directory | Defaulted | Empty = current repository root |
-| `{LOG_PATH}` | Designer log file (must be writable) | Highly desirable for any Designer-mode command | Ask when Designer-mode command is scheduled |
+| `{LOG_PATH}` | Designer log file (must be writable) | Defaulted | Empty = `$env:TEMP\1cv8.log` (Windows) / `$TMPDIR/1cv8.log` (POSIX). The directory always exists; any writable path works equally well — **never ask up front**. Re-ask only if the resolved path turns out to be non-writable at runtime. |
 | `{INFOBASE_PUBLISH_URL}` | Web-publish URL of the test infobase for `1c-tester` UI tests | **Highly desirable** — критично для UI-тестирования | Empty = UI tests are silently skipped, the rest of `/deploy-and-test` still runs; only ask if the user explicitly requested UI tests |
 | `{IBCMD_CONFIG}` | Path to standalone-server `config.yml` for `ibcmd`-based ops | Defaulted | Empty = fallback to Designer (per `.dev.env.example`) |
+
+### Subagent model parameters
+
+Consumed by the **installer** when rendering subagent files (source agents declare an abstract `modelTier: coding | light` instead of a concrete model — see `content/rules/subagents.md → Model-tier routing`). Not consulted at task time.
+
+| Parameter | Effect | Class | Behavior when empty |
+|---|---|---|---|
+| `{SUBAGENT_MODEL_CODING}` | Concrete model for tier `coding` (coding / architecture / planning / analysis / review subagents) | Defaulted | Empty = the model field is omitted from installed agent files; the AI client uses its default model. **Never ask at task time**; re-render via `install.ps1 update` after editing. |
+| `{SUBAGENT_MODEL_LIGHT}` | Concrete model for tier `light` (small bounded tasks: quick error fixes, scouting, mechanical checks) | Defaulted | Same as above |
 
 Task number `{TASK}` is **only required when modification comment markers are produced** — i.e. when the change touches **typical (standard) configuration code** and the templates `{COMMENT_OPEN}` / `{COMMENT_CLOSE}` reference `{TASK}`. For new objects with `{PREFIX}` (no per-method markers), review / analysis / documentation tasks, and any task where `COMPANY` / `DEVELOPER` are empty (markers skipped) — `{TASK}` is **not required**. Do not block on it.
 
@@ -285,6 +294,6 @@ Before keeping a comment, answer: **"What does this comment tell the reader that
 
 ## 8. Internal Code Review After Each Edit
 
-After any code change, perform a brief internal review covering: style, readability, correctness, edge cases, security, concurrency / locks / transactions, BSL-LS compliance. If issues are found — fix them and re-run the cycle until the code is clean.
+After any code change, perform a brief internal review covering: style, readability, correctness, edge cases, security, concurrency / locks / transactions, BSL-LS compliance. If issues are found — fix them and re-run the cycle, staying within the verification budget from `AGENTS.md → MCP Tool Calling → B.1` (one call per validator by default, up to 3 only on substantive defects). After the budget is exhausted — fix the substantive issues and report any remaining style noise instead of looping further.
 
 Always consider whether an external transaction already exists (e.g. an object-write transaction) before opening a new one. See `platform-solutions.md` for the canonical templates.
