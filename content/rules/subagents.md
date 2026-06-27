@@ -56,11 +56,12 @@ category: workflow
 
 ## Model-tier routing
 
-Subagent source files do **not** hard-code model names. Each agent declares an abstract tier in its frontmatter — `modelTier: coding` or `modelTier: light` — and the installer resolves the tier into a concrete model from `.dev.env` (`SUBAGENT_MODEL_CODING` / `SUBAGENT_MODEL_LIGHT`, both Defaulted: empty = the AI client's default model; see `dev-standards-core.md §1 → "Subagent model parameters"`). Model names live only in project settings, never in rules or agent prompts.
+Subagent source files do **not** hard-code model names. Each agent declares an abstract tier in its frontmatter — `modelTier: reasoning`, `modelTier: coding` or `modelTier: light` — and the installer resolves the tier into a concrete model from `.dev.env` (`SUBAGENT_MODEL_REASONING` / `SUBAGENT_MODEL_CODING` / `SUBAGENT_MODEL_LIGHT`, all Defaulted: empty = the AI client's default model; see `dev-standards-core.md §1 → "Subagent model parameters"`). Model names live only in project settings, never in rules or agent prompts.
 
-The two tiers:
+The three tiers (design → implementation → small tasks), so the strong "thinking" model produces specs and the cheaper model implements against them:
 
-- **`coding`** — the primary tier: coding, architecture, planning, analysis, review, metadata / forms, refactoring, performance, testing, documentation. Default for every subagent except `1c-error-fixer`.
+- **`reasoning`** — research, design and specifications: `1c-explorer` (codebase exploration), `1c-analytic` (PRD / specs), `1c-planner` (implementation plans), `1c-architect` (architecture), `1c-arch-reviewer` (architecture review). The strongest available model — deep analysis of an unfamiliar configuration and authoring the specs the `coding` tier then builds against.
+- **`coding`** — implementation against ready specs: `1c-developer`, `1c-metadata-manager`, `1c-refactoring`, `1c-tester`, `1c-code-reviewer`, `1c-performance-optimizer`, `1c-doc-writer`.
 - **`light`** — small bounded tasks where a cheaper / faster model saves limits without hurting quality: quick error fixes, read-only scouting, impact lists, mechanical post-edit checks. Default for `1c-error-fixer`.
 
 Routing rules:

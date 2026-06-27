@@ -1918,9 +1918,11 @@ function Invoke-PlaceSkill {
 # ============================================================================
 #
 # Source agent files in content/agents/*.md declare an abstract `modelTier`
-# (coding | light) instead of a concrete model name. The concrete model per
-# tier is a project setting in .dev.env:
-#   SUBAGENT_MODEL_CODING — coding / analysis / review subagents;
+# (reasoning | coding | light) instead of a concrete model name. The concrete
+# model per tier is a project setting in .dev.env:
+#   SUBAGENT_MODEL_REASONING — research / specs / architecture subagents
+#                              (explorer, analytic, planner, architect, arch-reviewer);
+#   SUBAGENT_MODEL_CODING — implementation / code-review / test subagents;
 #   SUBAGENT_MODEL_LIGHT  — small bounded tasks (e.g. 1c-error-fixer).
 # Both are DEFAULTED parameters: an empty value means the model field is
 # omitted from the installed agent file and the AI client uses its default
@@ -1929,7 +1931,7 @@ function Invoke-PlaceSkill {
 # during agent placement and persisted into the rendered .dev.env by
 # Place-DevEnv. On update they are read from the existing .dev.env silently.
 
-$script:ModelTierKeys = [ordered]@{ coding = 'SUBAGENT_MODEL_CODING'; light = 'SUBAGENT_MODEL_LIGHT' }
+$script:ModelTierKeys = [ordered]@{ reasoning = 'SUBAGENT_MODEL_REASONING'; coding = 'SUBAGENT_MODEL_CODING'; light = 'SUBAGENT_MODEL_LIGHT' }
 $script:ModelTierValues = $null
 
 function Resolve-ModelTiers {
@@ -1937,7 +1939,7 @@ function Resolve-ModelTiers {
     # default). Cached for the whole run so the interactive prompt fires once.
     param([string]$Root)
     if ($null -ne $script:ModelTierValues) { return $script:ModelTierValues }
-    $vals = [ordered]@{ coding = ''; light = '' }
+    $vals = [ordered]@{ reasoning = ''; coding = ''; light = '' }
     $envPath = Join-Path $Root $script:DevEnvFileName
     if (Test-Path $envPath) {
         $keys = Read-DevEnvKeys -Path $envPath
@@ -1949,11 +1951,12 @@ function Resolve-ModelTiers {
     elseif (-not $NonInteractive) {
         Write-Info ''
         Write-Info '  Модели субагентов (Enter — модель AI-клиента по умолчанию):'
-        $vals['coding'] = Read-Required 'SUBAGENT_MODEL_CODING (модель для кодинга/анализа/ревью)' ''
-        $vals['light']  = Read-Required 'SUBAGENT_MODEL_LIGHT (модель для небольших задач: быстрые исправления, разведка)' ''
+        $vals['reasoning'] = Read-Required 'SUBAGENT_MODEL_REASONING (модель для исследования/спек/архитектуры: explorer, analytic, planner, architect, arch-reviewer)' ''
+        $vals['coding']    = Read-Required 'SUBAGENT_MODEL_CODING (модель для реализации/ревью кода/тестов: developer, metadata-manager, refactoring, tester, code-reviewer, performance-optimizer, doc-writer)' ''
+        $vals['light']     = Read-Required 'SUBAGENT_MODEL_LIGHT (модель для небольших задач: быстрые исправления ошибок)' ''
     }
-    if (-not $vals['coding'] -and -not $vals['light']) {
-        Write-Info '  subagent models not set (SUBAGENT_MODEL_CODING / SUBAGENT_MODEL_LIGHT in .dev.env) — agents will use the AI client default model'
+    if (-not $vals['reasoning'] -and -not $vals['coding'] -and -not $vals['light']) {
+        Write-Info '  subagent models not set (SUBAGENT_MODEL_REASONING / SUBAGENT_MODEL_CODING / SUBAGENT_MODEL_LIGHT in .dev.env) — agents will use the AI client default model'
     }
     $script:ModelTierValues = $vals
     return $vals
@@ -3263,8 +3266,8 @@ function Place-RootTemplates {
 # never re-asked at task time):
 #   IB_PASSWORD (empty = no password; /P omitted),
 #   LOG_PATH    (empty = $env:TEMP\1cv8.log),
-#   SUBAGENT_MODEL_CODING / SUBAGENT_MODEL_LIGHT (empty = AI client default
-#   model; see SECTION 7b).
+#   SUBAGENT_MODEL_REASONING / SUBAGENT_MODEL_CODING / SUBAGENT_MODEL_LIGHT
+#   (empty = AI client default model; see SECTION 7b).
 
 function Find-PlatformPath {
     # Returns the path to the most recent installed 1C platform under
