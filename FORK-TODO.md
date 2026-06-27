@@ -13,6 +13,31 @@
 спрашивать»; модели субагентов по ярусам; новый `permission`-механизм OpenCode;
 секция про мультипроектную MCP-установку). Новые техдолги:
 
+### 7. Третий ярус моделей `reasoning` — осознанное расхождение с upstream
+
+Upstream использует **два** яруса субагентов (`coding` / `light`). Форк ввёл
+**третий** — `reasoning` (2026-06-27) под схему «opus проектирует → sonnet
+исполняет»: `reasoning` (исследование/спеки/архитектура: `1c-explorer`,
+`1c-analytic`, `1c-planner`, `1c-architect`, `1c-arch-reviewer`) → сильная
+модель; `coding` (реализация: developer, metadata-manager, refactoring, tester,
+code-reviewer, performance-optimizer, doc-writer); `light` (error-fixer).
+Параметр `.dev.env` — `SUBAGENT_MODEL_REASONING`. Затронуто: `modelTier:
+reasoning` у 5 агентов в `content/agents/`, `ModelTierKeys` в `install.ps1`,
+`MODEL_TIER_KEYS` в `scripts/install.sh`, `.dev.env.example` Раздел 4, доки
+(`AGENTS.md`, `subagents.md`, `dev-standards-core.md`, `AGENT-INSTALL.md`,
+`README.md`). **При будущем merge upstream:** их `modelTier: coding` у
+explorer/analytic/planner/architect/arch-reviewer будет конфликтовать с нашим
+`reasoning` — сохранять форк-значение. Если upstream введёт свой 3-й ярус с
+другим именем — согласовать.
+
+### 8. Удалён скилл `transcribe` (форк)
+
+Скилл `transcribe` (Gemini 2.5 Flash API, расшифровка аудио/видео) удалён из
+форка (2026-06-27): ни одна из используемых моделей (Claude) не принимает аудио,
+скилл не нужен. Удалена папка `content/skills/transcribe/` + ссылки в `AGENTS.md`,
+`README.md`, `AGENT-INSTALL.md`. **При будущем merge upstream** скилл вернётся
+(он есть в upstream) — удалять повторно при необходимости.
+
 ### 5. ✅ РЕШЕНО (2026-06-27): `scripts/install.sh` реализует `toolsToPermission`
 
 Upstream доработал `adapters/opencode.yaml`: вместо «дропнуть массив `tools`»

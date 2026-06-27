@@ -58,12 +58,13 @@ Used by `/loadfrom1cbase`, `/update1cbase`, `/getconfigfiles`, `/deploy-and-test
 
 ### Subagent model parameters
 
-Consumed by the **installer** when rendering subagent files (source agents declare an abstract `modelTier: coding | light` instead of a concrete model — see `content/rules/subagents.md → Model-tier routing`). Not consulted at task time.
+Consumed by the **installer** when rendering subagent files (source agents declare an abstract `modelTier: reasoning | coding | light` instead of a concrete model — see `content/rules/subagents.md → Model-tier routing`). Not consulted at task time.
 
 | Parameter | Effect | Class | Behavior when empty |
 |---|---|---|---|
-| `{SUBAGENT_MODEL_CODING}` | Concrete model for tier `coding` (coding / architecture / planning / analysis / review subagents) | Defaulted | Empty = the model field is omitted from installed agent files; the AI client uses its default model. **Never ask at task time**; re-render via `install.ps1 update` after editing. |
-| `{SUBAGENT_MODEL_LIGHT}` | Concrete model for tier `light` (small bounded tasks: quick error fixes, scouting, mechanical checks) | Defaulted | Same as above |
+| `{SUBAGENT_MODEL_REASONING}` | Concrete model for tier `reasoning` (research / specs / architecture: explorer, analytic, planner, architect, arch-reviewer) | Defaulted | Empty = the model field is omitted from installed agent files; the AI client uses its default model. **Never ask at task time**; re-render via `install.ps1 update` after editing. |
+| `{SUBAGENT_MODEL_CODING}` | Concrete model for tier `coding` (implementation against specs: developer, metadata-manager, refactoring, tester, code-reviewer, performance-optimizer, doc-writer) | Defaulted | Same as above |
+| `{SUBAGENT_MODEL_LIGHT}` | Concrete model for tier `light` (small bounded tasks: quick error fixes, mechanical checks) | Defaulted | Same as above |
 
 Task number `{TASK}` is **only required when modification comment markers are produced** — i.e. when the change touches **typical (standard) configuration code** and the templates `{COMMENT_OPEN}` / `{COMMENT_CLOSE}` reference `{TASK}`. For new objects with `{PREFIX}` (no per-method markers), review / analysis / documentation tasks, and any task where `COMPANY` / `DEVELOPER` are empty (markers skipped) — `{TASK}` is **not required**. Do not block on it.
 

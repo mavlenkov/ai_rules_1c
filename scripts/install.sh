@@ -274,14 +274,16 @@ def apply_frontmatter_ops(fm, ops):
     return out
 
 # --- Model-tier resolution (agents) ---------------------------------------
-# Source agent files declare an abstract `modelTier` (coding | light) instead of
-# a concrete model. Map it to `modelHint` (consumed by the adapters' keep/rename
-# ops) using SUBAGENT_MODEL_* from the target .dev.env. Mirrors
+# Source agent files declare an abstract `modelTier` (reasoning | coding | light)
+# instead of a concrete model. Map it to `modelHint` (consumed by the adapters'
+# keep/rename ops) using SUBAGENT_MODEL_* from the target .dev.env. Mirrors
 # Resolve-ModelTiers / Resolve-AgentModelTier in install.ps1. This installer is
 # non-interactive: when .dev.env (or the key) is absent, no model is emitted and
 # the AI client falls back to its default model.
 
-MODEL_TIER_KEYS = {'coding': 'SUBAGENT_MODEL_CODING', 'light': 'SUBAGENT_MODEL_LIGHT'}
+MODEL_TIER_KEYS = {'reasoning': 'SUBAGENT_MODEL_REASONING',
+                   'coding': 'SUBAGENT_MODEL_CODING',
+                   'light': 'SUBAGENT_MODEL_LIGHT'}
 _MODEL_TIERS = None  # cache for the whole run
 
 def read_dev_env_keys(path):
@@ -299,7 +301,7 @@ def resolve_model_tiers():
     global _MODEL_TIERS
     if _MODEL_TIERS is not None:
         return _MODEL_TIERS
-    vals = {'coding': '', 'light': ''}
+    vals = {'reasoning': '', 'coding': '', 'light': ''}
     env_path = TARGET / '.dev.env'
     if env_path.exists():
         keys = read_dev_env_keys(env_path)
