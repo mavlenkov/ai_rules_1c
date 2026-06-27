@@ -21,13 +21,17 @@ Read from `.dev.env`:
 | `PLATFORM_PATH` | Platform install dir. `V8_VERSION` = `basename(PLATFORM_PATH)`; the executable is `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows) |
 | `INFOBASE_KIND` | `file` or `server` (empty = `file`) |
 | `INFOBASE_PATH` | File path or server connection string (see "Connection string" below) |
-| `IB_USER` / `IB_PASSWORD` | Credentials, optional |
+| `IB_USER` / `IB_PASSWORD` | Credentials; empty = no authentication, `/N` / `/P` (or `--user` / `--password`) are omitted. An empty password is a fully valid configuration for dev / test infobases — **do not ask up front**. Re-ask only if the platform itself returns an authentication error. |
 | `EXTENSION_NAME` | Extension name; empty = main configuration |
-| `LOG_PATH` | Designer / converter log file |
+| `EXPORT_PATH` | Source directory; empty means repository root |
+| `LOG_PATH` | Designer / converter log file; empty resolves to `$TMPDIR/1cv8.log` (Linux) / `$env:TEMP\1cv8.log` (Windows). **Do not ask up front** — any writable path works equally well. Re-ask only if the resolved path turns out to be non-writable. |
 | `INFOBASE_PUBLISH_URL` | Web-publish URL for UI tests; empty = skip UI tests |
+| `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
 | **fork Section 3** | `CONVERTER_PATH`, `CONVERT_TOOL`, `IBCMD_TOOL`, `DB_SRV_*`, `REMOTE_*` — see `.dev.env.example` |
 
-Critical deploy fields: `INFOBASE_PATH`, `PLATFORM_PATH`, `LOG_PATH`. If empty, ask the user and write the values back to `.dev.env`. If the project requires 1CFilesConverter (Mode 1), `CONVERTER_PATH` is also critical.
+Critical deploy fields are `INFOBASE_PATH` and `PLATFORM_PATH`. If either is empty, ask the user and write the value to `.dev.env`. **Do not** ask about `IB_USER` / `IB_PASSWORD` / `LOG_PATH` when they are empty; apply the documented defaults silently. If the project requires 1CFilesConverter (Mode 1), `CONVERTER_PATH` is also critical.
+
+When substituting `.dev.env` values into the templates below: if `LOG_PATH` is empty, replace `{LOG_PATH}` with `"$TMPDIR/1cv8.log"` (Linux) / `"$env:TEMP\1cv8.log"` (Windows; PowerShell expands the env var inside a double-quoted string).
 
 ## Connection string (`<IB_CONNECTION>`)
 

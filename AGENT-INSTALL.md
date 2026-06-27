@@ -16,6 +16,19 @@ A project installed by one channel can later be updated by the other.
 
 If the user asks you to install or update `1c-rules`, follow this protocol from the **project root** (the directory where `AGENTS.md` should live).
 
+### Project root is mandatory — no global installs
+
+`1c-rules` is a **project-scoped** toolkit. Every supported tool (Cursor, Claude Code, Codex, OpenCode, Kilo Code, `other`) reads its always-on context from the project root, and every on-demand rule / agent / command / skill lands under a project-local tool directory (`.cursor/`, `.claude/`, `.kilo/`, `.codex/`, `.opencode/`, `.ai-agent/`). Installing into a tool's **global CLI configuration directory** (`~/.config/kilo/`, `~/.codex/`, `~/.claude/`, `~/.opencode/`, `%APPDATA%\…\<tool>\`, etc.) is **not supported and is forbidden**: such directories are owned by the CLI itself, the adapter targets (`.kilo/commands/`, `.kilo/agents/`, …) do not match what the CLI looks up globally, `AGENTS.md` path rewriting yields broken links, and `.dev.env` / OpenSpec / `.ai-rules.json` have no project to bind to. A "global" install is always wrong, even when the user has not opened a project — there is nothing meaningful for the rules to attach to.
+
+Before doing **any** filesystem operation, resolve the project root:
+
+1. Use the working directory the agent was launched in if it is plausibly a project root (contains `Configuration.xml`, `ConfigurationExtension.xml`, a `src/` / `cf/` source dump, a `.cursor/` / `.claude/` / `.kilo/` / `.codex/` / `.opencode/` / `.ai-agent/` directory, a `.git/`, or an existing `AGENTS.md` / `.ai-rules.json`).
+2. If the working directory **is** a tool CLI config directory (path matches `~/.config/<tool>`, `~/.codex`, `~/.claude`, `~/.opencode`, `%APPDATA%\…\<tool>`, or contains the CLI's own marker files such as `kilo.jsonc`, `config.toml` next to `prompts/`, `package.json` with `@kilocode/plugin` / `@openai/codex` / etc., or `bun.lock` / `package-lock.json` shipped by the CLI installer) — **STOP**. Do not install there.
+3. If the working directory is anonymous (user's home, `Documents`, `Desktop`, `Downloads`, `/tmp`, `$env:TEMP`) — **STOP**.
+4. When stopping, ask the user once: *"Установить правила в текущий каталог `<path>` — это похоже на конфиг-каталог Kilo CLI / Codex CLI / домашнюю папку, а правила ставятся per-project. Укажите путь к корню 1C-проекта, в который ставить правила."* Do not proceed with a guessed path, do not "install globally as a workaround", do not create a synthetic project folder.
+
+The same rule applies to the PowerShell fallback: `install.ps1` requires being run from the project root. If a user pipes the installer into a global config directory, refuse with the same message.
+
 ### Defaults — no questions when the answer is obvious
 
 - **Channel** — agent-driven by default. Do not ask the user to choose between the agent and PowerShell channels. If you cannot perform filesystem operations, fall back to PowerShell silently.
@@ -37,7 +50,7 @@ Use this lean sequence:
 
 2. **Read adapters only.** For each active tool open `adapters/<tool>.yaml` from the clone. These files are small and define, in a closed schema:
    - `detection` — how to confirm the tool is active.
-   - `rules`, `agents`, `commands`, `skills` — `copyTo` target paths (with `{name}` placeholder), `frontmatter.keep`/`drop`/`rename`/`addIf` operations, and copy `mode` (default per-file with frontmatter ops; `verbatim` for skills; `rebuild-toml` for Codex agents).
+   - `rules`, `agents`, `commands`, `skills` — `copyTo` target paths (with `{name}` placeholder), `frontmatter.keep`/`drop`/`rename`/`addIf`/`toolsToPermission` operations, and copy `mode` (default per-file with frontmatter ops; `verbatim` for skills; `rebuild-toml` for Codex agents). `toolsToPermission` (OpenCode only) converts the source `tools` array into OpenCode's `permission` object — see *OpenCode agents: `tools` array → `permission` object* below.
    - `mcp` — how `content/mcp-servers.json` is rendered into the tool's MCP config.
    - `entry` — optional entry-point template (e.g. minimal `CLAUDE.md` pointing at `AGENTS.md`).
 
@@ -45,16 +58,18 @@ Use this lean sequence:
    - `content/rules/` → `<rules.copyTo dir>/`
    - `content/agents/` → `<agents.copyTo dir>/`
    - `content/commands/` → `<commands.copyTo dir>/`
-   - `content/skills/` → `<skills.copyTo dir>/` (mode `verbatim` — copy each skill folder as-is, no transformation)
+   - `content/skills/` → `<skills.copyTo dir>/` (mode `verbatim` — copy **every** skill folder as-is, no transformation). Copy the whole `content/skills/` directory; do **not** cherry-pick a subset. All skills are required, including the non-1C-domain ones (`caveman`, `prompt-enhancer`, `handoff`, `mermaid-diagrams`, `transcribe`, `md-to-docx`, `img-grid-analysis`) — `AGENTS.md` references them and silently skipping any of them leaves a degraded ruleset. Use a single directory copy, not per-skill judgement calls.
    - `content/openspec-bundle/<tool>/` → at the locations encoded in that snapshot, **skip-if-exists**.
 
-4. **Apply frontmatter operations only where needed.** For sections that have `frontmatter.keep` / `drop` / `rename` / `addIf`:
+4. **Apply frontmatter operations only where needed.** For sections that have `frontmatter.keep` / `drop` / `rename` / `addIf` / `toolsToPermission`:
    - For each placed file, read **only** the YAML frontmatter block (between the leading `---` markers — typically the first 5–20 lines). Do not read the body.
    - Rewrite the frontmatter according to the adapter ops and write it back; the body is left untouched.
+   - **Agents: resolve `modelTier` first.** Source agent files declare an abstract `modelTier` (`coding` | `light`) instead of a concrete model name. Before applying the adapter ops, replace it with `modelHint: <concrete model>` taken from the project `.dev.env`: tier `coding` → `SUBAGENT_MODEL_CODING`, tier `light` → `SUBAGENT_MODEL_LIGHT`. When the corresponding value is empty or `.dev.env` does not exist yet, simply **remove** `modelTier` and emit no model field — the AI client then uses its default model (both parameters are DEFAULTED; never block or re-ask because of them). On first init the values may be asked once as part of the `.dev.env` bootstrap prompts (see *`.dev.env` bootstrap* below). After the resolution, the adapter ops apply as written (`keep`/`rename` reference `modelHint`).
+   - For OpenCode agents (`agents.frontmatter.toolsToPermission`) — convert the source `tools` array into a `permission` object before applying `keep`/`drop`. See *OpenCode agents: `tools` array → `permission` object* below. **Never** copy the source `tools` array into an OpenCode agent file verbatim — an array fails OpenCode config validation and prevents OpenCode from (re)starting.
    - For sections with `mode: verbatim` (skills) — skip the frontmatter step entirely.
    - For Codex agents (`mode: rebuild-toml`) — render via the adapter's `template`. This is the one case that requires the body, but only for those agent files in `content/agents/` (a small set).
 
-5. **Render the MCP config** from `content/mcp-servers.json` according to the adapter's `mcp.schema` (mcpServers JSON dictionary, OpenCode `mcp[id]` schema, or Codex TOML `[mcp_servers.<id>]`).
+5. **Render the MCP config** from `content/mcp-servers.json` according to the adapter's `mcp.schema`. **External MCP check first:** before rendering anything, detect an external MCP installation (user env `BASESAI_MCP_GLOBAL_ROOT`, fallback `MCP_GLOBAL_ROOT` in the project `.dev.env`, pointing at a folder that contains `install.manifest.json`) — see *External MCP installation (INSTALL.md, режим 3)* below. When detected, **skip this step entirely for every tool** (do not write `.cursor/mcp.json` or any other `mcp.target`), sync the `mcp:install_forme` section of `USER-RULES.md` from the install artifacts, and record `integrations.mcp.mode = "external"` in `.ai-rules.json`. Otherwise render from `content/mcp-servers.json` according to the adapter's `mcp.schema` (mcpServers JSON dictionary, OpenCode `mcp[id]` schema, or Codex TOML `[mcp_servers.<id>]`). **OpenCode only:** normalize each server key to start with a letter before writing it under `mcp` — leading `1c`/`1C` → `onec` (so `1c-syntax-checker-mcp` → `onec-syntax-checker-mcp`, `1C-docs-mcp` → `onec-docs-mcp`), any other non-letter-leading id gets an `mcp-` prefix. OpenCode names MCP tools `<server-key>_<tool>` and providers like Moonshot/Kimi reject function names that do not start with a letter (`^[a-zA-Z_]…`), which otherwise breaks the whole request with *"function name is invalid, must start with a letter"*. Canonical ids in `content/mcp-servers.json` and the docs stay `1c-…`; only the OpenCode-rendered key changes. The other adapters keep the verbatim id (Cursor/Claude prefix tool names with `mcp_`/`mcp__`, so a digit-leading key is already safe there). **Target file & merge:** write each tool's MCP into the path declared by `mcp.target` — for OpenCode this is `opencode.json` at the **project root** (NOT `.opencode/opencode.json`, which OpenCode never reads; `.opencode/` holds only agents/commands/modes/plugins/skills/tools/themes), and for Kilo Code it is `.kilo/kilo.json` under the top-level `mcp` key. Both are **shared** user configs (`mcp.merge: true`): deep-merge **only** the top-level `mcp` key and preserve every other key the user has. **OpenCode validates each MCP entry with a strict schema** — emit only `{ type: "remote", url, enabled }` (or `{ type: "local", command: [...], enabled }`); any extra key such as `description` or `connection_id` makes OpenCode reject the whole config and the servers silently never load. After writing it, **recommend that the user restart the AI client** — see *Recommend a restart after MCP changes* below.
 
 6. **Place the always-on layer** (`AGENTS.md`, `USER-RULES.md`, `memory.md`) — see the next section.
 
@@ -63,6 +78,65 @@ Use this lean sequence:
 8. **Scaffold OpenSpec.** Copy `openspec/` into the project in skip-if-exists mode (no overwrites).
 
 9. **Write the manifest** `.ai-rules.json` at the project root: list all placed files with their content sources, the active tools, the source version (`git describe --tags --always` from the clone), the protocol version (`1.0`), the canonical rules directory used for diagnostics / updates, and any detected foreign user-authored files under `foreignFiles`.
+
+### OpenCode agents: `tools` array → `permission` object
+
+The source agent files in `content/agents/*.md` declare capabilities as a `tools` **array** (e.g. `tools: ["Read", "Write", "Edit", "Grep", "Glob", "Shell", "MCP"]`). That shape is correct for Cursor and Claude Code, but **OpenCode rejects a `tools` array** — its `tools` field must be an object (`{write: true, ...}`) and is itself deprecated in favour of `permission` (OpenCode v1.1.1+). Copying the raw array into `.opencode/agent/<name>.md` fails OpenCode config validation and **prevents OpenCode from (re)starting**.
+
+When OpenCode is an active tool, the `agents` adapter therefore declares `frontmatter.toolsToPermission`, which both installation channels MUST apply: convert the `tools` array into a `permission` object **before** the `keep`/`drop` step, then drop `tools` (it is absent from `keep`). The mapping is:
+
+| Source tool | OpenCode permission key |
+| --- | --- |
+| `Read` | `read` |
+| `Write`, `Edit` | `edit` |
+| `Grep` | `grep` |
+| `Glob` | `glob` |
+| `Shell` | `bash` |
+| `MCP` | *(no key — MCP tools are gated by their own names; leave them enabled by default)* |
+
+Each mapped key granted by the source list is set to `allow`; every mapped key **not** granted is set to `deny`, so read-only agents (`1c-explorer`, `1c-code-reviewer`, `1c-arch-reviewer` — whose source `tools` omit `Write`/`Edit`/`Shell`) end up with `edit: deny` / `bash: deny` instead of silently inheriting OpenCode's permissive default tool set. Example for `1c-developer` (with `SUBAGENT_MODEL_CODING=opus` in `.dev.env`; when the parameter is empty the `model` line is omitted entirely):
+
+```yaml
+---
+name: 1c-developer
+description: "Expert 1C code developer agent. …"
+model: opus
+permission:
+  read: allow
+  edit: allow
+  grep: allow
+  glob: allow
+  bash: allow
+mode: subagent
+---
+```
+
+### Recommend a restart after MCP changes
+
+After the MCP config is written (init / update / add), **recommend that the user restart their AI client** (CLI or IDE). Most clients — OpenCode in particular — read the MCP configuration and agent definitions only at startup, so newly added MCP servers and subagents will not appear in an already-running session until the client is restarted. This recommendation applies to all tools; the PowerShell installer prints it automatically at the end of `init` / `update` / `add` whenever at least one MCP server was configured.
+
+### External MCP installation (INSTALL.md, режим 3)
+
+When the MCP servers were installed by the MCP vendor distribution's **`INSTALL.md`** in multi-project mode (**режим 3** — `GLOBAL_ROOT` folder, `projects.registry.json`, dynamic per-project ports, two-level mcp.json: global in `%USERPROFILE%\.cursor\mcp.json` + per-project in `<path_code>\.cursor\mcp.json`), the installer must **not** overwrite any tool MCP config with `content/mcp-servers.json` — the static catalog (fixed ids, ports 8000–8008) would break the working per-project layout. The catalog stays authoritative only for **managed** installs.
+
+**Detection (same order as `Detect-ExternalMcp` in `install.ps1`):**
+
+1. User environment variable **`BASESAI_MCP_GLOBAL_ROOT`** (User scope, then process scope).
+2. Fallback: **`MCP_GLOBAL_ROOT`** key in the project `.dev.env`.
+3. External mode **only if** `<GLOBAL_ROOT>/install.manifest.json` exists. Env signal without the manifest → warn and fall back to managed.
+
+**Artifact resolution — contract first, never hardcode.** Read `install.manifest.json` (`schema_version`, `artifacts`, `consumers`, `resolution`) and resolve all paths from it (placeholders `%USERPROFILE%`, `{global_root}`, `{path_code}`, `{mcp_root}`). A legacy manifest without `schema_version` resolves against the schema-v1 default contract (see `Get-DefaultMcpManifestContract` in `install.ps1`): registry at `<GLOBAL_ROOT>/projects.registry.json`, global servers in `%USERPROFILE%/.cursor/mcp.json`, project servers in `{path_code}/.cursor/mcp.json` (fallback `{mcp_root}/.cursor/mcp.json`). The current project is matched against `registry.projects[]` by `resolution.project_match` (default: normalized `path_code` == workspace root).
+
+**In external mode the agent / installer must:**
+
+- **Not create, not modify** `.cursor/mcp.json` or any other adapter `mcp.target` — for any tool.
+- Read the **actual** server ids, urls, and descriptions from the resolved global + project mcp.json files; parse ports **from the `url`** (`localhost:<PORT>`), never from constants. Servers absent from the actual mcp.json are not listed (do not "fill in" from the 1c-rules catalog). Docker container names come **only** from `registry.projects[].containers.*`.
+- Generate / refresh the block between `<!-- mcp:install_forme … -->` and `<!-- /mcp:install_forme -->` markers in `USER-RULES.md` with the resolved consumer paths and the actual server tables. Replace only the block; never touch content outside the markers. If the file contains `userModified: mcp:install_forme`, skip the regeneration and warn.
+- Record in `.ai-rules.json`: `integrations.mcp` = `{ mode: "external", schemaVersion, contractSource, manifestPath, registryPath, registryProjectId, globalMcpConfig, projectMcpConfig, globalServerIds, projectServerIds, userRulesSection: "mcp:install_forme", detectedAt }`, and set `mcpServers` to `[]` (the external installation owns the server list; the restart recommendation does not apply since no config was rewritten).
+
+**Install order to document for users:** 1) MCP via the distribution's `INSTALL.md` (режим 3; save `BASESAI_MCP_GLOBAL_ROOT` when offered), 2) `1c-rules` init in the project root (`path_code`), 3) restart the AI client. In this order the rules install never breaks the MCP links.
+
+**CLI override:** `install.ps1 init|update -McpMode managed` forces the catalog render even when the external installation is detected; `-McpMode external` requires the external installation and fails fast when the signal or manifest is missing; default `-McpMode auto` detects.
 
 ### Always-on layer placement
 
@@ -94,7 +168,7 @@ Bootstrap procedure:
    - `PLATFORM_VERSION` ← `CompatibilityMode` from `Configuration.xml` (or `ConfigurationExtension.xml`).
    - `PLATFORM_PATH` ← scan `C:\Program Files\1cv8\<version>\bin\1cv8.exe` (and `(x86)`) for the highest installed version that matches or exceeds `PLATFORM_VERSION`.
    - `PREFIX` ← `NamePrefix` from `ConfigurationExtension.xml` when the project is an extension.
-3. In interactive mode (agent channel, or PowerShell installer without `-NonInteractive`) — offer a one-time setup prompt for the **highly-desirable** fields that the user is most likely to need: `INFOBASE_PATH` (критично для `/update1cbase`, `/getconfigfiles`, `/loadfrom1cbase`, `/deploy-and-test`), `IB_USER` / `IB_PASSWORD` (если ИБ с аутентификацией), `LOG_PATH`, `INFOBASE_PUBLISH_URL` (критично для UI-тестирования через `1c-tester`), and the defaulted `INFOBASE_KIND`. Each prompt must have an obvious "skip" option — **leaving any of them empty is always valid**, it just means the corresponding command will ask later when it is actually invoked (or, for `INFOBASE_PUBLISH_URL`, silently skip UI tests). Advisory fields (`PREFIX`, `COMPANY`, `DEVELOPER`) may also be offered with the same skip choice, but they MUST NOT be re-asked on every task per `content/rules/dev-standards-core.md §1 → "Advisory parameters"`. **No field in `.dev.env` is mandatory at install time** — the installer must never block install over a missing parameter.
+3. In interactive mode (agent channel, or PowerShell installer without `-NonInteractive`) — offer a one-time setup prompt for the **highly-desirable** fields that the user is most likely to need: `INFOBASE_PATH` (критично для `/update1cbase`, `/getconfigfiles`, `/loadfrom1cbase`, `/deploy-and-test`), `INFOBASE_PUBLISH_URL` (критично для UI-тестирования через `1c-tester`), and the defaulted `INFOBASE_KIND`, `IB_USER` / `IB_PASSWORD` (empty = no authentication, the `/N` / `/P` flags are simply omitted — fully valid for dev / test infobases), `LOG_PATH` (empty = `$env:TEMP\1cv8.log` / `$TMPDIR/1cv8.log` — fully valid), `SUBAGENT_MODEL_CODING` / `SUBAGENT_MODEL_LIGHT` (empty = the AI client's default model; used to resolve the agents' `modelTier` — see *Lean placement*, step 4). Each prompt must have an obvious "skip" option — **leaving any of them empty is always valid**, it just means the corresponding command will use the documented default (`IB_USER` / `IB_PASSWORD` / `LOG_PATH` / `SUBAGENT_MODEL_*`), ask later when it is actually invoked (`INFOBASE_PATH`), or silently skip UI tests (`INFOBASE_PUBLISH_URL`). Advisory fields (`PREFIX`, `COMPANY`, `DEVELOPER`) may also be offered with the same skip choice, but they MUST NOT be re-asked on every task per `content/rules/dev-standards-core.md §1 → "Advisory parameters"`. **No field in `.dev.env` is mandatory at install time** — the installer must never block install over a missing parameter.
 4. In non-interactive mode (`-NonInteractive` / agent without ability to ask) — leave non-detected critical fields empty and emit a clear WARNING listing them. Do not block installation.
 5. Write the file to the project root and record it in `.ai-rules.json` with `template: true` so the file is never overwritten by subsequent updates.
 
@@ -102,9 +176,30 @@ The legacy `infobasesettings.md` file (used by earlier versions of `/loadfrom1cb
 
 ### Update / add / remove
 
-- **Update** — re-read the source clone, re-place all managed files, refresh `AGENTS.md` (template substitution against the current active tool set, idempotent on repeated updates). Files marked `userModified` in the existing `.ai-rules.json` are preserved. As part of update, **migrate** any legacy `.ai-rules/rules/*` entries (from earlier installer versions): delete those files and remove them from the manifest. If the user modified any of them, ask before deleting.
+- **Update** — re-read the source clone, re-place all managed files, refresh `AGENTS.md` (template substitution against the current active tool set, idempotent on repeated updates). The `userModified` contract is **uniform across every placement branch** — artefact files (rules / agents / commands), the MCP config (`.mcp.json` / `opencode.json` / `.kilo/kilo.json` / …), the `entry` file (`CLAUDE.md`), and individual skill files: any file whose on-disk hash diverges from the recorded `installedHash` is flagged `userModified` and **preserved untouched**, never silently overwritten. In particular, a user who trimmed or reformatted the MCP server list keeps that trim across updates (the full catalogue is not silently restored), and a customised `CLAUDE.md` or edited skill file survives. The update report explicitly lists which files were **left at their previous version** so "Update complete" never hides a stranded file.
+  - **Escape hatch** — `-Force` overwrites every drifted file with the shipped version ("take theirs"); `-ForcePaths <path>[,<path>…]` (comma-separated, implies `-Force`) restricts the overwrite to specific files (exact path or `*`/`?` wildcard, e.g. `.claude/skills/*`), leaving all other user edits intact. This is the supported way to pull updates into a file that drifted (including files mis-flagged by an older installer build) without hand-editing `.ai-rules.json`.
+  - **Skill files** are synced per-file rather than wiped-and-recopied: shipped files are refreshed, files dropped from the source are pruned, user-modified skill files are preserved, and files the user added into the skill directory themselves (never tracked by us) are always kept.
+  - As part of update, **migrate** any legacy `.ai-rules/rules/*` entries (from earlier installer versions): delete those files and remove them from the manifest. If the user modified any of them, ask before deleting.
 - **Add `<tool>`** — same as init but for one additional tool only; merge into the existing manifest. After adding, refresh `AGENTS.md` against the **full** active tool set — the canonical rules dir may shift if the new tool has higher priority.
 - **Remove `[<tool>]`** — delete files this tool owns according to the manifest. With no tool argument — delete every managed file and the manifest itself (the user keeps `USER-RULES.md`, `memory.md`, OpenSpec content, and any `*.bak.md`).
+
+### Anti-patterns observed in the wild — do not repeat
+
+Failures from past agent-driven installs that the protocol explicitly forbids:
+
+- **Installing into the CLI's global config directory.** Symptom: files copied to `~/.config/<tool>/`, `~/.codex/`, `~/.claude/`, `~/.opencode/` or `%APPDATA%\…\<tool>\`. See *Project root is mandatory — no global installs* above.
+- **Inventing directory names instead of reading the adapter.** The on-disk layout per tool is **only** what `adapters/<tool>.yaml` declares under `rules.copyTo`, `agents.copyTo`, `commands.copyTo`, `skills.copyTo`, `mcp.target`. Do not paraphrase: Kilo uses `.kilo/commands/` and `.kilo/agents/` (plural) — never `.kilo/command/` / `.kilo/agent/` (singular). The strings `commands`, `agents` are part of the targeted CLI's lookup contract.
+- **Overwriting an externally-managed MCP config with the static catalog.** Symptom: after installing the rules, `.cursor/mcp.json` of a project set up via the MCP distribution's `INSTALL.md` (режим 3) suddenly points at ports 8000/8006 instead of the project's registry-assigned ports (8200/8206, …), and the MCP tools stop responding. The MCP phase MUST run the external-installation detection first (see *External MCP installation (INSTALL.md, режим 3)* above) and skip rendering when `BASESAI_MCP_GLOBAL_ROOT` + `install.manifest.json` are present. `content/mcp-servers.json` is a default catalog for managed installs, not a source of truth that may overwrite a working configuration.
+- **Writing OpenCode MCP into `.opencode/opencode.json` instead of the root `opencode.json`.** OpenCode reads its project config (including the `mcp` key) only from `opencode.json` at the project root. `.opencode/` is for agents/commands/modes/plugins/skills/tools/themes, never the main config file, so MCP written under `.opencode/` is silently ignored — `/mcp` shows nothing and no MCP tools are exposed. Write to the root `opencode.json` and deep-merge only the `mcp` key (per `adapters/opencode.yaml > mcp.target` + `mcp.merge`).
+- **Injecting unknown keys into an OpenCode MCP entry (`description`, `connection_id`, …).** OpenCode validates each entry with a strict schema; an extra key makes it reject the whole config and load no servers. Emit only the documented keys: `{ type: "remote", url, enabled }` / `{ type: "local", command, enabled, environment? }`.
+- **Cherry-picking which skills to copy.** Symptom: some skills (often the non-1C-domain ones — `caveman`, `prompt-enhancer`, `handoff`) missing from the tool's skills directory because the agent decided they were "not 1C". The protocol copies **every** folder under `content/skills/` verbatim in one directory copy; there is no per-skill relevance judgement at install time.
+- **Emitting a Claude Code HTTP MCP entry without `"type": "http"`.** Claude Code's `.mcp.json` requires an explicit `"type": "http"` on every remote (URL-based) server; without it the current Claude Code (VS Code extension and CLI) silently does not load the server and it never appears in the tool list. Emit `{ "type": "http", "url": … }` (optionally `headers`), and do **not** copy the Cursor-only `connection_id` / `description` keys into the Claude Code config — they are not part of its schema. Local servers use `{ "command", "args", "env" }`.
+- **Writing Kilo MCP into the legacy `.kilocode/mcp.json` with the `mcpServers` dictionary.** Current Kilo CLI / Kilo Code (v7.x+) does not read that file — MCP must go into `.kilo/kilo.json` (per `adapters/kilocode.yaml > mcp.target`) under the top-level `mcp` key with per-server entries `{ "type": "remote"|"local", "url"|"command": …, "enabled": true }` (see https://kilo.ai/docs/automate/mcp/using-in-cli). Writing the legacy shape silently disables MCP discovery; `/mcps` shows an empty list and agent tool calls fail because no MCP tools are exposed. The installer deep-merges only the `mcp` key into `.kilo/kilo.json`, so user-added `instructions` / `skills.paths` / `permission` keys in that file are preserved across `update`.
+- **Dumping the whole `1c-rules` repo into the project as a vendor subfolder.** Symptom: `./1c-rules/AGENTS.md`, `./1c-rules/content/...` appearing under the project / config directory and being referenced from the tool's entry config. The protocol places files **per section** at the adapter's `copyTo` targets; the source clone is only a staging area outside the project. Vendoring the source tree leaves `AGENTS.md` with unrewritten `content/...` paths and the tool with no skill discovery.
+- **Hand-rolling frontmatter transforms with `node -e` / inline scripts.** Symptom: ad-hoc one-liners that only convert `modelHint → model` and forget `frontmatter.drop` / `addIf` rules. Use the adapter operations as a whole (read the YAML once, apply `keep` / `drop` / `rename` / `addIf` in one pass, write back) or run `install.ps1`, which already implements them.
+- **Hooking up the tool entry config (`kilo.jsonc`, `.codex/config.toml`, `claude_desktop_config.json`, …) by hand.** The tool entry is whatever the adapter declares (e.g. `AGENTS.md` at the project root for tools that read it, the rendered MCP file at `mcp.target`). Do not add custom `instructions` / `skills.paths` arrays pointing at the staging clone — they bypass adapter-rewritten paths.
+- **Skipping `AGENTS.md` rewriting, `.dev.env` bootstrap, OpenSpec scaffold, or `.ai-rules.json` manifest.** All four are mandatory steps of the lean sequence. An install that completes without them is incomplete and will fail later updates / diagnostics.
+- **Using `Invoke-Expression` on the raw `install.ps1` URL** — see *Do NOT pipe `install.ps1` into `Invoke-Expression`* below.
 
 ### Confirm before destructive actions
 
@@ -131,7 +226,7 @@ The script implements the protocol above. Notes:
 - `-Source` accepts a local path or a Git source URL (`https://...`, `git@...`, or a value ending with `.git`). URL sources are cloned into the installer's cache before placement.
 - Run from the **project root**; the script writes there.
 - Commands: `init` / `update` / `add <tool>` / `remove [<tool>]` / `doctor` (read-only diagnostic) / `eject` (delete the manifest, leave files in place).
-- Flags: `-Tools cursor,claude-code` (explicit list), `-NonInteractive` (auto-resolve prompts), `-AssumeYes` (answer yes to confirmations but still pause on destructive conflicts unless `-NonInteractive` is also set).
+- Flags: `-Tools cursor,claude-code` (explicit list), `-NonInteractive` (auto-resolve prompts), `-AssumeYes` (answer yes to confirmations but still pause on destructive conflicts unless `-NonInteractive` is also set), `-Force` (on `update`: overwrite user-modified files with the shipped version), `-ForcePaths <path>[,<path>…]` (on `update`: restrict the overwrite to the listed project-relative paths, comma-separated; exact match or `*`/`?` wildcard; implies `-Force`), `-McpMode auto|managed|external` (MCP phase behaviour — see *External MCP installation* above; default `auto` detects an external installation and leaves MCP configs untouched when found).
 
 ### Do NOT pipe `install.ps1` into `Invoke-Expression`
 

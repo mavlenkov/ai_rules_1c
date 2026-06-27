@@ -4,6 +4,39 @@
 Этот файл фиксирует расхождения форка с upstream, требующие отдельной работы.
 Не относится к upstream — при PR в upstream не включать.
 
+## После мержа upstream (2026-06-27, upstream `a421cf4`)
+
+Слит upstream `5b246bc..a421cf4` (11 коммитов) в ветке `merge/upstream-20260627`.
+Конфликтов было 9, разрешены: форк-специфика (Linux-пути, fork Section 3,
+команды `extensions`/`dataprocessors`) сохранена, upstream-улучшения приняты
+(семантика «пустые `IB_USER`/`IB_PASSWORD`/`LOG_PATH` — валидные дефолты, не
+спрашивать»; модели субагентов по ярусам; новый `permission`-механизм OpenCode;
+секция про мультипроектную MCP-установку). Новые техдолги:
+
+### 5. `scripts/install.sh` — не реализует `toolsToPermission` (OpenCode `permission`)
+
+Upstream доработал `adapters/opencode.yaml`: вместо «дропнуть массив `tools`»
+он теперь ТРАНСФОРМИРУЕТ список инструментов в объект `permission`
+(`toolsToPermission`: Read→read, Write/Edit→edit, Grep→grep, Glob→glob,
+Shell→bash; не выданное = `deny`), чтобы read-only субагенты (`explorer`,
+`code-reviewer`, `arch-reviewer`) не могли писать/звать shell. Наш
+`apply_frontmatter_ops()` в `scripts/install.sh` знает только
+`keep`/`drop`/`rename`/`addIf` — директиву `toolsToPermission` он игнорирует.
+Проверено эмпирически: opencode-агенты, разложенные через install.sh, выходят
+БЕЗ `permission` и без `tools` (дефолтный toolset). **Конфиг не ломается**
+(массив не пишется), но read-only ограничения не применяются. Установка через
+`install.ps1` корректна. Фикс: реализовать `toolsToPermission` в install.sh.
+
+### 6. `scripts/install.sh` — не подставляет модель по `modelTier`
+
+Upstream убрал `modelHint` из `content/agents/*.md` и ввёл `modelTier`
+(`coding` / `light`) + параметры `.dev.env` `SUBAGENT_MODEL_CODING` /
+`SUBAGENT_MODEL_LIGHT`; установщик подставляет модель в файл субагента по ярусу.
+`install.ps1` это умеет, наш `install.sh` — нет (`modelTier` не в `keep` →
+дропается, поле модели не появляется). Агенты выходят на дефолтной модели
+AI-клиента. Не ломает установку, но `.dev.env`-параметры моделей через bash-канал
+не действуют. Фикс: читать `SUBAGENT_MODEL_*` из `.dev.env` и маппить `modelTier`.
+
 ## После мержа upstream «версия 4» (2026-05-25, upstream `5b246bc`)
 
 ### 0. ✅ РЕШЕНО (2026-05-26): OpenCode adapter — формат `tools`

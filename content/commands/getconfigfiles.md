@@ -8,16 +8,17 @@ Fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). Reads all para
 
 ## Settings (`.dev.env`)
 
-Read from `.dev.env`. If a value is unknown, ask the user and write it back. If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` and delete the legacy file after a successful migration.
+All paths and identifiers come from `.dev.env`. Only `INFOBASE_PATH` and `PLATFORM_PATH` are blocking — if either is empty, ask the user and write the value to `.dev.env`. `IB_USER` / `IB_PASSWORD` / `LOG_PATH` have documented defaults (see the table below) — apply them silently, do not ask up front. If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` and delete the legacy file after a successful migration.
 
 | Key | Purpose |
 |---|---|
-| `PLATFORM_PATH` | Platform install dir; `V8_VERSION` = `basename(PLATFORM_PATH)`, executable `{PLATFORM_PATH}/1cv8` (Linux) |
+| `PLATFORM_PATH` | Platform install dir; `V8_VERSION` = `basename(PLATFORM_PATH)`, executable `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows) |
 | `INFOBASE_KIND` / `INFOBASE_PATH` | Build `<ib_connection>`: `file` → `/F<path>`, `server` → `/S<path>` (no space after flag, no quotes) |
-| `IB_USER` / `IB_PASSWORD` | Credentials, optional |
+| `IB_USER` / `IB_PASSWORD` | Credentials; empty = no authentication / no password (`/N` / `/P` omitted). An empty password is a fully valid configuration for dev / test infobases — **do not ask up front**. Re-ask only if the platform itself returns an authentication error. |
 | `EXTENSION_NAME` | Extension name; empty = main configuration |
 | `EXPORT_PATH` | Target export directory; empty = current repository root |
-| `LOG_PATH` | Designer log file |
+| `LOG_PATH` | Designer log file; empty resolves to `$TMPDIR/1cv8.log` (Linux) / `$env:TEMP\1cv8.log` (Windows). **Do not ask up front.** |
+| `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
 | `CONVERTER_PATH` | 1CFilesConverter path (fork Section 3); set = Mode 1, empty = Mode 2 |
 | `CONVERT_TOOL` | `designer` / `ibcmd` → `V8_CONVERT_TOOL` |
 

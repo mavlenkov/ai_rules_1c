@@ -37,8 +37,8 @@ After the table, list only actionable fixes. Do not include secret values from `
    - Cursor: `.cursor/rules/`, `.cursor/commands/`, `.cursor/mcp.json` when installed;
    - Claude Code: `.claude/rules/`, `.claude/agents/`, `.claude/commands/`, MCP config when installed;
    - Codex: `.codex/skills/`, `.codex/config.toml` when installed;
-   - OpenCode: `.opencode/command/`, `.opencode/opencode.json` when installed;
-   - Kilo Code: `.kilo/rules/`, `.kilo/commands/`, `.kilo/agents/`, `.kilo/skills/`, `.kilocode/mcp.json` when installed;
+   - OpenCode: `.opencode/command/`, `.opencode/agent/`, `.opencode/rules/`, and `opencode.json` at the **project root** (top-level `mcp` key) when installed — MCP lives in the root `opencode.json`, **not** `.opencode/opencode.json` (OpenCode does not read a config file under `.opencode/`); a leftover `.opencode/opencode.json` from older installs is **legacy** and the `update` flow removes it;
+   - Kilo Code: `.kilo/rules/`, `.kilo/commands/`, `.kilo/agents/`, `.kilo/skills/`, `.kilo/kilo.json` (top-level `mcp` key) when installed; a leftover `.kilocode/mcp.json` from older installs is **legacy** — current Kilo CLI / Kilo Code v7.x+ no longer reads it and the `update` flow removes it;
    - other: `.ai-agent/rules/`, `.ai-agent/agents/`, `.ai-agent/commands/`, `.ai-agent/skills/`, `.ai-agent/mcp.json`.
 
 Pass criterion: the root always-on files exist, and either the installed tool layout is present or the repository is clearly the `1c-rules` source repository being edited directly.
@@ -71,9 +71,10 @@ Also check:
    - `PLATFORM_PATH`;
    - `INFOBASE_KIND`;
    - `INFOBASE_PATH`;
-   - `LOG_PATH`;
    - `EXPORT_PATH` when the repository root is not the configuration source directory;
    - `PLATFORM_VERSION` when platform-version-specific docs or checks are needed.
+
+   Do **not** treat `IB_USER`, `IB_PASSWORD`, or `LOG_PATH` as critical even when empty — they are **Defaulted** per `content/rules/dev-standards-core.md §1`. Empty `IB_USER` / `IB_PASSWORD` = no authentication / no password (the `/N` / `/P` flags are simply omitted), empty `LOG_PATH` = `$env:TEMP\1cv8.log` (Windows) / `$TMPDIR/1cv8.log` (POSIX). Report them as "uses default" rather than as a missing value.
 4. Verify the platform executable exists at `PLATFORM_PATH`: `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows). Detect OS via `uname -s` / `%PROGRAMFILES%`.
 5. Verify that `INFOBASE_KIND` is `file` or `server`.
 6. Never print `IB_PASSWORD`, tokens, license keys, or full connection strings. Report only whether they are set.

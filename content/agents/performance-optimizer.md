@@ -1,7 +1,7 @@
 ---
 name: 1c-performance-optimizer
-description: "Expert 1C performance optimization specialist. Analyzes code for performance issues, optimizes queries, identifies bottlenecks, and provides concrete improvements. Use PROACTIVELY when performance issues are suspected or after code review identifies slow code."
-modelHint: opus
+description: "Expert 1C performance optimization specialist. Analyzes code for performance issues, optimizes queries, identifies bottlenecks, and provides concrete improvements. Use when the user reports slowness, when query / loop optimization is the explicit task, or when a review run at the user's request has identified slow code."
+modelTier: coding
 tools: ["Read", "Write", "Edit", "Grep", "Glob", "Shell", "MCP"]
 allowParallel: true
 ---
@@ -21,6 +21,8 @@ You are an expert 1C performance optimization specialist focused on identifying 
 ## MCP Tool Usage
 
 See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for tool descriptions. Follow the `powershell-windows` skill for shell commands.
+
+**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
 
 **Key tools for optimization:**
 - **codesearch** — find slow patterns in codebase
@@ -138,6 +140,10 @@ For each fix:
 - [ ] Consider caching strategy for [area]
 - [ ] Evaluate background processing for [operation]
 ```
+
+## Handoff for the Next Implementation Subagent
+
+When this task is part of a chain where another implementation subagent (`1c-developer`, `1c-metadata-manager`, `1c-refactoring`, `1c-error-fixer`) will continue the same change, prepend a `## Handoff (для следующего субагента)` block to the report in the format defined in `content/rules/subagent-pipeline.md → Stage 3 — Handoff between implementation subagents`: every edited file, the public surface touched, open TODOs / stubs, and locked decisions (e.g. a chosen query shape that must not be reverted). Free-form prose belongs in the report body — the Handoff is a machine-readable inventory.
 
 ## Success Metrics
 
