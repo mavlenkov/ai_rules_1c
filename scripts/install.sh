@@ -199,6 +199,18 @@ def fm_to_text(fm):
     for k, v in fm.items():
         if isinstance(v, bool):
             lines.append(f"{k}: {'true' if v else 'false'}")
+        elif isinstance(v, dict):
+            # Nested block-style dict (e.g. OpenCode `permission:` object).
+            # Mirrors Format-FrontmatterEntry in install.ps1.
+            lines.append(f"{k}:")
+            for sk, sv in v.items():
+                if isinstance(sv, bool):
+                    sv_s = 'true' if sv else 'false'
+                elif sv is None:
+                    sv_s = ''
+                else:
+                    sv_s = str(sv)
+                lines.append(f"  {sk}: {sv_s}")
         elif isinstance(v, list):
             lines.append(f"{k}: [{', '.join(str(x) for x in v)}]")
         elif v is None:
@@ -212,6 +224,35 @@ def fm_to_text(fm):
 
 def apply_frontmatter_ops(fm, ops):
     if not ops: return fm
+    fm = dict(fm)  # local copy — Phase 0 may inject a `permission` key
+
+    # Phase 0: tools array -> permission object (OpenCode).
+    # Runs BEFORE keep/drop so it can still read the source `tools` list.
+    # Each mapped source tool present in the list -> `grant` (allow); every
+    # mapped permission key NOT granted -> `deny`, so a read-only agent is
+    # actually denied edit/bash instead of falling back to OpenCode's permissive
+    # default tool set. Mirrors Invoke-FrontmatterOps Phase 0 in install.ps1.
+    ttp = ops.get('toolsToPermission')
+    if ttp:
+        src_key = ttp.get('source') or 'tools'
+        grant_val = ttp.get('grant') or 'allow'
+        deny_val = ttp.get('deny') or 'deny'
+        mp = ttp.get('map') or {}
+        if mp and src_key in fm:
+            granted = fm[src_key] if isinstance(fm[src_key], list) else [fm[src_key]]
+            permission = {}
+            for src_tool, perm_key in mp.items():
+                if not perm_key: continue
+                is_granted = src_tool in granted
+                if perm_key not in permission:
+                    permission[perm_key] = grant_val if is_granted else deny_val
+                elif is_granted:
+                    # Multiple source tools can map to one key (Write/Edit -> edit):
+                    # any granting tool wins.
+                    permission[perm_key] = grant_val
+            if permission:
+                fm['permission'] = permission
+
     out = {}
     keep = set(ops.get('keep') or [])
     drop = set(ops.get('drop') or [])
@@ -230,6 +271,59 @@ def apply_frontmatter_ops(fm, ops):
             if isinstance(payload, dict):
                 for pk, pv in payload.items():
                     out[pk] = pv
+    return out
+
+# --- Model-tier resolution (agents) ---------------------------------------
+# Source agent files declare an abstract `modelTier` (coding | light) instead of
+# a concrete model. Map it to `modelHint` (consumed by the adapters' keep/rename
+# ops) using SUBAGENT_MODEL_* from the target .dev.env. Mirrors
+# Resolve-ModelTiers / Resolve-AgentModelTier in install.ps1. This installer is
+# non-interactive: when .dev.env (or the key) is absent, no model is emitted and
+# the AI client falls back to its default model.
+
+MODEL_TIER_KEYS = {'coding': 'SUBAGENT_MODEL_CODING', 'light': 'SUBAGENT_MODEL_LIGHT'}
+_MODEL_TIERS = None  # cache for the whole run
+
+def read_dev_env_keys(path):
+    keys = {}
+    try:
+        for ln in path.read_text(encoding='utf-8').splitlines():
+            m = re.match(r'^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$', ln)
+            if m:
+                keys[m.group(1)] = m.group(2)
+    except OSError:
+        pass
+    return keys
+
+def resolve_model_tiers():
+    global _MODEL_TIERS
+    if _MODEL_TIERS is not None:
+        return _MODEL_TIERS
+    vals = {'coding': '', 'light': ''}
+    env_path = TARGET / '.dev.env'
+    if env_path.exists():
+        keys = read_dev_env_keys(env_path)
+        for tier, k in MODEL_TIER_KEYS.items():
+            if k in keys:
+                vals[tier] = keys[k].strip()
+    _MODEL_TIERS = vals
+    return vals
+
+def resolve_agent_model_tier(fm):
+    """Replace the abstract `modelTier` key with a concrete `modelHint` (or drop
+    it when the tier's model is not configured)."""
+    if 'modelTier' not in fm:
+        return fm
+    tiers = resolve_model_tiers()
+    tier = str(fm['modelTier']).strip().lower()
+    model = tiers.get(tier, '')
+    out = {}
+    for k, v in fm.items():
+        if k == 'modelTier':
+            if model:
+                out['modelHint'] = model
+            continue
+        out[k] = v
     return out
 
 # --- Per-tool placement ---------------------------------------------------
@@ -264,6 +358,8 @@ def place_section(adapter, section, src_dir):
                 dst.write_text(text, encoding='utf-8')
             else:
                 fm, body = split_frontmatter(text)
+                if section == 'agents':
+                    fm = resolve_agent_model_tier(fm)
                 new_fm = apply_frontmatter_ops(fm, ops)
                 dst.write_text(fm_to_text(new_fm) + body, encoding='utf-8')
             placed.append(dst_rel)
