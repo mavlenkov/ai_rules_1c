@@ -276,15 +276,23 @@ def apply_frontmatter_ops(fm, ops):
 # --- Model-tier resolution (agents) ---------------------------------------
 # Source agent files declare an abstract `modelTier` (reasoning | coding | light)
 # instead of a concrete model. Map it to `modelHint` (consumed by the adapters'
-# keep/rename ops) using SUBAGENT_MODEL_* from the target .dev.env. Mirrors
-# Resolve-ModelTiers / Resolve-AgentModelTier in install.ps1. This installer is
-# non-interactive: when .dev.env (or the key) is absent, no model is emitted and
+# keep/rename ops) PER CLIENT, because a model id is dialectal: Claude Code takes
+# a bare alias (`sonnet`), OpenCode requires `provider/model` (`deepseek/...`).
+# Cascade: SUBAGENT_MODEL_<TIER>__<TOOL> -> SUBAGENT_MODEL_<TIER> -> empty.
+# Mirrors Resolve-ModelTiers / Resolve-AgentModelTier in install.ps1. This
+# installer is non-interactive: when no value resolves, no model is emitted and
 # the AI client falls back to its default model.
 
 MODEL_TIER_KEYS = {'reasoning': 'SUBAGENT_MODEL_REASONING',
                    'coding': 'SUBAGENT_MODEL_CODING',
                    'light': 'SUBAGENT_MODEL_LIGHT'}
-_MODEL_TIERS = None  # cache for the whole run
+# Clients that require a `provider/model` id (a bare alias does not resolve).
+PROVIDER_MODEL_TOOLS = {'opencode', 'kilocode'}
+_DEV_ENV_KEYS = None  # cache of all .dev.env keys for the whole run
+MODEL_WARNINGS = []   # surfaced after placement (e.g. invalid model format)
+
+def tool_suffix(tool):
+    return tool.upper().replace('-', '_')
 
 def read_dev_env_keys(path):
     keys = {}
@@ -297,28 +305,39 @@ def read_dev_env_keys(path):
         pass
     return keys
 
-def resolve_model_tiers():
-    global _MODEL_TIERS
-    if _MODEL_TIERS is not None:
-        return _MODEL_TIERS
-    vals = {'reasoning': '', 'coding': '', 'light': ''}
-    env_path = TARGET / '.dev.env'
-    if env_path.exists():
-        keys = read_dev_env_keys(env_path)
-        for tier, k in MODEL_TIER_KEYS.items():
-            if k in keys:
-                vals[tier] = keys[k].strip()
-    _MODEL_TIERS = vals
-    return vals
+def dev_env_keys():
+    global _DEV_ENV_KEYS
+    if _DEV_ENV_KEYS is None:
+        env_path = TARGET / '.dev.env'
+        _DEV_ENV_KEYS = read_dev_env_keys(env_path) if env_path.exists() else {}
+    return _DEV_ENV_KEYS
 
-def resolve_agent_model_tier(fm):
-    """Replace the abstract `modelTier` key with a concrete `modelHint` (or drop
-    it when the tier's model is not configured)."""
+def resolve_tier_model(tier, tool):
+    """Per-client cascade: SUBAGENT_MODEL_<TIER>__<TOOL> -> SUBAGENT_MODEL_<TIER> -> ''."""
+    base = MODEL_TIER_KEYS.get(tier)
+    if not base:
+        return ''
+    keys = dev_env_keys()
+    override = (keys.get(base + '__' + tool_suffix(tool)) or '').strip()
+    if override:
+        return override
+    return (keys.get(base) or '').strip()
+
+def resolve_agent_model_tier(fm, tool):
+    """Replace the abstract `modelTier` key with a concrete `modelHint` for the
+    target client (or drop it when no model resolves or its format is invalid)."""
     if 'modelTier' not in fm:
         return fm
-    tiers = resolve_model_tiers()
     tier = str(fm['modelTier']).strip().lower()
-    model = tiers.get(tier, '')
+    model = resolve_tier_model(tier, tool)
+    # Format guard: provider/model clients reject bare aliases — skip + warn
+    # instead of writing a broken model id that silently falls back.
+    if model and tool in PROVIDER_MODEL_TOOLS and '/' not in model:
+        base = MODEL_TIER_KEYS.get(tier, tier)
+        MODEL_WARNINGS.append(
+            f"{base}='{model}' не похоже на provider/model — пропущено для {tool}; "
+            f"задай {base}__{tool_suffix(tool)}")
+        model = ''
     out = {}
     for k, v in fm.items():
         if k == 'modelTier':
@@ -361,7 +380,7 @@ def place_section(adapter, section, src_dir):
             else:
                 fm, body = split_frontmatter(text)
                 if section == 'agents':
-                    fm = resolve_agent_model_tier(fm)
+                    fm = resolve_agent_model_tier(fm, adapter.get('tool', ''))
                 new_fm = apply_frontmatter_ops(fm, ops)
                 dst.write_text(fm_to_text(new_fm) + body, encoding='utf-8')
             placed.append(dst_rel)
@@ -560,6 +579,11 @@ print(f"\nМанифест .ai-rules.json: {len(manifest_files)} файлов з
 if MCP_WARNINGS:
     print("\n⚠ MCP warnings:")
     for w in dict.fromkeys(MCP_WARNINGS):  # dedupe, keep order
+        print(f"  - {w}")
+
+if MODEL_WARNINGS:
+    print("\n⚠ Subagent model warnings:")
+    for w in dict.fromkeys(MODEL_WARNINGS):  # dedupe, keep order
         print(f"  - {w}")
 
 print(f"\n=== Готово ===")
