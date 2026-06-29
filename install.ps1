@@ -1934,6 +1934,25 @@ function Invoke-PlaceSkill {
 $script:ModelTierKeys = [ordered]@{ reasoning = 'SUBAGENT_MODEL_REASONING'; coding = 'SUBAGENT_MODEL_CODING'; light = 'SUBAGENT_MODEL_LIGHT' }
 $script:ModelTierValues = $null
 
+# Clients that require a `provider/model` model id (a bare alias does not resolve).
+$script:ProviderModelTools = @('opencode', 'kilocode')
+$script:DevEnvRawKeys = $null
+$script:ModelWarnedKeys = @{}
+
+function Get-ToolSuffix {
+    param([string]$Tool)
+    return ($Tool.ToUpperInvariant() -replace '-', '_')
+}
+
+function Get-DevEnvRawKeys {
+    # All raw .dev.env keys (cached) — used for per-client model overrides.
+    param([string]$Root)
+    if ($null -ne $script:DevEnvRawKeys) { return $script:DevEnvRawKeys }
+    $envPath = Join-Path $Root $script:DevEnvFileName
+    $script:DevEnvRawKeys = if (Test-Path $envPath) { Read-DevEnvKeys -Path $envPath } else { [ordered]@{} }
+    return $script:DevEnvRawKeys
+}
+
 function Resolve-ModelTiers {
     # Returns an ordered hashtable tier -> concrete model name ('' = client
     # default). Cached for the whole run so the interactive prompt fires once.
@@ -1964,18 +1983,43 @@ function Resolve-ModelTiers {
 
 function Resolve-AgentModelTier {
     # Replaces the abstract `modelTier` key in an agent's frontmatter with the
-    # concrete `modelHint` consumed by the adapters' keep/rename ops (and by
-    # the Codex rebuild-toml template). When the tier is unknown or its model
-    # is not configured, the key is removed and no model is emitted — the AI
-    # client falls back to its default model.
+    # concrete `modelHint` consumed by the adapters' keep/rename ops, resolved
+    # PER CLIENT. Cascade: SUBAGENT_MODEL_<TIER>__<TOOL> -> SUBAGENT_MODEL_<TIER>
+    # -> empty. For provider/model clients (opencode/kilocode) a bare alias
+    # (no `/`) is skipped with a warning instead of writing a broken model id.
+    # When nothing resolves, the key is removed and the AI client uses its
+    # default model. Mirrors resolve_agent_model_tier in scripts/install.sh.
     param(
         [System.Collections.IDictionary]$Frontmatter,
-        [string]$Root
+        [string]$Root,
+        [string]$Tool
     )
     if (-not $Frontmatter -or -not $Frontmatter.Contains('modelTier')) { return $Frontmatter }
-    $tiers = Resolve-ModelTiers -Root $Root
     $tier = ([string]$Frontmatter['modelTier']).Trim().ToLowerInvariant()
-    $model = if ($tiers.Contains($tier)) { [string]$tiers[$tier] } else { '' }
+    $base = if ($script:ModelTierKeys.Contains($tier)) { $script:ModelTierKeys[$tier] } else { '' }
+
+    $model = ''
+    if ($base) {
+        $raw = Get-DevEnvRawKeys -Root $Root
+        $suffixKey = "${base}__$(Get-ToolSuffix $Tool)"
+        if ($raw.Contains($suffixKey) -and ([string]$raw[$suffixKey]).Trim()) {
+            $model = ([string]$raw[$suffixKey]).Trim()
+        }
+        else {
+            $tiers = Resolve-ModelTiers -Root $Root
+            if ($tiers.Contains($tier)) { $model = [string]$tiers[$tier] }
+        }
+    }
+
+    if ($model -and ($script:ProviderModelTools -contains $Tool) -and ($model -notmatch '/')) {
+        $wk = "$tier|$Tool"
+        if (-not $script:ModelWarnedKeys.Contains($wk)) {
+            Write-Warn "$base='$model' не похоже на provider/model — пропущено для $Tool; задай ${base}__$(Get-ToolSuffix $Tool)"
+            $script:ModelWarnedKeys[$wk] = $true
+        }
+        $model = ''
+    }
+
     $result = [ordered]@{}
     foreach ($k in $Frontmatter.Keys) {
         if ($k -eq 'modelTier') {
@@ -2023,7 +2067,7 @@ function Invoke-PlacePhase {
             $template = $adapter.agents.template
             foreach ($f in Get-ChildItem -File (Join-Path $SourceRoot 'content/agents') -Filter *.md) {
                 $parts = Split-FrontmatterAndBody (Read-TextFile $f.FullName)
-                $agentFm = Resolve-AgentModelTier -Frontmatter $parts.Frontmatter -Root $Root
+                $agentFm = Resolve-AgentModelTier -Frontmatter $parts.Frontmatter -Root $Root -Tool $tool
                 $name = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
                 $target = Resolve-CopyToPath $copyTpl $name
                 Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `

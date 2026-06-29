@@ -108,6 +108,10 @@ If — and only if — the user explicitly requested a code review:
 - Critical / major issues were addressed before delivery; minor issues were summarized.
 - For non-review-requested tasks, gates 2 and 3 already cover the routine quality bar — do not auto-trigger the reviewer subagent (forbidden by `subagents.md`).
 
+### Soft gate D — Automatic external critic (non-trivial code)
+
+For **non-trivial** code changes (the full-cycle vs quick-fix boundary), run the automatic external critic as a second-opinion layer **on top of** the hard gates above — load `external-review.md`. In short: prefer Codex (with the `anti-patterns.md` rubric + `coding-standards.md` index + diff attached); if Codex is unavailable, degrade to the `1c-code-reviewer` subagent on the current client's model. This does **not** replace Gates 1–3 — `review_1c_code` (1С:Напарник) stays mandatory. Skip for quick-fix / docs-fix. Codex unavailability must not block completion. This differs from soft gate C: gate C is a user-requested review; gate D is the automatic critic for non-trivial code.
+
 ## Delivery summary — what the user sees
 
 After all gates pass, the delivery report MUST contain:

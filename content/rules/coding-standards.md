@@ -20,7 +20,7 @@ Prefer self-documenting code. Comments are appropriate only when they add value:
 
 ## Code Review After Each Edit
 
-After any code edit, perform an internal review: style, readability, correctness, edge cases, security, concurrency, locks, transactions. Always consider whether an outer transaction already exists (e.g., the object-write transaction) before opening a new one. Loop until clean within the verification budget from `AGENTS.md`; after the budget is exhausted, fix substantive issues and report any remaining style noise. Full guidance — `dev-standards-core.md §8`.
+After any code edit, perform an internal review: style, readability, correctness, edge cases, security, concurrency, locks, transactions. Always consider whether an outer transaction already exists (e.g., the object-write transaction) before opening a new one. Loop until clean within the verification budget from `AGENTS.md`; after the budget is exhausted, fix substantive issues and report any remaining style noise. Full guidance — `dev-standards-core.md §8`. For non-trivial changes, an automatic external critic (Codex, with `1c-code-reviewer` fallback) also runs at the verification gate — see `external-review.md`.
 
 ## Code Reuse
 

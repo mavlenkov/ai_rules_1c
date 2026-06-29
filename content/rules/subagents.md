@@ -51,12 +51,16 @@ category: workflow
 | **1c-performance-optimizer** | User reports slowness, or query / loop optimization is the explicit task | No performance concern was raised |
 | **1c-error-fixer** | Quick fix of syntax / runtime errors / BSL LS warnings without architectural changes (tier `light` — runs on the small-tasks model when one is configured) | The fix requires architectural rework — escalate to `1c-architect` / `1c-developer` |
 | **1c-tester** | User asks to verify changes via deploy + UI automation against a test infobase | No test infobase available, or the task is purely static |
-| **1c-code-reviewer** | **Only when the user explicitly asks for a code review** | Auto-triggering after edits is forbidden |
+| **1c-code-reviewer** | **When the user explicitly asks for a code review**, OR as the automatic-critic fallback when Codex is unavailable (`external-review.md`, non-trivial code) | Auto-triggering after edits in any other case is forbidden |
 | **1c-doc-writer** | User-facing documentation: user guides, admin manuals, tutorials, codemaps, API references | Inline code documentation (module / procedure headers) — that is the developer's responsibility |
 
 ## Model-tier routing
 
 Subagent source files do **not** hard-code model names. Each agent declares an abstract tier in its frontmatter — `modelTier: reasoning`, `modelTier: coding` or `modelTier: light` — and the installer resolves the tier into a concrete model from `.dev.env` (`SUBAGENT_MODEL_REASONING` / `SUBAGENT_MODEL_CODING` / `SUBAGENT_MODEL_LIGHT`, all Defaulted: empty = the AI client's default model; see `dev-standards-core.md §1 → "Subagent model parameters"`). Model names live only in project settings, never in rules or agent prompts.
+
+**Per-client resolution.** A model name is client-specific on two axes — name format (Claude Code / Cursor accept short aliases like `sonnet`; OpenCode / Kilo Code require `provider/model`, e.g. `zai-coding-plan/glm-5.2`) and available providers (Claude Code → Anthropic only; OpenCode → Z.AI Coding Plan / DeepSeek). So each tier may be overridden per client with the suffix `__<TOOL>` (TOOL upper-cased, `-`→`_`: `SUBAGENT_MODEL_CODING__OPENCODE`, `__CLAUDE_CODE`, `__CURSOR`, `__KILOCODE`). The installer resolves by cascade `SUBAGENT_MODEL_<TIER>__<TOOL>` → `SUBAGENT_MODEL_<TIER>` → empty, and for `provider/model` clients drops a name without `/` with a WARNING (so a bare alias never silently breaks an OpenCode config).
+
+**Tier meaning is billing-relative.** Under per-token billing (Claude Code) a tier means cost × capability — `reasoning`=opus, `coding`=sonnet, `light`=haiku. Under a flat plan (OpenCode on Z.AI Coding Plan) a tier means capability × latency — `reasoning` and `coding` may collapse to the same model (`zai-coding-plan/glm-5.2`) while `light` picks a faster one (`zai-coding-plan/glm-5-turbo`); a "more expensive" tier carries no benefit because the subscription covers the requests. Pick the per-client override accordingly.
 
 The three tiers (design → implementation → small tasks), so the strong "thinking" model produces specs and the cheaper model implements against them:
 
