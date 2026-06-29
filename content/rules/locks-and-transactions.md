@@ -31,14 +31,14 @@ The platform opens its own transaction around:
 - `НаборЗаписей.Записать()` for register record sets.
 - Movement materialization at the end of `ОбработкаПроведения`.
 
-**Inside an object's `ПередЗаписью` / `ПриЗаписи` / `ОбработкаПроведения`, do NOT open your own `НачалоТранзакции` / `ЗафиксироватьТранзакцию`.** The transaction is already there; a nested call fakes a savepoint but disables proper rollback on the outer error. See `platform-solutions.md §4 → "Transactions in event handlers"`.
+**Inside an object's `ПередЗаписью` / `ПриЗаписи` / `ОбработкаПроведения`, do NOT open your own `НачатьТранзакцию` / `ЗафиксироватьТранзакцию`.** The transaction is already there; a nested call fakes a savepoint but disables proper rollback on the outer error. See `platform-solutions.md §4 → "Transactions in event handlers"`.
 
 ### Explicit transactions in calling code
 
 When the calling code needs to atomically write several objects or to combine a write with register edits, open the transaction there:
 
 ```bsl
-НачалоТранзакции();
+НачатьТранзакцию();
 
 Попытка
 	Документ.Записать(РежимЗаписиДокумента.Проведение);
@@ -67,7 +67,7 @@ The structured payload (`Данные = Структура`) and the dotted even
 
 Rules:
 
-- The `НачалоТранзакции()` → `Попытка` … `ЗафиксироватьТранзакцию()` → `Исключение` `ОтменитьТранзакцию()` `ВызватьИсключение` `КонецПопытки` shape (see the example above) is the **only** correct pattern. Any deviation (no `Попытка`, no `ОтменитьТранзакцию` in the catch branch, no re-raise) is a defect.
+- The `НачатьТранзакцию()` → `Попытка` … `ЗафиксироватьТранзакцию()` → `Исключение` `ОтменитьТранзакцию()` `ВызватьИсключение` `КонецПопытки` shape (see the example above) is the **only** correct pattern. Any deviation (no `Попытка`, no `ОтменитьТранзакцию` in the catch branch, no re-raise) is a defect.
 - **Diagnose, do not swallow.** Log the error and `ВызватьИсключение` — see `logging-strategy.md §5 → "Error / exception logging"`.
 - **Re-check `ТранзакцияАктивна()`** before second `ОтменитьТранзакцию` only in diagnostics — normally the flow already guarantees it.
 
@@ -170,7 +170,7 @@ Never hold a single transaction across thousands of documents — lock escalatio
 For information registers used as a status log (`СтатусыЗаказов`, `СтатусыИнтеграции`), use a register-record-set write with `НаборЗаписей.Заблокировать()` inside an explicit transaction:
 
 ```bsl
-НачалоТранзакции();
+НачатьТранзакцию();
 
 Попытка
 

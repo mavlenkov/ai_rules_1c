@@ -43,7 +43,7 @@ If the same task also wires the new object into existing code (a query, a moveme
 **Promote to full-cycle even if the change looks small.** If the change touches any of the following — escalate from quick-fix:
 
 - metadata wired into existing behavior — renaming or removing an object / attribute / tabular section / form / role; modifying an existing posting / write path because of the metadata change; adding a metadata object that is immediately used by existing modules in the same change; changes to RLS conditions, indexing of an existing dimension, fill-checks, or event subscriptions;
-- a transactional code path (`ОбработкаПроведения`, `ПередЗаписью` / `ПриЗаписи`, anything inside `НачалоТранзакции`);
+- a transactional code path (`ОбработкаПроведения`, `ПередЗаписью` / `ПриЗаписи`, anything inside `НачатьТранзакцию`);
 - a public `Экспорт` procedure / function of a common module (signature, return type, side effects);
 - an adopted object of an extension (`ObjectBelonging=Adopted`);
 - an event subscription, scheduled / background job, or RLS condition.
