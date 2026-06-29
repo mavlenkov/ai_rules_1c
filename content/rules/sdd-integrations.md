@@ -250,6 +250,7 @@ Rules for the template:
 - **`## Plan for this session`** precedes `## Genuine blockers` because the plan defines the scope of "questions that matter now". Questions about tasks outside the plan do not belong in preflight.
 - **`## Genuine blockers`** holds **all** legitimate apply-time questions in a single batch. After this round, the implementation loop is silent except for the two critical exceptions above.
 - If `## Genuine blockers` is empty after the preflight scope is correctly applied (banned-questions filter, defaulted-fields filter, in-session-plan filter), **omit the block entirely** and proceed straight to implementation. An empty block is not a question.
+- **Executor selection precedes implementation.** Before the implementation loop the parent decides *who writes the code*. For full-cycle changes (the quick-fix boundary from `AGENTS.md → Triage`) implementation is delegated to a coding-tier subagent per `subagent-pipeline.md → Stage 3` — the parent (reasoning model) orchestrates and verifies, it does **not** write the code directly. The `/opsx:apply` instruction "make the code changes required" does **not** override this: project rules outrank slash-command phrasing. Quick-fix / docs-fix changes the parent may implement directly. The recurring trap is the parent implementing a full-cycle change itself **because it already holds full context from the propose phase** — having the context is not a license to skip delegation.
 
 ## Subagent → OpenSpec artifact mapping
 
