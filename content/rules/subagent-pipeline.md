@@ -100,6 +100,8 @@ For projects on the OpenSpec workflow (`/opsx:propose`), the plan lives in `open
 
 ### Stage 3 — Implement (delegate to an implementation subagent)
 
+When implementation is driven by `/opsx:apply`, the apply loop's "make the code changes required" step **is** this stage — delegate to the coding-tier implementation subagent. Implementing a full-cycle change directly on the reasoning model (parent) is a pipeline violation **even when the parent already holds full context from the propose phase** — that shared-context confidence is the single most common reason this stage gets skipped. The `/opsx:apply` slash-command wording is generic ("you implement the tasks"); project rules win on conflict — see `sdd-integrations.md → Apply-phase opening template` ("Executor selection precedes implementation").
+
 Choose by task shape:
 
 - **`1c-developer`** — bulk BSL changes across modules, common modules, server / client procedures.
