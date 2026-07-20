@@ -8,7 +8,7 @@ Source (this fork): `https://github.com/mavlenkov/ai_rules_1c` — the Linux + 1
 
 Action: update managed files in the current installation to the latest fork version (on-demand rules, subagent descriptions, slash commands, SKILL packages, MCP config, OpenSpec bundle, rendered `AGENTS.md`). Preserve:
 
-- `USER-RULES.md` and `memory.md` — one-time templates, never overwritten;
+- `USER-RULES.md`, `memory.md`, and `LLM-RULES.md` — one-time templates, never overwritten (a missing `LLM-RULES.md` on an older install is placed by this update);
 - `.dev.env` — never overwritten (user secrets / connection params);
 - contents of `openspec/specs/` and `openspec/changes/` — copied in skip-if-exists mode;
 - any managed file marked `userModified: true` in `.ai-rules.json`.
@@ -58,7 +58,7 @@ if (Test-Path (Join-Path $src '.git')) {
    - `User-modified files detected: N` (PowerShell) — files with local edits; marked `userModified` and preserved;
    - `Verification OK` / `Verification found N mismatch(es)` — state of freshly placed files.
 
-4. If neither channel is available (no `git`/`pwsh`/`bash`), execute *Update / add / remove* from `AGENT-INSTALL.md` through the agent channel: re-place managed files from the updated clone, re-render `AGENTS.md`, and update `version` and `updatedAt` in `.ai-rules.json`. Do not touch `USER-RULES.md`, `memory.md`, or `.dev.env`.
+4. If neither channel is available (no `git`/`pwsh`/`bash`), execute *Update / add / remove* from `AGENT-INSTALL.md` through the agent channel: re-place managed files from the updated clone, re-render `AGENTS.md`, and update `version` and `updatedAt` in `.ai-rules.json`. Do not touch `USER-RULES.md`, `memory.md`, `.dev.env`, or `LLM-RULES.md` (place the latter from the template only if absent).
 
 ## Parameters (PowerShell channel)
 

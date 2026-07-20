@@ -274,17 +274,19 @@ def apply_frontmatter_ops(fm, ops):
     return out
 
 # --- Model-tier resolution (agents) ---------------------------------------
-# Source agent files declare an abstract `modelTier` (reasoning | coding | light)
+# Source agent files declare an abstract `modelTier` (coding | analysis | light)
 # instead of a concrete model. Map it to `modelHint` (consumed by the adapters'
 # keep/rename ops) PER CLIENT, because a model id is dialectal: Claude Code takes
 # a bare alias (`sonnet`), OpenCode requires `provider/model` (`deepseek/...`).
 # Cascade: SUBAGENT_MODEL_<TIER>__<TOOL> -> SUBAGENT_MODEL_<TIER> -> empty.
+# Legacy 2-tier .dev.env (no SUBAGENT_MODEL_ANALYSIS key) falls back to
+# SUBAGENT_MODEL_CODING for the `analysis` tier (mirrors install.ps1).
 # Mirrors Resolve-ModelTiers / Resolve-AgentModelTier in install.ps1. This
 # installer is non-interactive: when no value resolves, no model is emitted and
 # the AI client falls back to its default model.
 
-MODEL_TIER_KEYS = {'reasoning': 'SUBAGENT_MODEL_REASONING',
-                   'coding': 'SUBAGENT_MODEL_CODING',
+MODEL_TIER_KEYS = {'coding': 'SUBAGENT_MODEL_CODING',
+                   'analysis': 'SUBAGENT_MODEL_ANALYSIS',
                    'light': 'SUBAGENT_MODEL_LIGHT'}
 # Clients that require a `provider/model` id (a bare alias does not resolve).
 PROVIDER_MODEL_TOOLS = {'opencode', 'kilocode'}
@@ -321,7 +323,15 @@ def resolve_tier_model(tier, tool):
     override = (keys.get(base + '__' + tool_suffix(tool)) or '').strip()
     if override:
         return override
-    return (keys.get(base) or '').strip()
+    val = (keys.get(base) or '').strip()
+    # Legacy 2-tier .dev.env: no ANALYSIS key at all -> analysis reuses coding
+    # (per-client CODING override first, then bare CODING), as in install.ps1.
+    if not val and tier == 'analysis' and base not in keys:
+        c_override = (keys.get('SUBAGENT_MODEL_CODING__' + tool_suffix(tool)) or '').strip()
+        if c_override:
+            return c_override
+        return (keys.get('SUBAGENT_MODEL_CODING') or '').strip()
+    return val
 
 def resolve_agent_model_tier(fm, tool):
     """Replace the abstract `modelTier` key with a concrete `modelHint` for the
@@ -539,9 +549,9 @@ agents_out = agents_src.replace('{{ rulesDir }}', rules_dir).replace('{{ rulesEx
 print(f"AGENTS.md размещён (rulesDir={rules_dir}, rulesExt={rules_ext})")
 manifest_files.append({'path': 'AGENTS.md', 'tool': 'always-on', 'section': 'always-on'})
 
-# --- USER-RULES.md и memory.md (skip-if-exists) --------------------------
+# --- USER-RULES.md, memory.md и LLM-RULES.md (skip-if-exists) ------------
 
-for fname in ('USER-RULES.md', 'memory.md'):
+for fname in ('USER-RULES.md', 'memory.md', 'LLM-RULES.md'):
     src = REPO / fname
     dst = TARGET / fname
     if dst.exists():

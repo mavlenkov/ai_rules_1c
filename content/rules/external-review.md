@@ -6,7 +6,7 @@ category: quality
 
 # External Review — automatic critic at the verification gate
 
-**When to load this file:** at the verification gate of any **non-trivial** code change, right after the hard validators pass and before declaring the change "done". Referenced as a soft gate from `verification-checklist.md`. Companion files: `verification-checklist.md` (the gate this plugs into), `subagents.md` (the `1c-code-reviewer` fallback), `anti-patterns.md` (the review rubric passed to Codex).
+**When to load this file:** at the verification gate of any **non-trivial** code change, right after the hard validators pass and before declaring the change "done". Referenced as soft gate E from `verification-delivery.md`. Companion files: `verification-gates.md` (the hard gates this layers on top of), `verification-delivery.md` (the soft-gate stage this plugs into), `subagents.md` (the `1c-code-reviewer` fallback), `anti-patterns.md` (the review rubric passed to Codex).
 
 This rule adds an **automatic external critic** as a second opinion on top of the mandatory in-toolchain validators. It does not replace them.
 
@@ -16,7 +16,7 @@ The verification gate for non-trivial code has two layers:
 
 ```
 verification gate (non-trivial code):
-  ① mandatory hard validators (verification-checklist.md):
+  ① mandatory hard validators (verification-gates.md):
        syntaxcheck → check_1c_code → review_1c_code (1С:Напарник)
   ② external critic (automatic, this rule):
        try   → Codex   (rules context + diff)
