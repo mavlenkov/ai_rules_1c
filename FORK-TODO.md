@@ -13,7 +13,16 @@
 спрашивать»; модели субагентов по ярусам; новый `permission`-механизм OpenCode;
 секция про мультипроектную MCP-установку). Новые техдолги:
 
-### 7. Третий ярус моделей `reasoning` — осознанное расхождение с upstream
+### 7. ✅ ЗАКРЫТО (2026-07-20): ярус `reasoning` упразднён — принята upstream-схема
+
+При merge upstream 7266528 обнаружилось, что upstream ввёл собственный 3-й ярус
+`analysis` с другой раскладкой (architect→coding, explorer→light). По решению
+пользователя форк перешёл на upstream-схему `coding`/`analysis`/`light`;
+ключ `SUBAGENT_MODEL_REASONING` заменён на `SUBAGENT_MODEL_ANALYSIS`
+(в развёрнутых проектах ключи переименованы при перекатке).
+Ниже — историческое описание упразднённого форк-яруса.
+
+#### (история) Третий ярус моделей `reasoning`
 
 Upstream использует **два** яруса субагентов (`coding` / `light`). Форк ввёл
 **третий** — `reasoning` (2026-06-27) под схему «opus проектирует → sonnet
@@ -39,6 +48,12 @@ explorer/analytic/planner/architect/arch-reviewer будет конфликто�
 (он есть в upstream) — удалять повторно при необходимости.
 
 ### 9. Per-client модели субагентов + автоматический внешний критик (форк)
+
+**Обновление 2026-07-20:** после merge upstream ярусы переименованы в
+`coding`/`analysis`/`light` (см. п.7) — per-client каскад и формат-гард работают
+поверх новых имён без изменений логики; hook внешнего критика перенесён в новую
+структуру verification-правил (soft gate E в `verification-delivery.md`,
+указатель в роутере `verification-checklist.md`).
 
 Расхождение с upstream, внесено 2026-06-29 (OpenSpec change `multi-client-routing`).
 
@@ -72,6 +87,23 @@ flat-подписка (OpenCode/Z.AI) = способность×латентно
 
 **При будущем merge upstream:** обе части — форк-only, сохранять. Если upstream
 введёт свою развязку моделей/критика — согласовать имена параметров и хуки.
+
+### 10. Merge upstream 7266528 (2026-07-20): принятое и отложенное
+
+**Принято:** реструктуризация правил (dev-standards-core и verification-checklist →
+роутеры + focused-файлы: dev-standards-env/code-style/change-markers,
+verification-policy/gates/delivery); ярусы `coding`/`analysis`/`light` (п.7);
+новые команды `/economymode`, `/litemode`, `/caveman`, `/evolve`; параметры
+`ORCHESTRATION`, `QUICKFIX_MAX_LINES`, `DEBUG_FAST_PATH`, `VERIFICATION_DEPTH`,
+`CAVEMAN`, `UI_TESTING`; корневой `LLM-RULES.md` (install.sh кладёт skip-if-exists);
+скилл `v8unpack-cf`; фикс kilocode (.kilo) и профили моделей по бенчу в install.ps1.
+
+**Отложено / не поддержано в install.sh:** новые адаптеры Kimi/Qwen/Command
+Code/Cline/Pi — только через `install.ps1` (bash-канал по-прежнему
+cursor/claude-code/opencode). Форк-команды деплоя (`deploy-and-test`,
+`getconfigfiles`, `loadfrom1cbase`, `update1cbase`) оставлены форк-версиями и НЕ
+перенесены на новую upstream-структуру «команда-тонкая → правило-канон» — при
+следующем merge пересмотреть. `transcribe` удалён повторно (п.8).
 
 ### 5. ✅ РЕШЕНО (2026-06-27): `scripts/install.sh` реализует `toolsToPermission`
 
