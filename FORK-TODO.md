@@ -97,6 +97,12 @@ verification-policy/gates/delivery); ярусы `coding`/`analysis`/`light` (п.
 `ORCHESTRATION`, `QUICKFIX_MAX_LINES`, `DEBUG_FAST_PATH`, `VERIFICATION_DEPTH`,
 `CAVEMAN`, `UI_TESTING`; корневой `LLM-RULES.md` (install.sh кладёт skip-if-exists);
 скилл `v8unpack-cf`; фикс kilocode (.kilo) и профили моделей по бенчу в install.ps1.
+**Дослано в install.sh (2026-07-21):** нормализация OpenCode MCP-ключей
+`1c…`→`onec…` (Moonshot/Kimi отвергают имена функций с цифры), строгая схема
+записей ({type,url,enabled} — без description), merge-логика для корневого
+`opencode.json` (заменяется только ключ `mcp`, instructions и прочее
+пользовательское сохраняется) и удаление legacyTargets
+(`.opencode/opencode.json`).
 
 **Отложено / не поддержано в install.sh:** новые адаптеры Kimi/Qwen/Command
 Code/Cline/Pi — только через `install.ps1` (bash-канал по-прежнему
