@@ -444,7 +444,19 @@ def render_mcp(adapter, host, publish_url):
                 e['type'] = 'http'
             out['mcpServers'][s['id']] = e
     elif 'mcp[id]' in schema:
-        out = {'mcp': {}}
+        # OpenCode: ключи серверов должны начинаться с буквы — OpenCode именует
+        # тулзы `<key>_<tool>`, а провайдеры вроде Moonshot/Kimi отвергают имена
+        # функций, начинающиеся с цифры. `1c…` -> `onec…`, прочее не-буквенное
+        # получает префикс `mcp-`. Каждая запись — строгая схема OpenCode
+        # (только type/url/command/environment/enabled; description ломает
+        # весь конфиг). Зеркало ConvertTo-OpenCodeMcpKey/New-McpConfig-OpenCode.
+        def opencode_key(sid):
+            if sid.lower().startswith('1c'):
+                sid = 'onec' + sid[2:]
+            if not sid[:1].isalpha():
+                sid = 'mcp-' + sid
+            return sid
+        out = {'$schema': 'https://opencode.ai/config.json', 'mcp': {}}
         for s in servers:
             e = {}
             if 'url' in s:
@@ -453,8 +465,9 @@ def render_mcp(adapter, host, publish_url):
             elif 'command' in s:
                 e['type'] = 'local'
                 e['command'] = [s['command']] + list(s.get('args', []))
-            if 'description' in s: e['description'] = s['description']
-            out['mcp'][s['id']] = e
+                if s.get('env'): e['environment'] = s['env']
+            e['enabled'] = True
+            out['mcp'][opencode_key(s['id'])] = e
     else:
         raise ValueError(f"Unknown MCP schema: {schema}")
 
@@ -507,9 +520,29 @@ for tool, adapter in adapters.items():
     if mcp_cfg:
         dst = TARGET / mcp_cfg['target']
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.write_text(render_mcp(adapter, HOST, PUBLISH_URL), encoding='utf-8')
+        rendered = json.loads(render_mcp(adapter, HOST, PUBLISH_URL))
+        if mcp_cfg.get('merge') and dst.exists():
+            # merge:true — файл общий (instructions, model, permissions, …):
+            # заменяем ТОЛЬКО ключ mcp (+$schema, если его не было), остальное
+            # пользовательское сохраняем. Зеркало merge-логики install.ps1.
+            try:
+                existing = json.loads(dst.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                existing = {}
+            existing['mcp'] = rendered.get('mcp', rendered.get('mcpServers', {}))
+            if '$schema' in rendered:
+                existing.setdefault('$schema', rendered['$schema'])
+            rendered = existing
+        dst.write_text(json.dumps(rendered, indent=2, ensure_ascii=False), encoding='utf-8')
         print(f"  mcp: {mcp_cfg['target']} (host={HOST})")
         manifest_files.append({'path': mcp_cfg['target'], 'tool': tool, 'section': 'mcp'})
+        # legacyTargets: мёртвые дубликаты старых установок (например
+        # .opencode/opencode.json — OpenCode его не читает) — удаляем.
+        for legacy in mcp_cfg.get('legacyTargets') or []:
+            lp = TARGET / legacy
+            if lp.exists():
+                lp.unlink()
+                print(f"  mcp: удалён legacy-дубликат {legacy}")
     entry = adapter.get('entry')
     if entry:
         dst = TARGET / entry['target']
