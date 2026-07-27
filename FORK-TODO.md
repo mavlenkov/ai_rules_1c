@@ -4,6 +4,47 @@
 Этот файл фиксирует расхождения форка с upstream, требующие отдельной работы.
 Не относится к upstream — при PR в upstream не включать.
 
+## После мержа upstream (2026-07-27, upstream `5ae333e`)
+
+Слит upstream `7266528..5ae333e` (3 коммита): hard gate против `tools`-массива
+во frontmatter агентов OpenCode (`5ae333e`), перенос on-demand правил Claude Code
+в `.claude/rules-1c/` (`1b6e2ed`), усиление правил — hard gate metadata-manage,
+platform-first, MCP-first search (`f33d240`). Конфликтов было 4 (все в
+`content/commands/`), разрешены по политике форка:
+
+- `deploy-and-test.md` — сохранена форк-версия (Linux + 1CFilesConverter,
+  пример PostgreSQL); upstream-секция «Failure handling — retry loop» перенесена
+  перед `# Diagnostics` с поправкой на форк-нумерацию шагов.
+- `update1cbase.md` — upstream-секция «Update retry loop» влилась чисто;
+  в финальном отчёте объединены форк-список инструментов (1CFilesConverter /
+  ibcmd / Designer) и upstream-учёт попыток retry loop.
+- `doctor.md` — объединён список починки (форк-пункт про `scripts/install.sh` +
+  upstream-пункт про OpenCode-гейт); к PowerShell quick-check добавлен
+  bash-эквивалент.
+- `updaterules.md` — сохранена форк-структура (OS-detect, bash-канал, источник
+  `mavlenkov/ai_rules_1c`); приняты upstream-шаги 5–6 (post-update гейт) и
+  hard obligation для agent-канала; к гейту добавлен bash-эквивалент.
+- `memory.md` — восстановлена секция `## Captured during work (no remember
+  available)`: upstream удалил её в `1b6e2ed`, но собственный `AGENTS.md`
+  ссылается на неё в трёх местах.
+
+**Проверено после мержа:** `scripts/install.sh` читает `copyTo` из адаптера
+динамически — переезд claude-code на `.claude/rules-1c/` bash-канал подхватывает
+без правок. `install.ps1` слился без дублей функций (`Test-OpenCodeAgentFrontmatter`
+и миграция legacy `.claude/rules/` на месте); синтаксис не прогнан — на машине
+нет `pwsh`. Форк-хуки целы: external-review (soft gate E), per-client каскад
+`__<TOOL>`, форк-секции `AGENTS.md`. `transcribe` не вернулся (п.8 не требуется).
+
+### 11. Отложено после мержа `5ae333e`
+
+- Bash-канал (`scripts/install.sh`) не выполняет post-update OpenCode-гейт
+  автоматически и не имеет repair-флага уровня `-ForcePaths` (гейт покрыт
+  ручным шагом 5 в `/updaterules`, bash-сниппет добавлен). Legacy-очистки
+  `.claude/rules/` в install.sh тоже нет — старые managed-файлы оттуда bash
+  не удаляет.
+- Новые адаптеры (Kimi/Qwen/Command Code/Cline/Pi) по-прежнему только через
+  `install.ps1` (см. п.10).
+
 ## После мержа upstream (2026-06-27, upstream `a421cf4`)
 
 Слит upstream `5b246bc..a421cf4` (11 коммитов) в ветке `merge/upstream-20260627`.
