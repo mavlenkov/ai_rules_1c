@@ -270,6 +270,12 @@ Read `<LOG_PATH>` to confirm success.
 
 ---
 
+## Failure handling — retry loop
+
+Apply the **Update retry loop** from `/update1cbase` (`content/commands/update1cbase.md → Update retry loop`) verbatim: read `<LOG_PATH>` after every attempt (errors in the log override exit code 0); on failure terminate the hung / failed Configurator by its own PID only (never blanket-kill `1cv8` processes); fix the logged cause before any retry (re-running unchanged is forbidden); after a failed load restart from the load step; at most 3 full attempts, then stop and report. UI tests run only after a clean pass.
+
+---
+
 # Diagnostics
 
 ## Common issues after deployment

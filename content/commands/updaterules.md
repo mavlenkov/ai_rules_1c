@@ -53,14 +53,48 @@ if (Test-Path (Join-Path $src '.git')) {
 & "$src\install.ps1" update -Source $src -AssumeYes
 ```
 
+The PowerShell channel applies every adapter frontmatter transform (including OpenCode `toolsToPermission`) and runs the OpenCode agent frontmatter gate before reporting success. Prefer it over the agent channel whenever `git` / PowerShell are available.
+
 3. Check installer output:
    - `Update complete.` / `Манифест .ai-rules.json: N файлов записано` — success;
-   - `User-modified files detected: N` (PowerShell) — files with local edits; marked `userModified` and preserved;
-   - `Verification OK` / `Verification found N mismatch(es)` — state of freshly placed files.
+   - `User-modified files detected: N` (PowerShell) — files with local edits; marked `userModified` and preserved; use `-Force` / `-ForcePaths` only when the user wants the shipped version;
+   - `Verification OK` / `Verification found N mismatch(es)` — state of freshly placed files;
+   - `OpenCode agent frontmatter OK` — OpenCode gate passed (or skipped when `.opencode/agent/` is absent);
+   - `OpenCode agent frontmatter INVALID` / exit code 1 — **update failed the hard gate** (see Step 5). Do not treat the run as successful.
 
 4. If neither channel is available (no `git`/`pwsh`/`bash`), execute *Update / add / remove* from `AGENT-INSTALL.md` through the agent channel: re-place managed files from the updated clone, re-render `AGENTS.md`, and update `version` and `updatedAt` in `.ai-rules.json`. Do not touch `USER-RULES.md`, `memory.md`, `.dev.env`, or `LLM-RULES.md` (place the latter from the template only if absent).
+
+   **OpenCode hard obligation on the agent channel.** When `opencode` is an active tool (or `.opencode/agent/` exists), every placed agent file **must** go through `adapters/opencode.yaml → agents.frontmatter.toolsToPermission` before write-back: convert the source `tools` array into a `permission` object, then apply `keep` / `drop` / `rename` / `addIf` so that `tools`, `modelTier`, `isSubagent`, and `allowParallel` are **not** left in the file. Copying `content/agents/*.md` into `.opencode/agent/` verbatim is a defect — OpenCode rejects a `tools` array and will not start. Canon — `AGENT-INSTALL.md → OpenCode agents: tools array → permission object`.
+
+5. **Mandatory post-update gate (both channels).** After the update, if `.opencode/agent/` or `.opencode/agents/` exists, verify that **no** agent markdown still has a `tools` **array** in its YAML frontmatter:
+
+```powershell
+Get-ChildItem .opencode\agent, .opencode\agents -Filter *.md -File -ErrorAction SilentlyContinue |
+  ForEach-Object {
+    $raw = Get-Content $_.FullName -Raw
+    if ($raw -match '(?ms)\A---\r?\n.*?^tools:\s*\[') {
+      "FAIL: $($_.FullName)"
+    }
+  }
+```
+
+   Linux equivalent (bash):
+
+```bash
+for f in .opencode/agent/*.md .opencode/agents/*.md; do
+  [ -f "$f" ] || continue
+  awk '/^---$/{c++} c==1 && /^tools:[[:space:]]*\[/{print "FAIL: " FILENAME}' "$f"
+done
+```
+
+   - Any match → **update is incomplete / failed**. Report FAIL, list the files, and repair by re-running the PowerShell channel with `-ForcePaths .opencode/agent/*` (or re-applying `toolsToPermission` correctly on the agent channel). Do not tell the user the update succeeded.
+   - Optional live check when `opencode` is on PATH: `opencode agent list` must not print `Configuration is invalid` / `Expected object | undefined, got [...] tools`.
+   - If neither OpenCode agent directory exists → skip this gate.
+
+6. Recommend restarting the AI client (OpenCode in particular) so it re-reads agent definitions and MCP config.
 
 ## Parameters (PowerShell channel)
 
 - `-AssumeYes` — answers "yes" to confirmations and keeps user edits (`keep`) on conflicting files. For a fully automated run (CI), add `-NonInteractive`.
+- `-Force` / `-ForcePaths .opencode/agent/*` — overwrite drifted / broken OpenCode agent files with the correctly transformed shipped versions.
 - `-Tools cursor,claude-code` — not needed: active tools are read from `.ai-rules.json`.
