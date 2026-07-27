@@ -12,7 +12,7 @@ This is a fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). It r
 
 `.dev.env` lives at the project root and is created by the 1c-rules installer. If it is missing, ask the user to run `install.ps1 init` / `scripts/install.sh` or to copy `.dev.env.example` to `.dev.env`.
 
-If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` (Section 2 + the fork Section 3), preserving already-filled `.dev.env` keys, and delete the legacy file after a successful migration. There is no other location for connection settings.
+If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` (Section 2 + the fork Section 5), preserving already-filled `.dev.env` keys, and delete the legacy file after a successful migration. There is no other location for connection settings.
 
 Read from `.dev.env`:
 
@@ -27,7 +27,7 @@ Read from `.dev.env`:
 | `LOG_PATH` | Designer / converter log file; empty resolves to `$TMPDIR/1cv8.log` (Linux) / `$env:TEMP\1cv8.log` (Windows). **Do not ask up front** — any writable path works equally well. Re-ask only if the resolved path turns out to be non-writable. |
 | `INFOBASE_PUBLISH_URL` | Web-publish URL for UI tests; empty = skip UI tests |
 | `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
-| **fork Section 3** | `CONVERTER_PATH`, `CONVERT_TOOL`, `IBCMD_TOOL`, `DB_SRV_*`, `REMOTE_*` — see `.dev.env.example` |
+| **fork Section 5** | `CONVERTER_PATH`, `CONVERT_TOOL`, `IBCMD_TOOL`, `DB_SRV_*`, `REMOTE_*` — see `.dev.env.example` |
 
 Critical deploy fields are `INFOBASE_PATH` and `PLATFORM_PATH`. If either is empty, ask the user and write the value to `.dev.env`. **Do not** ask about `IB_USER` / `IB_PASSWORD` / `LOG_PATH` when they are empty; apply the documented defaults silently. If the project requires 1CFilesConverter (Mode 1), `CONVERTER_PATH` is also critical.
 
