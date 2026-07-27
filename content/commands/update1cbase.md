@@ -29,7 +29,7 @@ Used `.dev.env` keys:
 | `EXPORT_PATH` | Source directory; empty means repository root |
 | `LOG_PATH` | Designer log file; empty resolves to `$env:TEMP\1cv8.log` (Windows) / `$TMPDIR/1cv8.log` (POSIX). **Do not ask up front** — any writable path works equally well. Re-ask only if the resolved path turns out to be non-writable. |
 | `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
-| `CONVERTER_PATH` | 1CFilesConverter path (fork Section 3); set = converter path available |
+| `CONVERTER_PATH` | 1CFilesConverter path (fork Section 5); set = converter path available |
 
 Only `INFOBASE_PATH` and `PLATFORM_PATH` are blocking — if either is empty, ask the user and write the value to `.dev.env`. **Do not** ask about `IB_USER` / `IB_PASSWORD` / `LOG_PATH` when they are empty; apply the documented defaults silently.
 

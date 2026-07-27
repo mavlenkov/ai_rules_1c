@@ -10,7 +10,7 @@ Fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). Reads all para
 
 ## Prerequisites
 
-**Requires 1CFilesConverter** (`CONVERTER_PATH` in `.dev.env`, fork Section 3). Read from `.dev.env`:
+**Requires 1CFilesConverter** (`CONVERTER_PATH` in `.dev.env`, fork Section 5). Read from `.dev.env`:
 1) `CONVERTER_PATH` — path to 1CFilesConverter
 2) `PLATFORM_PATH` (`V8_VERSION` = `basename(PLATFORM_PATH)`), `CONVERT_TOOL`
 3) `IB_USER`, `IB_PASSWORD`

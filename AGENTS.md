@@ -156,7 +156,7 @@ Individual rule and subagent files therefore do **not** repeat the disclaimer "o
 
 ### Infobase deployment (Linux + 1CFilesConverter — fork)
 
-> Fork-specific (`mavlenkov/ai_rules_1c`). The fork deploy commands (`deploy-and-test`, `extensions`, `dataprocessors`, `getconfigfiles`) read all parameters from `.dev.env` — the standard Section 2 (`PLATFORM_PATH`, `INFOBASE_KIND`, `INFOBASE_PATH`, `IB_USER`, `IB_PASSWORD`, `EXTENSION_NAME`, `EXPORT_PATH`, `LOG_PATH`) plus the fork-only Section 3 (1CFilesConverter / ibcmd / remote-SSH parameters; see `.dev.env.example`). A legacy `infobasesettings.md` is migrated into `.dev.env` on first use, then deleted.
+> Fork-specific (`mavlenkov/ai_rules_1c`). The fork deploy commands (`deploy-and-test`, `extensions`, `dataprocessors`, `getconfigfiles`) read all parameters from `.dev.env` — the standard Section 2 (`PLATFORM_PATH`, `INFOBASE_KIND`, `INFOBASE_PATH`, `IB_USER`, `IB_PASSWORD`, `EXTENSION_NAME`, `EXPORT_PATH`, `LOG_PATH`) plus the fork-only Section 5 (1CFilesConverter / ibcmd / remote-SSH parameters; see `.dev.env.example`). A legacy `infobasesettings.md` is migrated into `.dev.env` on first use, then deleted.
 
 **Connection string.** Built from `INFOBASE_KIND` + `INFOBASE_PATH`: `file` → `/F<path>`, `server` → `/S<path>`. `V8_VERSION` for the converter scripts is derived as `basename(PLATFORM_PATH)`.
 

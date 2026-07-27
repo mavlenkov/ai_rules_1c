@@ -19,7 +19,7 @@ All paths and identifiers come from `.dev.env`. Only `INFOBASE_PATH` and `PLATFO
 | `EXPORT_PATH` | Target export directory; empty = current repository root |
 | `LOG_PATH` | Designer log file; empty resolves to `$TMPDIR/1cv8.log` (Linux) / `$env:TEMP\1cv8.log` (Windows). **Do not ask up front.** |
 | `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
-| `CONVERTER_PATH` | 1CFilesConverter path (fork Section 3); set = Mode 1, empty = Mode 2 |
+| `CONVERTER_PATH` | 1CFilesConverter path (fork Section 5); set = Mode 1, empty = Mode 2 |
 | `CONVERT_TOOL` | `designer` / `ibcmd` → `V8_CONVERT_TOOL` |
 
 ## Mode selection
