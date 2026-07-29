@@ -36,7 +36,7 @@ fi
 "$src/scripts/install.sh" "$(pwd)"
 ```
 
-Codex and Kilo Code are not covered by the bash installer — for those use the PowerShell channel under `pwsh`.
+Kilo Code is not covered by the bash installer — for it use the PowerShell channel under `pwsh`.
 
 ### Windows — PowerShell channel
 

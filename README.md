@@ -34,7 +34,7 @@
 
 ### Fallback: Linux/bash-установщик (основной CLI этого форка)
 
-Под Linux/macOS детерминированный CLI-путь этого форка — `scripts/install.sh`. Поддерживает три tools (cursor, claude-code, opencode), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — подставляет реальный хост docker-MCP-серверов в `localhost`-URL'ы из `content/mcp-servers.json`; и `--publish-url` — подставляет URL веб-публикации ИБ в сервер `1c-data-mcp` (`{INFOBASE_PUBLISH_URL}/hs/mcp`, с обрезкой концевого `/` и сегмента локали `/ru`). Без `--publish-url` плейсхолдер сохраняется и выводится предупреждение.
+Под Linux/macOS детерминированный CLI-путь этого форка — `scripts/install.sh`. Поддерживает четыре tools (cursor, claude-code, opencode, codex), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — подставляет реальный хост docker-MCP-серверов в `localhost`-URL'ы из `content/mcp-servers.json`; и `--publish-url` — подставляет URL веб-публикации ИБ в сервер `1c-data-mcp` (`{INFOBASE_PUBLISH_URL}/hs/mcp`, с обрезкой концевого `/` и сегмента локали `/ru`). Без `--publish-url` плейсхолдер сохраняется и выводится предупреждение.
 
 ```bash
 git clone https://github.com/mavlenkov/ai_rules_1c.git /tmp/1c-rules

@@ -3,10 +3,10 @@
 # Минимальный Linux-installer для ai_rules_1c (Linux + 1CFilesConverter edition).
 # Реализует протокол AGENT-INSTALL.md в форме CLI — альтернатива install.ps1
 # для Linux/CI-сценариев. По возможностям эквивалентен upstream-protocol'у
-# в пределах поддерживаемых tools (cursor, claude-code, opencode).
+# в пределах поддерживаемых tools (cursor, claude-code, opencode, codex).
 #
 # Использование:
-#   ./install.sh <target-dir> [--tools cursor,claude-code,opencode] [--host HOST]
+#   ./install.sh <target-dir> [--tools cursor,claude-code,opencode,codex] [--host HOST]
 #
 # По умолчанию: auto-detect активных tools, host=localhost.
 
@@ -28,7 +28,7 @@ Usage:
   $0 <target-dir> [options]
 
 Options:
-  --tools <list>   Comma-separated tool ids: cursor, claude-code, opencode.
+  --tools <list>   Comma-separated tool ids: cursor, claude-code, opencode, codex.
                    Default: auto-detect by adapter detection rules.
   --host <host>    MCP server host (substitutes 'localhost' in content/mcp-servers.json).
                    Default: localhost.
@@ -169,7 +169,20 @@ def _parse_block(lines, idx, base_indent):
         k, _, v = ln.lstrip().partition(':')
         v = v.strip()
         k = k.strip()
-        if v:
+        if v and v in ('|', '|-', '|+', '>', '>-', '>+'):
+            # Block scalar (e.g. codex adapter `template: |`): collect the
+            # more-indented lines verbatim. Blank lines were dropped by the
+            # pre-filter — acceptable for our adapter templates.
+            block = []
+            idx += 1
+            while idx < len(lines) and _indent(lines[idx]) > base_indent:
+                block.append(lines[idx][base_indent + 2:])
+                idx += 1
+            text = '\n'.join(block)
+            if v.startswith('>'):
+                text = text.replace('\n', ' ')
+            out[k] = text
+        elif v:
             out[k] = _parse_inline_value(v)
             idx += 1
         else:
@@ -359,6 +372,37 @@ def resolve_agent_model_tier(fm, tool):
 
 # --- Per-tool placement ---------------------------------------------------
 
+_USER_SCOPE_WARNED = set()  # tools for which the user-scope warning was printed
+
+def resolve_target_base(copy_to, tool):
+    """Return (base_path, is_user_scope). Adapter targets starting with '~/' are
+    user-level scope (e.g. codex commands -> ~/.codex/prompts/) — shared across
+    projects, so warn once per tool (mirrors the install.ps1 warning)."""
+    if copy_to.startswith('~/'):
+        if tool not in _USER_SCOPE_WARNED:
+            print(f"  ⚠ {tool}: цель '{copy_to.split('/{name}')[0] if '{name}' in copy_to else copy_to}' — user-scope (~), файлы общие для всех проектов")
+            _USER_SCOPE_WARNED.add(tool)
+        return Path.home(), True
+    return TARGET, False
+
+def codex_agent_template(template, fm, body):
+    """Render the codex rebuild-toml template. Per line: every {placeholder}
+    (except {body}) must exist non-empty in fm, otherwise the whole line is
+    dropped (e.g. `model = "{modelHint}"` disappears when no model resolved).
+    Mirrors Invoke-CodexAgentTemplate in install.ps1."""
+    out_lines = []
+    for line in template.split('\n'):
+        keys = [k for k in re.findall(r'\{([\w-]+)\}', line) if k != 'body']
+        if any(not fm.get(k) for k in keys):
+            continue
+        rendered = line
+        for k in keys:
+            rendered = rendered.replace('{%s}' % k, str(fm[k]))
+        if '{body}' in rendered:
+            rendered = rendered.replace('{body}', body)
+        out_lines.append(rendered)
+    return '\n'.join(out_lines)
+
 def place_section(adapter, section, src_dir):
     """Walk src_dir, copy files to adapter[section].copyTo with frontmatter ops."""
     cfg = adapter.get(section)
@@ -370,22 +414,32 @@ def place_section(adapter, section, src_dir):
     src_path = REPO / src_dir
     if not src_path.exists(): return []
 
+    base, user_scope = resolve_target_base(copy_to, adapter.get('tool', ''))
+
     if copy_to.endswith('/'):  # directory mode (skills)
         for entry in sorted(src_path.iterdir()):
             if not entry.is_dir(): continue
-            dst = TARGET / copy_to.format(name=entry.name)
+            dst = base / copy_to.format(name=entry.name) if not user_scope else base / copy_to[2:].format(name=entry.name)
             if dst.exists(): shutil.rmtree(dst)
             shutil.copytree(entry, dst)
-            placed.append(str(dst.relative_to(TARGET)))
+            placed.append(str(dst) if user_scope else str(dst.relative_to(TARGET)))
     else:
         for entry in sorted(src_path.iterdir()):
             if not entry.is_file() or entry.suffix != '.md': continue
             name = entry.stem
             dst_rel = copy_to.format(name=name)
-            dst = TARGET / dst_rel
+            if user_scope:
+                dst_rel = dst_rel[2:]  # strip '~/'
+            dst = base / dst_rel
             dst.parent.mkdir(parents=True, exist_ok=True)
             text = entry.read_text(encoding='utf-8')
-            if mode == 'verbatim' or not ops:
+            if mode == 'rebuild-toml':
+                # Codex agents: rebuild the file from a TOML template instead
+                # of frontmatter ops. Mirrors install.ps1 rebuild-toml branch.
+                fm, body = split_frontmatter(text)
+                fm = resolve_agent_model_tier(fm, adapter.get('tool', ''))
+                dst.write_text(codex_agent_template(cfg.get('template') or '', fm, body), encoding='utf-8')
+            elif mode == 'verbatim' or not ops:
                 dst.write_text(text, encoding='utf-8')
             else:
                 fm, body = split_frontmatter(text)
@@ -393,7 +447,7 @@ def place_section(adapter, section, src_dir):
                     fm = resolve_agent_model_tier(fm, adapter.get('tool', ''))
                 new_fm = apply_frontmatter_ops(fm, ops)
                 dst.write_text(fm_to_text(new_fm) + body, encoding='utf-8')
-            placed.append(dst_rel)
+            placed.append(str(dst) if user_scope else dst_rel)
     return placed
 
 # --- MCP rendering --------------------------------------------------------
@@ -468,10 +522,28 @@ def render_mcp(adapter, host, publish_url):
                 if s.get('env'): e['environment'] = s['env']
             e['enabled'] = True
             out['mcp'][opencode_key(s['id'])] = e
+    elif 'mcp_servers' in schema:
+        # Codex: TOML `[mcp_servers."<id>"]` sections in `.codex/config.toml`.
+        # Mirrors New-McpConfig-Codex / Format-TomlString / Format-TomlArray.
+        def toml_str(v):
+            return '"' + str(v).replace('\\', '\\\\').replace('"', '\\"') + '"'
+        lines = ['# MCP server configuration for Codex CLI',
+                 '# Generated by 1c-rules installer', '']
+        for s in servers:
+            lines.append(f'[mcp_servers.{toml_str(s["id"])}]')
+            if s.get('url'): lines.append('url = ' + toml_str(s['url']))
+            if s.get('connectionId'): lines.append('connection_id = ' + toml_str(s['connectionId']))
+            if s.get('description'): lines.append('description = ' + toml_str(s['description']))
+            if s.get('command'):
+                lines.append('command = ' + toml_str(s['command']))
+                if s.get('args'):
+                    lines.append('args = [' + ', '.join(toml_str(a) for a in s['args']) + ']')
+            lines.append('')
+        return 'toml', '\n'.join(lines)
     else:
         raise ValueError(f"Unknown MCP schema: {schema}")
 
-    return json.dumps(out, indent=2, ensure_ascii=False)
+    return 'json', json.dumps(out, indent=2, ensure_ascii=False)
 
 # --- Detection ------------------------------------------------------------
 
@@ -481,7 +553,16 @@ def detect_tools():
     for ad_path in sorted((REPO / 'adapters').glob('*.yaml')):
         ad = parse_yaml(ad_path.read_text(encoding='utf-8'))
         tool = ad['tool']
-        if tool not in ('cursor', 'claude-code', 'opencode'): continue
+        if tool not in ('cursor', 'claude-code', 'opencode', 'codex'): continue
+        if tool == 'codex':
+            # The codex adapter lists `exists: "AGENTS.md"` as a detection rule,
+            # which would auto-add codex to EVERY installed project (OR semantics).
+            # install.ps1 sidesteps this with its own detection map (`.codex` dir
+            # only) — mirror that: codex is auto-detected only when a `.codex`
+            # DIRECTORY already exists. A 0-byte `.codex` file does not count.
+            if (TARGET / '.codex').is_dir():
+                active.append(tool)
+            continue
         det = ad.get('detection', [])
         for rule in det:
             if 'exists' in rule and (TARGET / rule['exists']).exists():
@@ -520,20 +601,26 @@ for tool, adapter in adapters.items():
     if mcp_cfg:
         dst = TARGET / mcp_cfg['target']
         dst.parent.mkdir(parents=True, exist_ok=True)
-        rendered = json.loads(render_mcp(adapter, HOST, PUBLISH_URL))
-        if mcp_cfg.get('merge') and dst.exists():
-            # merge:true — файл общий (instructions, model, permissions, …):
-            # заменяем ТОЛЬКО ключ mcp (+$schema, если его не было), остальное
-            # пользовательское сохраняем. Зеркало merge-логики install.ps1.
-            try:
-                existing = json.loads(dst.read_text(encoding='utf-8'))
-            except (OSError, ValueError):
-                existing = {}
-            existing['mcp'] = rendered.get('mcp', rendered.get('mcpServers', {}))
-            if '$schema' in rendered:
-                existing.setdefault('$schema', rendered['$schema'])
-            rendered = existing
-        dst.write_text(json.dumps(rendered, indent=2, ensure_ascii=False), encoding='utf-8')
+        mcp_fmt, mcp_text = render_mcp(adapter, HOST, PUBLISH_URL)
+        if mcp_fmt == 'toml':
+            # Codex `.codex/config.toml` — готовый TOML-текст, пишем как есть
+            # (merge для TOML bash-канал не делает — см. FORK-TODO).
+            dst.write_text(mcp_text, encoding='utf-8')
+        else:
+            rendered = json.loads(mcp_text)
+            if mcp_cfg.get('merge') and dst.exists():
+                # merge:true — файл общий (instructions, model, permissions, …):
+                # заменяем ТОЛЬКО ключ mcp (+$schema, если его не было), остальное
+                # пользовательское сохраняем. Зеркало merge-логики install.ps1.
+                try:
+                    existing = json.loads(dst.read_text(encoding='utf-8'))
+                except (OSError, ValueError):
+                    existing = {}
+                existing['mcp'] = rendered.get('mcp', rendered.get('mcpServers', {}))
+                if '$schema' in rendered:
+                    existing.setdefault('$schema', rendered['$schema'])
+                rendered = existing
+            dst.write_text(json.dumps(rendered, indent=2, ensure_ascii=False), encoding='utf-8')
         print(f"  mcp: {mcp_cfg['target']} (host={HOST})")
         manifest_files.append({'path': mcp_cfg['target'], 'tool': tool, 'section': 'mcp'})
         # legacyTargets: мёртвые дубликаты старых установок (например
@@ -635,6 +722,6 @@ PYEOF
 echo ""
 echo "Следующие шаги:"
 echo "  1. Скопируй .dev.env.example в .dev.env и заполни подключение к ИБ"
-echo "     (Раздел 2 + fork Раздел 3 для 1CFilesConverter)"
+echo "     (Раздел 2 + fork Раздел 5 для 1CFilesConverter)"
 echo "  2. Запусти MCP-серверы (host=$HOST)"
 echo "  3. Открой проект в нужном AI-инструменте"
