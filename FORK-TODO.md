@@ -45,6 +45,43 @@ platform-first, MCP-first search (`f33d240`). Конфликтов было 4 (�
 - Новые адаптеры (Kimi/Qwen/Command Code/Cline/Pi) по-прежнему только через
   `install.ps1` (см. п.10).
 
+### 12. ✅ РЕШЕНО (2026-07-27): `scripts/install.sh` поддерживает codex
+
+Bash-канал научился устанавливать codex-адаптер (раньше — только
+cursor/claude-code/opencode; FORK-TODO п.10). Реализовано:
+
+- `parse_yaml` — блочные скаляры `|` / `>` (шаблон `template: |` адаптера
+  codex раньше терялся).
+- `place_section` — режим `rebuild-toml` (агенты → `.codex/agents/*.toml`
+  через `codex_agent_template`, зеркало `Invoke-CodexAgentTemplate`: строка
+  шаблона с пустым плейсхолдером выбрасывается — `model = …` без модели,
+  `model_reasoning_effort` всегда) и user-scope цели `~/` (команды →
+  `~/.codex/prompts/`, WARNING раз за прогон, в манифест — абсолютный путь,
+  как в install.ps1).
+- `render_mcp` — TOML-схема `[mcp_servers."<id>"]` → `.codex/config.toml`
+  (зеркало `New-McpConfig-Codex`); контракт изменён на `(fmt, text)`, для
+  TOML merge НЕ делается (файл перезаписывается целиком — отличие от
+  потенциальной merge-семантики ps1, зафиксировано как допустимое расхождение).
+- `detect_tools` — codex авто-детектится только по директории `.codex/`
+  (правило `exists: "AGENTS.md"` из адаптера проигнорировано: OR-семантика
+  добавляла бы codex в каждый проект; зеркало detection-map install.ps1).
+  Пустой 0-байтовый ФАЙЛ `.codex` детект не срабатывает.
+- Модели ярусов: codex принимает свои slug'и без провайдера
+  (`gpt-5.6-sol/terra/luna`), в `PROVIDER_MODEL_TOOLS` НЕ добавлен.
+  Примеры `__CODEX` добавлены в `.dev.env.example` Раздел 4.
+- Бонус: финальное сообщение install.sh говорило «fork Раздел 3» → «Раздел 5».
+
+Проверено: temp-проект (TOML валиден tomllib, модели из `__CODEX` override,
+13 агентов, 35 правил, 10 скиллов, 15 команд в fake-HOME), регрессия
+claude-code (rules-1c, JSON-путь MCP), детект по файлу/директории. Боевая
+установка в LocalProject1 (2026-07-27): `--tools claude-code,codex --host mcp-host`,
+мусор (0-байтовый `.codex`, папка `codex/` со старой копией бандла) удалён,
+ключи `SUBAGENT_MODEL_*__CODEX` добавлены в `.dev.env` проекта.
+
+**При будущем merge upstream:** если upstream допишет codex в свой bash-канал
+или изменит `adapters/codex.yaml` (merge-флаг MCP, новые поля шаблона) —
+сверять с этой реализацией.
+
 ## После мержа upstream (2026-06-27, upstream `a421cf4`)
 
 Слит upstream `5b246bc..a421cf4` (11 коммитов) в ветке `merge/upstream-20260627`.
