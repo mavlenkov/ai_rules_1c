@@ -96,7 +96,13 @@ help-тексты. Детект по адаптеру: `.kimi-code/` или `.ki
 трогали: алиасы Kimi (`kimi-code/k3`) содержат `/` и проходят формат-гард.
 Проверено на temp-проекте: 35 правил, 13 агентов (`model: kimi-code/k3` из
 `__KIMI` override), 10 скиллов, 8 MCP-серверов, манифест
-`['kimi']` / `.kimi-code/rules-1c`. OpenSpec-бандла для kimi в
+`['kimi']` / `.kimi-code/rules-1c`. Раскатано (2026-07-29) во все 9 проектов
+с установленными правилами (1C_SVS, gitsync, ДемоМедси, ЕвротестРасширение,
+КДЦ52Расширение, ЛИС1С, ЛИС1СГистология, Микробиология, Тестирование):
+`--tools <манифестные tools>+kimi --host <из манифеста>`, ключи
+`SUBAGENT_MODEL_*__KIMI` (coding/analysis=`kimi-code/k3`,
+light=`kimi-code/kimi-for-coding-highspeed`) дописаны в `.dev.env` проектов
+(в 1C_SVS `.dev.env` нет — модель не эмитится, дефолт клиента). OpenSpec-бандла для kimi в
 `content/openspec-bundle/` нет (upstream не поставляет) — цикл бандла его
 пропускает; `.kimi/skills/openspec-*` в проектах ставит собственный
 инсталлятор OpenSpec, не 1c-rules.
