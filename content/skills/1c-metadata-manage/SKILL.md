@@ -30,6 +30,13 @@ PowerShell examples in this skill (`SKILL.md` and every `docs/*.md`) use the pre
 
 The same convention applies to `docs/*.md` references like `skills/1c-metadata-manage/tools/1c-skd-info/modes-reference.md`.
 
+## Platform note (Linux — fork)
+
+The `tools/` scripts are PowerShell (`pwsh`). On Linux they work under the cross-platform PowerShell 7.x — pure .NET XML processing, no Windows-only APIs. Before any mutation task, probe `command -v pwsh` once:
+
+- **Available** — run the scripts exactly as the docs show (`pwsh -NoProfile -File …`).
+- **Missing** — do **not** fall back to silent hand-editing and do not burn turns probing alternatives (`powershell`, `powershell.exe`, `dotnet`, …). Report to the user in one line ("metadata mutation blocked: `pwsh` is not installed — install PowerShell 7.x, e.g. the official tarball into `~/.local/share/powershell` + symlink into `~/.local/bin`") and stop the mutation part of the task. The narrow hard-rule exceptions above still apply unchanged.
+
 ## Dispatch Strategy
 
 Determine task complexity, then choose the execution mode:

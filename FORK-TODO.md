@@ -102,7 +102,30 @@ help-тексты. Детект по адаптеру: `.kimi-code/` или `.ki
 `--tools <манифестные tools>+kimi --host <из манифеста>`, ключи
 `SUBAGENT_MODEL_*__KIMI` (coding/analysis=`kimi-code/k3`,
 light=`kimi-code/kimi-for-coding-highspeed`) дописаны в `.dev.env` проектов
-(в 1C_SVS `.dev.env` нет — модель не эмитится, дефолт клиента). OpenSpec-бандла для kimi в
+(в 1C_SVS `.dev.env` нет — модель не эмитится, дефолт клиента).
+
+### 14. ✅ РЕШЕНО (2026-07-29): OpenSpec `schema: proposal` + pwsh для скилла
+
+Две проблемы, вскрытые прогоном Codex в ЛИС1С:
+
+**A. OpenSpec CLI 1.4.1 не знал `schema: proposal`.** Старые change-директории
+(апрель 2026) несли `schema: proposal` — переименованный предок `spec-driven`;
+CLI падал с `Unknown schema 'proposal'`. Починено заменой на `spec-driven`
+в 6 `.openspec.yaml` (ЛИС1С: 3 активных + 2 архива; ЕвротестРасширение: 1 архив).
+Это данные проектов, не рулесета — бандл `.openspec.yaml` не содержит.
+**При появлении новых проектов со старыми change — повторять замену.**
+
+**B. Скилл `1c-metadata-manage` требовал PowerShell, которого не было.**
+Весь тулчейн (`tools/*/scripts/*.ps1`) — PowerShell; на машине не было ни
+pwsh, ни dotnet; Codex метался (пробовал pwsh/powershell/powershell.exe).
+Решение: (1) установлен PowerShell 7.6.4 из официального tarball в
+`~/.local/share/powershell` + symlink `~/.local/bin/pwsh` (user-level, без
+root) — smoke-тест `meta-edit.ps1 -Operation add-attribute` на копии
+`Documents/ЗаказУслугУПК.xml` прошёл; (2) в `SKILL.md` добавлена секция
+«Platform note (Linux — fork)»: пробить `command -v pwsh` один раз; если нет —
+сообщить пользователю и остановить мутацию, а не метаться и не hand-edit'ить.
+**При будущем merge upstream:** секция помечена fork; если upstream введёт
+свою платформенную заметку — объединить. OpenSpec-бандла для kimi в
 `content/openspec-bundle/` нет (upstream не поставляет) — цикл бандла его
 пропускает; `.kimi/skills/openspec-*` в проектах ставит собственный
 инсталлятор OpenSpec, не 1c-rules.
