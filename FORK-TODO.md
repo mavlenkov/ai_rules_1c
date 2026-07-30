@@ -82,6 +82,25 @@ claude-code (rules-1c, JSON-путь MCP), детект по файлу/дире
 или изменит `adapters/codex.yaml` (merge-флаг MCP, новые поля шаблона) —
 сверять с этой реализацией.
 
+### 13. ✅ РЕШЕНО (2026-07-29): `scripts/install.sh` поддерживает kimi
+
+Kimi-адаптер (`adapters/kimi.yaml`) простой — rules → `.kimi-code/rules-1c/`,
+agents → `.kimi-code/agents/*.md` (generic frontmatter ops, `modelHint`→`model`),
+без секции commands (у Kimi нет проектного каталога команд — by design
+адаптера), skills verbatim, MCP — схема `mcpServers` (уже поддерживалась
+JSON-веткой `render_mcp`). Поэтому доработка свелась к: добавлению `kimi` в
+список детектируемых tools, в priority rulesDir для рендера `AGENTS.md`
+(между kilocode и opencode — порядок `RulesDirPriority` из install.ps1) и в
+help-тексты. Детект по адаптеру: `.kimi-code/` или `.kimi/` — оба легитимные
+маркеры, спец-обработки (как у codex) не нужно. `PROVIDER_MODEL_TOOLS` не
+трогали: алиасы Kimi (`kimi-code/k3`) содержат `/` и проходят формат-гард.
+Проверено на temp-проекте: 35 правил, 13 агентов (`model: kimi-code/k3` из
+`__KIMI` override), 10 скиллов, 8 MCP-серверов, манифест
+`['kimi']` / `.kimi-code/rules-1c`. OpenSpec-бандла для kimi в
+`content/openspec-bundle/` нет (upstream не поставляет) — цикл бандла его
+пропускает; `.kimi/skills/openspec-*` в проектах ставит собственный
+инсталлятор OpenSpec, не 1c-rules.
+
 ## После мержа upstream (2026-06-27, upstream `a421cf4`)
 
 Слит upstream `5b246bc..a421cf4` (11 коммитов) в ветке `merge/upstream-20260627`.
