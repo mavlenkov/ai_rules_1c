@@ -1054,22 +1054,34 @@ function New-McpConfig-Codex {
     return ($lines -join "`n")
 }
 
-# Koda MCP: generates .koda/mcp-setup.md with /mcp add-http commands
+# Koda MCP: generate project-scoped registration commands without overwriting
+# the shared .kodacli/settings.json file.
 function New-McpConfig-Koda {
     param([array]$Servers)
-    $lines = @()
-    $lines += '# Koda MCP Setup'
-    $lines += '#'
-    $lines += '# Run these commands in Koda to add MCP servers:'
-    $lines += '#'
+    $lines = @(
+        '# Koda MCP Setup',
+        '',
+        'Run these commands in a shell from the project root:',
+        ''
+    )
+    $count = 0
+    $hasUnresolvedUrl = $false
     foreach ($s in $Servers) {
-        if (-not $s.url) { continue }
-        $lines += "# Server: $($s.id)"
-        $lines += "/mcp add-http $($s.id) $($s.url)"
+        if (-not $s.url -or $s.transport -ne 'http') { continue }
+        if ($s.url -match '\{[^}]+\}') {
+            $hasUnresolvedUrl = $true
+            continue
+        }
+        $lines += '```bash'
+        $lines += "koda mcp add $($s.id) `"$($s.url)`" --transport http --scope project"
+        $lines += '```'
+        if ($s.description) { $lines += "`n> $($s.description)" }
         $lines += ''
+        $count++
     }
-    if ($Servers.Count -eq 0) {
-        $lines += '# No MCP servers configured.'
+    if ($count -eq 0) { $lines += 'No HTTP MCP servers configured.' }
+    if ($hasUnresolvedUrl) {
+        $lines += 'Regenerate this file after setting INFOBASE_PUBLISH_URL to include 1c-data-mcp.'
     }
     return ($lines -join "`n")
 }
@@ -1181,7 +1193,7 @@ function Get-ToolDetectionSignals {
         'qwen'         = @((Test-Path (Join-Path $Root '.qwen')), (Test-Path (Join-Path $Root 'QWEN.md')))
         'command-code' = @((Test-Path (Join-Path $Root '.commandcode')))
         'cline'        = @((Test-Path (Join-Path $Root '.cline')), (Test-Path (Join-Path $Root '.clinerules')))
-        'koda'         = @((Test-Path (Join-Path $Root '.koda')))
+        'koda'         = @((Test-Path (Join-Path $Root '.kodacli')), (Test-Path (Join-Path $Root '.koda')), (Test-Path (Join-Path $Root 'KODA.md')))
         'pi'           = @((Test-Path (Join-Path $Root '.pi')))
         # 'other' is a manual-only fallback — never auto-detected.
         'other'        = @()
@@ -2267,86 +2279,6 @@ function Resolve-AgentModelTier {
     return $result
 }
 
-# Koda agent JSON conversion: YAML frontmatter + markdown body → .koda/agents/<name>.json
-# Schema: { name, system_prompt, model, trust, allowed_tools, disallowed_tools, max_iterations, skip_memory }
-function ConvertTo-KodaAgentJson {
-    param(
-        [System.Collections.IDictionary]$Frontmatter,
-        [string]$Body,
-        [string]$Tool,
-        [string]$Root
-    )
-    # Resolve model from .dev.env (same cascade as other adapters)
-    $model = ''
-    if ($Frontmatter -and $Frontmatter.Contains('modelTier')) {
-        $tier = ([string]$Frontmatter['modelTier']).Trim().ToLowerInvariant()
-        $base = if ($script:ModelTierKeys.Contains($tier)) { $script:ModelTierKeys[$tier] } else { '' }
-        if ($base) {
-            $raw = Get-DevEnvRawKeys -Root $Root
-            $suffixKey = "${base}__$(Get-ToolSuffix $Tool)"
-            if ($raw.Contains($suffixKey) -and ([string]$raw[$suffixKey]).Trim()) {
-                $model = ([string]$raw[$suffixKey]).Trim()
-            }
-            else {
-                $tiers = Resolve-ModelTiers -Root $Root
-                if ($tiers.Contains($tier)) { $model = [string]$tiers[$tier] }
-            }
-        }
-    }
-
-    # Map tools array to allowed_tools
-    $toolMap = @{
-        'Read'  = 'Read'
-        'Write' = 'Write'
-        'Edit'  = 'Edit'
-        'Grep'  = 'Grep'
-        'Glob'  = 'Glob'
-        'Shell' = 'Bash'
-        'MCP'   = 'MCP'
-    }
-    $allowedTools = @()
-    $disallowedTools = @('Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash', 'MCP')
-
-    if ($Frontmatter -and $Frontmatter.Contains('tools')) {
-        $toolsArr = @($Frontmatter['tools'])
-        foreach ($t in $toolsArr) {
-            $tStr = ([string]$t).Trim()
-            if ($toolMap.ContainsKey($tStr)) {
-                $allowedTools += $toolMap[$tStr]
-                if ($disallowedTools -contains $tStr) {
-                    $disallowedTools = $disallowedTools | Where-Object { $_ -ne $tStr }
-                }
-            }
-        }
-    }
-
-    # Determine trust, max_iterations, skip_memory
-    $isSubagent = $false
-    if ($Frontmatter -and $Frontmatter.Contains('isSubagent')) {
-        $isSubagent = [bool]$Frontmatter['isSubagent']
-    }
-
-    $trust = 'safe'  # Koda uses "safe" for both sub-agents and top-level
-    $maxIterations = if ($isSubagent) { 30 } else { 200 }
-
-    # Read-only agents (no Write/Edit/Bash in allowed_tools) → skip_memory
-    $skipMemory = -not ($allowedTools -contains 'Write' -or $allowedTools -contains 'Edit' -or $allowedTools -contains 'Bash')
-
-    # Build JSON object
-    $jsonAgent = [ordered]@{
-        name = if ($Frontmatter -and $Frontmatter.Contains('name')) { [string]$Frontmatter['name'] } else { '' }
-        system_prompt = $Body
-    }
-    if ($model) { $jsonAgent['model'] = $model }
-    $jsonAgent['trust'] = $trust
-    if ($allowedTools.Count -gt 0) { $jsonAgent['allowed_tools'] = $allowedTools }
-    if ($disallowedTools.Count -gt 0) { $jsonAgent['disallowed_tools'] = $disallowedTools }
-    $jsonAgent['max_iterations'] = $maxIterations
-    $jsonAgent['skip_memory'] = $skipMemory
-
-    return $jsonAgent
-}
-
 function Invoke-PlacePhase {
     param(
         [string]$Root,
@@ -2386,28 +2318,6 @@ function Invoke-PlacePhase {
                 $agentFm = Resolve-AgentModelTier -Frontmatter $parts.Frontmatter -Root $Root -Tool $tool
                 $name = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
                 $target = Resolve-CopyToPath $copyTpl $name
-
-                # Koda: mode json-convert — convert YAML frontmatter + body to JSON
-                if ($mode -eq 'json-convert') {
-                    $jsonAgent = ConvertTo-KodaAgentJson -Frontmatter $agentFm -Body $parts.Body -Tool $tool -Root $Root
-                    $jsonPath = $absTarget = Join-Path $Root (if ([System.IO.Path]::IsPathRooted($target)) { $target } else { Join-Path $Root $target })
-                    $jsonParent = Split-Path -Parent $jsonPath
-                    if ($jsonParent -and -not (Test-Path $jsonParent)) {
-                        New-Item -ItemType Directory -Path $jsonParent -Force | Out-Null
-                    }
-                    $jsonAgent | ConvertTo-Json -Depth 10 | Set-Content -Path $jsonPath -Encoding UTF8NoBom -ErrorAction Stop
-                    $hash = Get-FileSha256 $jsonPath
-                    $previousEntry = if ($Manifest.files.Contains($target)) { $Manifest.files[$target] } else { $null }
-                    $entry = [ordered]@{
-                        source        = "content/agents/" + $f.Name
-                        installedHash = $hash
-                    }
-                    $owners = @(Merge-ManifestOwners -Entry $previousEntry -OwnerTool $tool)
-                    if ($owners.Count -gt 0) { $entry['owners'] = $owners }
-                    $Manifest.files[$target] = $entry
-                    Write-Info "  agent (Koda JSON): $target"
-                    continue
-                }
 
                 Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                     -TargetRel $target -SourceFm $agentFm -SourceBody $parts.Body `
@@ -4307,8 +4217,8 @@ function Write-RestartRecommendation {
     )
     if ($McpCount -le 0) { return }
     Write-Info ""
-    Write-Info "ВАЖНО: перезапустите AI-клиент (CLI / IDE), чтобы он перечитал MCP-конфигурацию и определения агентов."
-    Write-Info "       MCP-серверы и новые субагенты подхватываются только при старте клиента — без перезапуска они не появятся в текущей сессии."
+    Write-Info "ВАЖНО: перезапустите AI-клиент (CLI / IDE), чтобы он перечитал установленные правила и интеграции."
+    Write-Info "       Возможности конкретного клиента подхватываются только при старте — без перезапуска они могут не появиться в текущей сессии."
     if ($ActiveTools -contains 'opencode') {
         Write-Info "       OpenCode: полностью завершите и заново запустите сессию OpenCode (config читается при старте)."
     }
