@@ -1,0 +1,86 @@
+# Adapter: Koda CLI (lijunzh/koda)
+#
+# Describes how to copy and adapt files from content/ for Koda CLI.
+# Read by both installation channels (AI-agent installer and install.ps1).
+#
+# Schema: closed adapter schema described in AGENT-INSTALL.md (Lean placement)
+# and implemented by install.ps1.
+#
+# Koda specifics:
+#   - AGENTS.md at project root (de-facto standard, read by Koda).
+#   - Subagents are JSON files in .koda/agents/ (not markdown with frontmatter).
+#     Source content/agents/*.md have YAML frontmatter (name, description,
+#     modelTier, tools, isSubagent, allowParallel) — these are converted to
+#     Koda's JSON schema:
+#       { name, system_prompt (body of markdown), model, trust, allowed_tools,
+#         disallowed_tools, max_iterations, skip_memory }
+#     modelTier is resolved from .dev.env (SUBAGENT_MODEL_<TIER>) per the
+#     standard cascade (per-client override → bare tier → empty).
+#     tools array maps: Read→Read, Write→Write, Edit→Edit, Grep→Grep,
+#     Glob→Glob, Shell→Bash, MCP→MCP.
+#     isSubagent: true → trust: "safe" (write-capable sub-agent);
+#     isSubagent: false → trust: "safe" (top-level agent).
+#     allowParallel is not a Koda field — ignored.
+#     max_iterations defaults to 30 for sub-agents, 200 for top-level.
+#     skip_memory: true for read-only agents (explorer, code-reviewer,
+#     arch-reviewer — those whose tools omit Write/Edit/Bash).
+#   - Skills are placed under .koda/skills/<name>/SKILL.md — same Anthropic
+#     SKILL.md format, copied verbatim.
+#   - MCP servers are NOT written to a config file. Koda uses /mcp add-http
+#     commands. The adapter generates a helper script / instruction block that
+#     lists all MCP servers from content/mcp-servers.json with the exact
+#     /mcp add-http commands to run. This is placed in USER-RULES.md or a
+#     dedicated .koda/mcp-setup.md file.
+#   - Commands (slash-commands) are not supported as files in Koda. The
+#     content/commands/*.md files are adapted into .koda/commands/<name>.md
+#     as reference documents that the agent reads on demand (not auto-loaded).
+#     AGENTS.md references them by path.
+#   - Koda does NOT auto-discover on-demand rules from a directory. Rules
+#     are referenced explicitly from AGENTS.md by path. We place them under
+#     .koda/rules/ for a stable, predictable location.
+
+tool: koda
+schemaVersion: 1
+
+detection:
+  - exists: ".koda/"
+
+rules:
+  copyTo: ".koda/rules/{name}.md"
+  frontmatter:
+    keep: [description, alwaysApply]
+    drop: [globs, category]
+
+agents:
+  copyTo: ".koda/agents/{name}.json"
+  mode: json-convert
+  # JSON conversion is handled specially by the installer:
+  #   1. Read YAML frontmatter from content/agents/<name>.md
+  #   2. Resolve modelTier → model from .dev.env
+  #   3. Convert body to system_prompt
+  #   4. Map tools array to allowed_tools
+  #   5. Set trust, max_iterations, skip_memory
+  #   6. Write JSON to .koda/agents/<name>.json
+  # No frontmatter keep/drop/rename — the whole file is restructured as JSON.
+
+commands:
+  copyTo: ".koda/commands/{name}.md"
+  frontmatter:
+    keep: [description]
+    drop: [argumentHint, allowedTools]
+
+skills:
+  copyTo: ".koda/skills/{name}/"
+  mode: verbatim
+
+mcp:
+  # Koda does not use a static MCP config file. Servers are added via
+  # /mcp add-http <name> <url> commands. We generate a helper file that
+  # lists all servers with ready-to-copy commands.
+  target: ".koda/mcp-setup.md"
+  format: mcp-add-http-script
+
+entry:
+  # Koda reads AGENTS.md from the project root automatically.
+  # No additional entry file needed.
+  target: null

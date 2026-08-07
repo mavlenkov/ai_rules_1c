@@ -3,10 +3,10 @@
 # Минимальный Linux-installer для ai_rules_1c (Linux + 1CFilesConverter edition).
 # Реализует протокол AGENT-INSTALL.md в форме CLI — альтернатива install.ps1
 # для Linux/CI-сценариев. По возможностям эквивалентен upstream-protocol'у
-# в пределах поддерживаемых tools (cursor, claude-code, opencode, codex, kimi).
+# в пределах поддерживаемых tools (cursor, claude-code, opencode, codex, kimi, kilocode, qwen, koda).
 #
 # Использование:
-#   ./install.sh <target-dir> [--tools cursor,claude-code,opencode,codex,kimi] [--host HOST]
+#   ./install.sh <target-dir> [--tools cursor,claude-code,opencode,codex,kimi,kilocode,qwen,koda] [--host HOST]
 #
 # По умолчанию: auto-detect активных tools, host=localhost.
 
@@ -28,7 +28,7 @@ Usage:
   $0 <target-dir> [options]
 
 Options:
-  --tools <list>   Comma-separated tool ids: cursor, claude-code, opencode, codex, kimi.
+  --tools <list>   Comma-separated tool ids: cursor, claude-code, opencode, codex, kimi, kilocode, qwen, koda.
                    Default: auto-detect by adapter detection rules.
   --host <host>    MCP server host (substitutes 'localhost' in content/mcp-servers.json).
                    Default: localhost.
@@ -553,7 +553,7 @@ def detect_tools():
     for ad_path in sorted((REPO / 'adapters').glob('*.yaml')):
         ad = parse_yaml(ad_path.read_text(encoding='utf-8'))
         tool = ad['tool']
-        if tool not in ('cursor', 'claude-code', 'opencode', 'codex', 'kimi'): continue
+        if tool not in ('cursor', 'claude-code', 'opencode', 'codex', 'kimi', 'kilocode', 'qwen', 'koda'): continue
         if tool == 'codex':
             # The codex adapter lists `exists: "AGENTS.md"` as a detection rule,
             # which would auto-add codex to EVERY installed project (OR semantics).
@@ -657,7 +657,7 @@ print()
 
 # --- AGENTS.md с подстановкой rulesDir/rulesExt --------------------------
 
-priority = ['cursor', 'claude-code', 'kilocode', 'kimi', 'opencode', 'codex']
+priority = ['cursor', 'claude-code', 'kilocode', 'kimi', 'opencode', 'koda', 'qwen', 'codex']
 canonical = next((t for t in priority if t in tools), tools[0])
 copy_to = adapters[canonical]['rules']['copyTo']
 m = re.match(r'(.+)/\{name\}\.(\w+)$', copy_to)
