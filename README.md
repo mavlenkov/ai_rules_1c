@@ -20,7 +20,7 @@
 - **Command Code** (`.commandcode/rules-1c/`, `.commandcode/agents/`, `.commandcode/commands/`, `.commandcode/skills/`; MCP в корневом `.mcp.json`, общий с Claude Code)
 - **Cline** (`.cline/rules-1c/`, `.cline/agents/`, `.cline/skills/`; MCP только глобальный — установщик проектный MCP не пишет; **не** кладёт on-demand правила в `.clinerules/`, чтобы не раздувать контекст)
 - **Pi** (`.pi/rules-1c/`, `.pi/prompts/` для команд, `.pi/skills/`; без субагентов и без MCP — у Pi нет встроенного MCP)
-- **Koda CLI** (`.koda/rules/`, `.koda/agents/`, `.koda/commands/`, `.koda/skills/`; MCP через `/mcp add-http`; субагенты в JSON-формате `.koda/agents/<name>.json`; entry stub `KODA.md` → `AGENTS.md`)
+- **Koda CLI** (`KODA.md` → `AGENTS.md`, `.koda/rules/`, `.koda/agents/` как справочные промпты, `.koda/commands/`, `.koda/skills/`; MCP регистрируется командами `koda mcp add ... --transport http --scope project`; исполняемых проектных субагентов нет)
 - **Прочее (`other`, универсальный fallback)** (`.ai-agent/rules/`, `.ai-agent/agents/`, `.ai-agent/commands/`, `.ai-agent/skills/`, `.ai-agent/mcp.json`) — для любого ИИ-клиента, которого нет в списке выше (Aider, Continue, Cody и т.п.). Ничего не автодетектится — выбирается вручную при установке. На диск пишутся максимально портабельные правила: `AGENTS.md` в корне (де-факто стандарт для современных агентов), а on-demand-правила и описания субагентов — по нейтральным путям под `.ai-agent/` с минимальной frontmatter (`description` + `alwaysApply`).
 
 Один и тот же исходный набор правил из `content/` раскладывается во все активные инструменты одновременно, поэтому `AGENTS.md`, on-demand правила и описания субагентов остаются согласованными независимо от того, в каком клиенте вы работаете.
@@ -88,7 +88,7 @@ git clone https://github.com/mavlenkov/ai_rules_1c.git $env:TEMP\1c-rules
 ├── LLM-RULES.md             # самоулучшаемые правила агента (пишет только /evolve, с одобрения пользователя)
 ├── install.ps1              # PowerShell-установщик
 ├── .dev.env.example         # шаблон параметров проекта
-├── adapters/                # адаптеры под инструменты (cursor, claude-code, codex, opencode, kilocode, kimi, qwen, command-code, cline, pi, other)
+├── adapters/                # адаптеры под инструменты (cursor, claude-code, codex, opencode, kilocode, kimi, qwen, command-code, cline, koda, pi, other)
 ├── content/
 │   ├── rules/               # on-demand правила, подключаемые по задаче
 │   ├── agents/              # описания 13 специализированных субагентов
@@ -104,12 +104,12 @@ git clone https://github.com/mavlenkov/ai_rules_1c.git $env:TEMP\1c-rules
 
 Независимо от канала установки (агент или `install.ps1`) на диске будет:
 
-- `AGENTS.md`, `USER-RULES.md`, `memory.md`, `LLM-RULES.md` — **в корне проекта**. Это требование инструментов: Cursor, Claude Code, Codex, OpenCode, Kilo, Kimi, Qwen, Command Code, Cline и Pi читают `AGENTS.md` именно из корня; перенос в `.cursor/`/`.claude/` отключит загрузку. Для Qwen дополнительно пишется stub `QWEN.md` → `AGENTS.md`.
-- директории активных инструментов (`.cursor/`, `.claude/`, `.codex/`, `.opencode/`, `.kilo/`, `.kimi-code/`, `.qwen/`, `.commandcode/`, `.cline/`, `.pi/`, `.ai-agent/`) — для каждого детектированного. On-demand правила лежат в каталоге `rules` / `rules-1c` адаптера, не дублируются в отдельный «общий» каталог. Особенности MCP: Kilo — `.kilo/kilo.json` (`mcp`); Qwen — merge `mcpServers` в `.qwen/settings.json` (`httpUrl`); Command Code / Claude Code — общий `.mcp.json`; Cline и Pi — проектный MCP не пишется.
+- `AGENTS.md`, `USER-RULES.md`, `memory.md`, `LLM-RULES.md` — **в корне проекта**. Cursor, Claude Code, Codex, OpenCode, Kilo, Kimi, Qwen, Command Code, Cline и Pi используют корневой `AGENTS.md`; для Qwen дополнительно пишется stub `QWEN.md`, для Koda — `KODA.md`, оба ссылаются на `AGENTS.md`.
+- директории активных инструментов (`.cursor/`, `.claude/`, `.codex/`, `.opencode/`, `.kilo/`, `.kimi-code/`, `.qwen/`, `.commandcode/`, `.cline/`, `.koda/`, `.kodacli/`, `.pi/`, `.ai-agent/`) — для каждого детектированного. On-demand правила лежат в каталоге `rules` / `rules-1c` адаптера, не дублируются в отдельный «общий» каталог. Особенности MCP: Kilo — `.kilo/kilo.json` (`mcp`); Qwen — merge `mcpServers` в `.qwen/settings.json` (`httpUrl`); Command Code / Claude Code — общий `.mcp.json`; Koda — команды регистрации в `.kodacli/mcp-setup.md`; Cline и Pi — проектный MCP не пишется.
 - `openspec/` — OpenSpec-воркспейс (если ещё не было).
 - `.ai-rules.json` — манифест с перечнем размещённых файлов, активных инструментов, выбранным каноническим каталогом on-demand правил и версией.
 
-`AGENTS.md` ссылается на on-demand правила по пути одного канонического каталога (приоритет `cursor → claude-code → kilocode → kimi → qwen → command-code → cline → opencode → koda → codex → pi → other`; `other` становится каноном только когда выбран без «реального» инструмента). При установке только под один инструмент в проекте появится ровно одна тулзовая директория плюс `AGENTS.md`/`USER-RULES.md`/`memory.md`/`LLM-RULES.md` в корне — без дополнительных общих папок.
+`AGENTS.md` ссылается на on-demand правила по пути одного канонического каталога (приоритет `cursor → claude-code → kilocode → kimi → qwen → command-code → cline → opencode → koda → codex → pi → other`; `other` становится каноном только когда выбран без «реального» инструмента). При установке только под один инструмент создаются только каталоги, объявленные его адаптером, плюс корневые `AGENTS.md`/`USER-RULES.md`/`memory.md`/`LLM-RULES.md` и предусмотренный адаптером entry stub.
 
 Если активен ровно один инструмент, агент-установщик не задаёт уточняющих вопросов. PowerShell-fallback дополнительно поддерживает флаги `-Tools cursor,claude-code`, `-NonInteractive`, `-AssumeYes`. Полный протокол и описание манифеста — в [`AGENT-INSTALL.md`](AGENT-INSTALL.md).
 

@@ -485,7 +485,36 @@ def render_mcp(adapter, host, publish_url):
                     f"{s['id']}: URL содержит плейсхолдер {{INFOBASE_PUBLISH_URL}} — "
                     f"запусти с --publish-url <URL> или отредактируй MCP-конфиг вручную")
 
-    schema = adapter['mcp']['schema']
+    mcp_cfg = adapter['mcp']
+    if mcp_cfg.get('format') == 'koda-mcp-commands':
+        lines = [
+            '# Koda MCP Setup', '',
+            'Run these commands in a shell from the project root:', ''
+        ]
+        count = 0
+        has_unresolved_url = False
+        for s in servers:
+            if not s.get('url') or s.get('transport') != 'http':
+                continue
+            if re.search(r'\{[^}]+\}', s['url']):
+                has_unresolved_url = True
+                continue
+            lines.extend([
+                '```bash',
+                f'koda mcp add {s["id"]} "{s["url"]}" --transport http --scope project',
+                '```'
+            ])
+            if s.get('description'):
+                lines.extend(['', f'> {s["description"]}'])
+            lines.append('')
+            count += 1
+        if count == 0:
+            lines.append('No HTTP MCP servers configured.')
+        if has_unresolved_url:
+            lines.append('Regenerate this file after setting INFOBASE_PUBLISH_URL to include 1c-data-mcp.')
+        return 'markdown', '\n'.join(lines)
+
+    schema = mcp_cfg['schema']
     if schema == 'mcpServers':
         out = {'mcpServers': {}}
         for s in servers:
@@ -602,9 +631,8 @@ for tool, adapter in adapters.items():
         dst = TARGET / mcp_cfg['target']
         dst.parent.mkdir(parents=True, exist_ok=True)
         mcp_fmt, mcp_text = render_mcp(adapter, HOST, PUBLISH_URL)
-        if mcp_fmt == 'toml':
-            # Codex `.codex/config.toml` — готовый TOML-текст, пишем как есть
-            # (merge для TOML bash-канал не делает — см. FORK-TODO).
+        if mcp_fmt in ('toml', 'markdown'):
+            # Text formats: Codex TOML or Koda setup instructions.
             dst.write_text(mcp_text, encoding='utf-8')
         else:
             rendered = json.loads(mcp_text)
@@ -657,7 +685,7 @@ print()
 
 # --- AGENTS.md с подстановкой rulesDir/rulesExt --------------------------
 
-priority = ['cursor', 'claude-code', 'kilocode', 'kimi', 'opencode', 'koda', 'qwen', 'codex']
+priority = ['cursor', 'claude-code', 'kilocode', 'kimi', 'qwen', 'opencode', 'koda', 'codex']
 canonical = next((t for t in priority if t in tools), tools[0])
 copy_to = adapters[canonical]['rules']['copyTo']
 m = re.match(r'(.+)/\{name\}\.(\w+)$', copy_to)
