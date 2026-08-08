@@ -22,3 +22,7 @@ preserve original 1C identifiers (objects, modules, attributes) as-is:
 ## Captured during work (no remember available)
 
 <!-- Populated only when `1c-templates-mcp` is offline; migrate to `remember` once it is back. -->
+
+### 2026-08-07 — Preserve MCP endpoint addresses during rules updates
+
+- Mass deployment of 1c-rules must preserve each project's existing MCP server URLs and hosts. The managed MCP host for the nine deployed projects is `alcor` (`MCP_HOST=alcor`). Do not regenerate MCP configs from catalog defaults (`localhost`) unless the user explicitly requests it; verify the existing per-project addresses before updating.

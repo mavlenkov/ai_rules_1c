@@ -8,7 +8,8 @@
 # Использование:
 #   ./install.sh <target-dir> [--tools cursor,claude-code,opencode,codex,kimi,kilocode,qwen,koda] [--host HOST]
 #
-# По умолчанию: auto-detect активных tools, host=localhost.
+# По умолчанию: auto-detect активных tools; MCP host берётся из
+# target/.dev.env MCP_HOST, пустое значение = localhost.
 
 set -euo pipefail
 
@@ -17,7 +18,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 TARGET=""
 TOOLS=""
-HOST="localhost"
+HOST=""
 PUBLISH_URL=""
 
 usage() {
@@ -31,7 +32,7 @@ Options:
   --tools <list>   Comma-separated tool ids: cursor, claude-code, opencode, codex, kimi, kilocode, qwen, koda.
                    Default: auto-detect by adapter detection rules.
   --host <host>    MCP server host (substitutes 'localhost' in content/mcp-servers.json).
-                   Default: localhost.
+                   Default: MCP_HOST from target/.dev.env, then localhost.
   --publish-url <url>
                    Infobase web-publish URL (INFOBASE_PUBLISH_URL). Substituted
                    into the 1c-data-mcp server URL ({INFOBASE_PUBLISH_URL}/hs/mcp),
@@ -66,6 +67,15 @@ done
 [ -z "$TARGET" ] && { echo "Ошибка: не указан target-dir"; usage; }
 [ ! -d "$TARGET" ] && { echo "Ошибка: $TARGET не существует"; exit 1; }
 TARGET="$(cd "$TARGET" && pwd)"
+
+if [ -z "$HOST" ] && [ -f "$TARGET/.dev.env" ]; then
+    HOST="$(awk -F= '/^[[:space:]]*MCP_HOST[[:space:]]*=/{sub(/^[^=]*=/, ""); gsub(/^[[:space:]\047\"]+|[[:space:]\047\"]+$/, ""); print; exit}' "$TARGET/.dev.env")"
+fi
+HOST="${HOST:-localhost}"
+if [[ "$HOST" == *[/:\\]* ]]; then
+    echo "Ошибка: MCP host должен содержать только имя хоста или IP: $HOST"
+    exit 1
+fi
 
 command -v python3 >/dev/null || { echo "Ошибка: python3 нужен для парсинга YAML"; exit 1; }
 

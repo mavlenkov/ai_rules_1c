@@ -793,6 +793,34 @@ function Get-InfobasePublishUrlBase {
     return $url
 }
 
+function Get-McpHost {
+    # Managed MCP servers use this project-scoped host instead of the catalog's
+    # portable `localhost` default. Empty / missing resolves to localhost.
+    param([string]$Root)
+
+    $envPath = Join-Path $Root $script:DevEnvFileName
+    if (-not (Test-Path $envPath)) { return 'localhost' }
+    $keys = Read-DevEnvKeys -Path $envPath
+    if (-not $keys.Contains('MCP_HOST')) { return 'localhost' }
+    $hostName = ([string]$keys['MCP_HOST']).Trim().Trim('"', "'")
+    if ([string]::IsNullOrWhiteSpace($hostName)) { return 'localhost' }
+    if ($hostName -match '[/\\:]') {
+        throw "MCP_HOST must contain only a hostname or IP address, got: $hostName"
+    }
+    return $hostName
+}
+
+function Resolve-McpServerHost {
+    param(
+        [array]$Servers,
+        [string]$HostName
+    )
+    foreach ($s in $Servers) {
+        if (-not $s.url) { continue }
+        $s.url = $s.url -replace '(?<=://)localhost(?=[:/])', $HostName
+    }
+}
+
 function Resolve-McpServerPlaceholders {
     # Substitutes {INFOBASE_PUBLISH_URL} in the `url` field of every server
     # entry that contains it. Mutates the input collection. Returns the list
@@ -2557,6 +2585,9 @@ function Invoke-McpPhase {
         [System.Collections.IDictionary]$Manifest
     )
     $servers = Read-McpServers -Root $SourceRoot
+    $mcpHost = Get-McpHost -Root $Root
+    Resolve-McpServerHost -Servers $servers -HostName $mcpHost
+    Write-Info "  MCP config: managed server host = $mcpHost (MCP_HOST)"
 
     # Substitute {INFOBASE_PUBLISH_URL} placeholders in server URLs from the
     # project's .dev.env (Place-DevEnv runs earlier in the pipeline so the
