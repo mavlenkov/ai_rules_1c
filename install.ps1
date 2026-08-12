@@ -1419,8 +1419,11 @@ function Invoke-OpenSpecScaffold {
 }
 
 # Map an OpenSpec bundle relative path to its real install destination for a
-# given tool. The bundle mirrors the layout `openspec init` produces, which for
-# Kilo Code is the legacy `.kilocode/` tree (`workflows/` + `skills/`). Every
+# given tool. The bundle mirrors the layout `openspec init` produces. Kilo Code
+# uses the legacy `.kilocode/` tree (`workflows/` + `skills/`) and Kimi uses
+# `.kimi/skills/`, while their 1c-rules adapters use `.kilo/` and `.kimi-code/`.
+# Remap both official bundle layouts onto the canonical adapter locations.
+# Every
 # other piece of Kilo Code content is installed into `.kilo/` (see
 # `adapters/kilocode.yaml`), so copying the bundle verbatim would leave Kilo
 # Code with two project folders (`.kilo` + `.kilocode`). Remap the Kilo Code
@@ -1443,6 +1446,17 @@ function Get-OpenSpecBundleDestRel {
         if ($Rel -like '.kilocode/*') {
             return '.kilo/' + $Rel.Substring('.kilocode/'.Length)
         }
+    }
+    if ($Tool -eq 'kimi') {
+        if ($Rel -like '.kimi/skills/*') {
+            return '.kimi-code/skills/' + $Rel.Substring('.kimi/skills/'.Length)
+        }
+        if ($Rel -like '.kimi/*') {
+            return '.kimi-code/' + $Rel.Substring('.kimi/'.Length)
+        }
+    }
+    if ($Tool -eq 'opencode' -and $Rel -like '.opencode/commands/*') {
+        return '.opencode/command/' + $Rel.Substring('.opencode/commands/'.Length)
     }
     return $Rel
 }
@@ -1534,7 +1548,10 @@ function Invoke-OpenSpecArtifacts {
         $toolBundleFull = (Resolve-Path $toolBundle).Path.TrimEnd('\', '/')
         $toolCopied = 0
         $toolKept = 0
-        Get-ChildItem -Recurse -File -Path $toolBundle -ErrorAction SilentlyContinue | ForEach-Object {
+        # Bundle roots contain dot-directories (`.kimi`, `.opencode`, ...),
+        # which PowerShell treats as hidden on POSIX. `-Force` is required or
+        # the Linux pwsh channel reports the bundle version but places 0 files.
+        Get-ChildItem -Recurse -File -Force -Path $toolBundle -ErrorAction SilentlyContinue | ForEach-Object {
             $rel = $_.FullName.Substring($toolBundleFull.Length + 1).Replace('\', '/')
             $destRel = Get-OpenSpecBundleDestRel -Tool $tool -Rel $rel
             if ($Manifest.files.Contains($destRel)) {

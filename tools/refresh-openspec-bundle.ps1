@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Maintainer-only utility. Runs `openspec init` in a temporary directory
-    against the five tools supported by 1c-rules, then mirrors the resulting
+    against the six tools supported by 1c-rules, then mirrors the resulting
     files into content/openspec-bundle/<tool>/ and refreshes
     content/openspec-bundle/version.txt with the CLI's reported version.
 
@@ -39,14 +39,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$script:Tools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode')
-$script:OpenSpecToolsArg = 'cursor,claude,codex,opencode,kilocode'
+$script:Tools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode', 'kimi')
+$script:OpenSpecToolsArg = 'cursor,claude,codex,opencode,kilocode,kimi'
 $script:DotMap = @{
     'cursor'      = '.cursor'
     'claude-code' = '.claude'
     'codex'       = '.codex'
     'opencode'    = '.opencode'
     'kilocode'    = '.kilocode'
+    'kimi'        = '.kimi'
 }
 
 function Resolve-RepoRoot {
@@ -125,8 +126,10 @@ function Sync-ToolBundle {
 
     $sourceFiles = Get-RelativeFiles $sourceDir
     $targetFiles = Get-RelativeFiles $targetDir
-    $sourceSet = [System.Collections.Generic.HashSet[string]]::new([string[]]$sourceFiles)
-    $targetSet = [System.Collections.Generic.HashSet[string]]::new([string[]]$targetFiles)
+    $sourceSet = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($item in $sourceFiles) { [void]$sourceSet.Add([string]$item) }
+    $targetSet = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($item in $targetFiles) { [void]$targetSet.Add([string]$item) }
 
     $added = @($sourceFiles | Where-Object { -not $targetSet.Contains($_) })
     $removed = @($targetFiles | Where-Object { -not $sourceSet.Contains($_) })
@@ -162,7 +165,8 @@ Write-Host "DryRun:  $DryRun"
 $cliVersion = Test-OpenSpecAvailable
 Write-Host "OpenSpec CLI version: $cliVersion"
 
-$probe = Join-Path $env:TEMP ("opsx-refresh-" + [Guid]::NewGuid().ToString('N'))
+$tempRoot = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { [System.IO.Path]::GetTempPath() }
+$probe = Join-Path $tempRoot ("opsx-refresh-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $probe | Out-Null
 try {
     Write-Host ''

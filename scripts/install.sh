@@ -685,6 +685,14 @@ for tool in tools:
     for src in bundle_root.rglob('*'):
         if not src.is_file(): continue
         rel = src.relative_to(bundle_root)
+        if tool == 'kilocode' and rel.parts[:2] == ('.kilocode', 'workflows'):
+            rel = Path('.kilo', 'commands', *rel.parts[2:])
+        elif tool == 'kilocode' and rel.parts[:2] == ('.kilocode', 'skills'):
+            rel = Path('.kilo', 'skills', *rel.parts[2:])
+        elif tool == 'kimi' and rel.parts[:2] == ('.kimi', 'skills'):
+            rel = Path('.kimi-code', 'skills', *rel.parts[2:])
+        elif tool == 'opencode' and rel.parts[:2] == ('.opencode', 'commands'):
+            rel = Path('.opencode', 'command', *rel.parts[2:])
         dst = TARGET / rel
         if dst.exists(): continue  # skip-if-exists
         dst.parent.mkdir(parents=True, exist_ok=True)

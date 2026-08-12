@@ -266,7 +266,7 @@ git clone https://github.com/mavlenkov/ai_rules_1c.git $env:TEMP\1c-rules
 
 ## OpenSpec
 
-Установщик безусловно разворачивает OpenSpec-воркспейс (`openspec/`) с режимом «не перезаписывать существующее». Слэш-команды `/opsx:propose`, `/opsx:apply`, `/opsx:archive`, `/opsx:explore` разворачиваются автоматически для каждого активного инструмента из набора `cursor`, `claude-code`, `codex`, `opencode`, `kilocode` (бандлы — в `content/openspec-bundle/<tool>/`). Особенность Codex: его бандл содержит только SKILL-пакеты OpenSpec (`.codex/skills/openspec-*`), без слэш-команд — workflow вызывается через скиллы напрямую. Для `kimi`, `qwen`, `command-code`, `cline`, `pi` и `other` тулз-специфичного OpenSpec-бандла нет — работайте напрямую с `openspec/specs/` и `openspec/changes/` (или через установленные OpenSpec skills, где они есть). Подробности — в [`openspec/README.md`](openspec/README.md).
+Установщик безусловно разворачивает OpenSpec-воркспейс (`openspec/`) с режимом «не перезаписывать существующее». Бандлы находятся в `content/openspec-bundle/<tool>/`: Cursor, Claude Code, OpenCode и Kilo получают команды и skills; Codex и Kimi — только skills (`.codex/skills/openspec-*`, `.kimi-code/skills/openspec-*`) и вызывают workflow через них. Для `qwen`, `command-code`, `cline`, `pi` и `other` отдельного бандла пока нет. Подробности — в [`openspec/README.md`](openspec/README.md).
 
 ## Ссылки
 
