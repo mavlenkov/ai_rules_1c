@@ -1,14 +1,17 @@
 ---
 description: Dump the configuration from the infobase defined in .dev.env into the current repository files (Linux + Windows)
+argumentHint: "[all]"
 ---
 
 # /loadfrom1cbase — dump from infobase to repository
 
-Full configuration dump (`/DumpConfigToFiles`) from the infobase defined in `.dev.env` into the current repository directory.
+Full configuration dump (`/DumpConfigToFiles`) from the infobase defined in `.dev.env` into the current repository directory. With the `all` argument (or an explicit "with extensions" request) the command dumps the **full snapshot** — main configuration plus every extension from `EXTENSION_NAMES` — see "Full-snapshot mode" at the end.
 
 For a partial object-by-object export, use `/getconfigfiles` (via `repoobjects.txt`).
 
 This command is **cross-platform** (Linux-first in this fork). Platform paths, the `ibcmd` check and the command syntax differ between Linux and Windows — both are given below.
+
+**EDT gate:** the dump this command writes is in **Designer XML format**. In a project developed in 1C:EDT (`.dev.env` `USE_EDT=true`) whose working tree is an EDT (`src/**/*.mdo`) workspace, dumping into that tree is wrong — pick a separate target directory and state that the result is a dump, not the workspace; bringing changes back into EDT is a separate, confirmed step (`content/rules/edt-workflow.md`).
 
 ## Step 0. Check `.dev.env` parameters
 
@@ -21,14 +24,15 @@ Used `.dev.env` keys:
 | Key | Purpose |
 |---|---|
 | `PLATFORM_PATH` | Platform install dir. Executable: `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows) |
-| `INFOBASE_KIND` | `file` or `server` |
+| `INFOBASE_KIND` | `file` or `server` (empty = `file`) |
 | `INFOBASE_PATH` | File infobase path or server connection string |
-| `IB_USER` | Infobase user; empty = no authentication, `/N` / `--user` is omitted. **Do not ask up front.** |
-| `IB_PASSWORD` | Password; empty = no password, `/P` / `--password` is omitted. An empty password is a fully valid configuration for dev / test infobases — **do not ask up front**. Re-ask only if the platform itself returns an authentication error. |
+| `IB_USER` / `IB_PASSWORD` | Credentials; empty = no authentication / no password (`/N` / `/P` / `--user` / `--password` omitted). Do not ask up front; re-ask only when the platform returns an authentication error |
 | `EXTENSION_NAME` | Extension name; empty means main configuration |
+| `EXTENSION_NAMES` | Full-snapshot extension list for the `all` mode — comma-separated, order preserved (empty = single-target mode) |
 | `EXPORT_PATH` | Dump directory; empty means repository root |
-| `LOG_PATH` | Designer log file; empty resolves to `$env:TEMP\1cv8.log` (Windows) / `$TMPDIR/1cv8.log` (POSIX). **Do not ask up front** — any writable path works equally well. Re-ask only if the resolved path turns out to be non-writable. |
-| `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
+| `EXTENSIONS_PATH` | Root of extension dump directories for the `all` mode: `{EXTENSIONS_PATH}\<Name>\` (empty = `cfe` at the repository root) |
+| `LOG_PATH` | Designer log file; empty resolves to `$env:TEMP\1cv8.log` (Windows) / `$TMPDIR/1cv8.log` (POSIX). Do not ask up front — re-ask only if the resolved path turns out to be non-writable |
+| `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`; empty = Designer fallback |
 | `CONVERTER_PATH` | 1CFilesConverter path (fork Section 5); set = converter path available |
 
 Only `INFOBASE_PATH` and `PLATFORM_PATH` are blocking — if either is empty, ask the user and write the value to `.dev.env`. **Do not** ask about `IB_USER` / `IB_PASSWORD` / `LOG_PATH` when they are empty; apply the documented defaults silently.
@@ -117,3 +121,13 @@ For an extension dump use `ext2xml.sh` with `V8_EXT_NAME={EXTENSION_NAME}`. Cont
    - For `ibcmd` / converter, success means no `error` / `ошибка` lines and a zero exit code.
 2. If errors exist, show the relevant log fragment to the user and stop.
 3. Briefly list which top-level object directories appeared or changed according to `git status`, without content diffs.
+
+## Full-snapshot mode (`/loadfrom1cbase all`) — optional
+
+Dumps the **effective snapshot**: main configuration + every extension from `EXTENSION_NAMES` (`.dev.env`, comma-separated, order preserved). Used by `/initproject` and whenever the user asks for a dump "with extensions".
+
+- If `EXTENSION_NAMES` is empty, fall back to the regular single-target run above and note that in the report.
+- **Pass 1 — main configuration:** Steps 2–3 as written, into `{EXPORT_PATH}`, without `-Extension` / `--extension`.
+- **Pass per extension**, in `EXTENSION_NAMES` order: the same Step 2a/2b template with `-Extension <Name>` / `--extension=<Name>`, target directory `{EXTENSIONS_PATH}\<Name>\` (`EXTENSIONS_PATH` empty = `cfe` at the repository root; create missing directories). Run the Step 3 check after **every** pass.
+- The Step 0 dirty-working-tree guard covers `{EXTENSIONS_PATH}` as well as `{EXPORT_PATH}`.
+- A failed pass stops the mode — do not continue to the next extension over a broken dump; report which passes completed.

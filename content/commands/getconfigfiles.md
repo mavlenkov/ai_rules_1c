@@ -10,6 +10,9 @@ Fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). Reads all para
 
 All paths and identifiers come from `.dev.env`. Only `INFOBASE_PATH` and `PLATFORM_PATH` are blocking — if either is empty, ask the user and write the value to `.dev.env`. `IB_USER` / `IB_PASSWORD` / `LOG_PATH` have documented defaults (see the table below) — apply them silently, do not ask up front. If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` and delete the legacy file after a successful migration.
 
+- The `ibcmd` path requires both `{PLATFORM_PATH}/bin/ibcmd` (Linux) or `{PLATFORM_PATH}\bin\ibcmd.exe` (Windows) and a filled `IBCMD_CONFIG`; clustered server infobases always use Designer.
+- **EDT projects** (`.dev.env` `USE_EDT=true`): this command exports a Designer XML dump. If the working tree is an EDT (`src/**/*.mdo`) workspace, export to a separate directory and never mix the two trees — canon `content/rules/edt-workflow.md`.
+
 | Key | Purpose |
 |---|---|
 | `PLATFORM_PATH` | Platform install dir; `V8_VERSION` = `basename(PLATFORM_PATH)`, executable `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows) |

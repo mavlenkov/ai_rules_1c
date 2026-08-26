@@ -8,6 +8,8 @@ Deploy the current configuration (or extension) into the infobase defined in `.d
 
 This is a fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). It reads all parameters from **`.dev.env`** (the single source of truth — see `.dev.env.example`).
 
+When `EXTENSION_NAMES` is filled and the user asked to deploy the full snapshot ("all" / "with extensions"), deployment runs as multiple passes — main configuration first, then each extension in order — per `/loadfrom1cbase → Full-snapshot mode` logic mirrored by `/update1cbase`; everything else in this command is unchanged.
+
 ## Step 0. Settings (`.dev.env`)
 
 `.dev.env` lives at the project root and is created by the 1c-rules installer. If it is missing, ask the user to run `install.ps1 init` / `scripts/install.sh` or to copy `.dev.env.example` to `.dev.env`.
@@ -23,9 +25,12 @@ Read from `.dev.env`:
 | `INFOBASE_PATH` | File path or server connection string (see "Connection string" below) |
 | `IB_USER` / `IB_PASSWORD` | Credentials; empty = no authentication, `/N` / `/P` (or `--user` / `--password`) are omitted. An empty password is a fully valid configuration for dev / test infobases — **do not ask up front**. Re-ask only if the platform itself returns an authentication error. |
 | `EXTENSION_NAME` | Extension name; empty = main configuration |
+| `EXTENSION_NAMES` | Full-snapshot extension list for the full-snapshot deploy — comma-separated, order = load order (empty = single-target mode) |
 | `EXPORT_PATH` | Source directory; empty means repository root |
+| `EXTENSIONS_PATH` | Root of extension sources for the full-snapshot deploy: `{EXTENSIONS_PATH}\<Name>\` (empty = `cfe` at the repository root) |
 | `LOG_PATH` | Designer / converter log file; empty resolves to `$TMPDIR/1cv8.log` (Linux) / `$env:TEMP\1cv8.log` (Windows). **Do not ask up front** — any writable path works equally well. Re-ask only if the resolved path turns out to be non-writable. |
 | `INFOBASE_PUBLISH_URL` | Web-publish URL for UI tests; empty = skip UI tests |
+| `UI_TESTING` | Web UI-testing mode: `manual` (empty = default) / `auto` / `off` — governs whether Step 4 runs (see Step 4) |
 | `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
 | **fork Section 5** | `CONVERTER_PATH`, `CONVERT_TOOL`, `IBCMD_TOOL`, `DB_SRV_*`, `REMOTE_*` — see `.dev.env.example` |
 
@@ -39,6 +44,10 @@ Build it from `INFOBASE_KIND` + `INFOBASE_PATH`:
 
 - `file` → `/F<INFOBASE_PATH>` (no space after `/F`, no quotes)
 - `server` → `/S<INFOBASE_PATH>` (e.g. `/Sserver:port\basename` — no space after `/S`, no quotes)
+
+**EDT gate:** when `.dev.env` `USE_EDT=true`, the same source-format check as `/update1cbase` applies — this command loads a Designer XML dump, not an EDT `src/**/*.mdo` tree, and only one deployment owner (this command **or** EDT's `update_database`) may act on the infobase in a run. Canon — `content/rules/edt-workflow.md`.
+
+This command uses forced session termination while applying the DB configuration. The target must be an explicitly identified dev/test infobase. If the current context does not establish that, stop before the DB update and ask the user to confirm the target; never infer that an arbitrary `.dev.env` points to a test base.
 
 **WARNING:** A space after `/F` or `/S` produces an invalid connection string. Designer exits with code 0 but fails silently.
 
@@ -270,9 +279,24 @@ Read `<LOG_PATH>` to confirm success.
 
 ---
 
+## Applicability check before the DB update — mandatory when an extension is deployed
+
+Whenever this run loads an extension (`EXTENSION_NAME` filled, or a full-snapshot pass over `EXTENSION_NAMES`), run the batch check ladder **between the configuration load and the DB update** — canon `content/rules/designer-batch-checks.md → The check ladder`:
+
+```
+/CheckModules -ThinClient -Server -ExternalConnection -Extension {EXTENSION_NAME}
+/CheckCanApplyConfigurationExtensions -Extension {EXTENSION_NAME}
+```
+
+Stop at the first failure and do not proceed to the DB update. An interceptor pointing at a method the vendor renamed loads without complaint and only fails at apply time — or, worse, silently stops intercepting; the applicability check is the only thing in this pipeline that names it. Read the verdict from all three signals (exit code, `/DumpResult`, `/Out`), classifying success phrases before error stems.
+
+For the main configuration alone the ladder is optional — run `/CheckConfig` when the change is large (whole-snapshot deploy, release build) or when the Gate 1–3 MCP validators were not exposed in this session.
+
+---
+
 ## Failure handling — retry loop
 
-Apply the **Update retry loop** from `/update1cbase` (`content/commands/update1cbase.md → Update retry loop`) verbatim: read `<LOG_PATH>` after every attempt (errors in the log override exit code 0); on failure terminate the hung / failed Configurator by its own PID only (never blanket-kill `1cv8` processes); fix the logged cause before any retry (re-running unchanged is forbidden); after a failed load restart from the load step; at most 3 full attempts, then stop and report. UI tests run only after a clean pass.
+Apply the **Update retry loop** from `/update1cbase` (`content/commands/update1cbase.md → Update retry loop`) verbatim: read `{LOG_PATH}` after every attempt (diagnostics in the log override exit code 0 — classify the platform's success phrases first, `content/rules/designer-batch-checks.md → The success-phrase trap`); on failure terminate the hung / failed Configurator by its own PID only (never blanket-kill `1cv8` processes); fix the logged cause before any retry (re-running unchanged is forbidden); after a failed load restart from the load step; at most 3 full attempts, then stop and report. UI tests run only after a clean pass.
 
 ---
 
@@ -332,3 +356,5 @@ Open `{INFOBASE_PUBLISH_URL}` with the tool chosen in 4a. Prefer **`agent-browse
 ## Final report
 
 Briefly report which infobase was updated, which mode/tool was used (1CFilesConverter Mode 1 — designer/ibcmd, or Designer Mode 2), which test scenarios passed/failed, and list errors separately with log fragments and screenshots.
+
+When scenarios failed and the user wants the failures driven to green, do not improvise ad-hoc retries — suggest `/test-fix-loop` (`content/commands/test-fix-loop.md`): the closed deploy → test → fix → redeploy loop with its own iteration budget and no-change-repeat rules. It runs only on explicit invocation.
