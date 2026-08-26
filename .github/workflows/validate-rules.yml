@@ -15,6 +15,10 @@ on:
 
 jobs:
   validate:
+    # Fork (mavlenkov): this repo is a deployment carrier, not the corpus
+    # authority - run validation locally (pwsh tools/validate-rules.ps1)
+    # instead of burning CI runs on every sync push.
+    if: github.repository == 'comol/ai_rules_1c'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
