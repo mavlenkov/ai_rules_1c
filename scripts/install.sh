@@ -494,6 +494,16 @@ def render_mcp(adapter, host, publish_url):
                 MCP_WARNINGS.append(
                     f"{s['id']}: URL содержит плейсхолдер {{INFOBASE_PUBLISH_URL}} — "
                     f"запусти с --publish-url <URL> или отредактируй MCP-конфиг вручную")
+        headers = {}
+        for header, env_spec in (s.get('headersFromEnv') or {}).items():
+            value = os.environ.get(env_spec.get('env', ''), '')
+            if value:
+                headers[header] = env_spec.get('prefix', '') + value
+            else:
+                MCP_WARNINGS.append(
+                    f"{s['id']}:{env_spec.get('env', '')} не задан — защищённые MCP-операции могут быть недоступны")
+        if headers:
+            s['headers'] = headers
 
     mcp_cfg = adapter['mcp']
     if mcp_cfg.get('format') == 'koda-mcp-commands':
@@ -532,6 +542,8 @@ def render_mcp(adapter, host, publish_url):
             for src_k, dst_k in [('url','url'), ('connectionId','connection_id'),
                                   ('description','description')]:
                 if src_k in s: e[dst_k] = s[src_k]
+            if s.get('headers'):
+                e['headers'] = s['headers']
             # для cursor/claude добавим type: http если есть url с http
             if 'url' in s and s.get('transport') == 'http':
                 e['type'] = 'http'
@@ -555,12 +567,39 @@ def render_mcp(adapter, host, publish_url):
             if 'url' in s:
                 e['type'] = 'remote'
                 e['url'] = s['url']
+                if s.get('headers'): e['headers'] = s['headers']
             elif 'command' in s:
                 e['type'] = 'local'
                 e['command'] = [s['command']] + list(s.get('args', []))
                 if s.get('env'): e['environment'] = s['env']
             e['enabled'] = True
             out['mcp'][opencode_key(s['id'])] = e
+    elif schema == 'kilo-mcp':
+        out = {'mcp': {}}
+        for s in servers:
+            e = {}
+            if s.get('url'):
+                e['type'] = 'remote'
+                e['url'] = s['url']
+                if s.get('headers'): e['headers'] = s['headers']
+            elif s.get('command'):
+                e['type'] = 'local'
+                e['command'] = [s['command']] + list(s.get('args', []))
+                if s.get('env'): e['environment'] = s['env']
+            e['enabled'] = True
+            out['mcp'][s['id']] = e
+    elif schema == 'qwen-mcp':
+        out = {'mcpServers': {}}
+        for s in servers:
+            e = {}
+            if s.get('url'):
+                e['httpUrl'] = s['url']
+                if s.get('headers'): e['headers'] = s['headers']
+            elif s.get('command'):
+                e['command'] = s['command']
+                if s.get('args'): e['args'] = s['args']
+                if s.get('env'): e['env'] = s['env']
+            out['mcpServers'][s['id']] = e
     elif 'mcp_servers' in schema:
         # Codex: TOML `[mcp_servers."<id>"]` sections in `.codex/config.toml`.
         # Mirrors New-McpConfig-Codex / Format-TomlString / Format-TomlArray.
@@ -573,6 +612,9 @@ def render_mcp(adapter, host, publish_url):
             if s.get('url'): lines.append('url = ' + toml_str(s['url']))
             if s.get('connectionId'): lines.append('connection_id = ' + toml_str(s['connectionId']))
             if s.get('description'): lines.append('description = ' + toml_str(s['description']))
+            if s.get('headers'):
+                parts = [f'{toml_str(k)} = {toml_str(v)}' for k, v in s['headers'].items()]
+                lines.append('http_headers = { ' + ', '.join(parts) + ' }')
             if s.get('command'):
                 lines.append('command = ' + toml_str(s['command']))
                 if s.get('args'):
@@ -654,7 +696,8 @@ for tool, adapter in adapters.items():
                     existing = json.loads(dst.read_text(encoding='utf-8'))
                 except (OSError, ValueError):
                     existing = {}
-                existing['mcp'] = rendered.get('mcp', rendered.get('mcpServers', {}))
+                merge_key = mcp_cfg.get('mergeKey') or ('mcp' if 'mcp' in rendered else 'mcpServers')
+                existing[merge_key] = rendered.get(merge_key, {})
                 if '$schema' in rendered:
                     existing.setdefault('$schema', rendered['$schema'])
                 rendered = existing

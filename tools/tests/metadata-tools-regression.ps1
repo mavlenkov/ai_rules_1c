@@ -57,6 +57,9 @@ $FixturesDir = Join-Path $PSScriptRoot 'fixtures'
 $ToolsDir    = Join-Path $RepoRoot 'content\skills\1c-metadata-manage\tools'
 $MetaEdit    = Join-Path $ToolsDir '1c-meta-edit\scripts\meta-edit.ps1'
 $MetaCompile = Join-Path $ToolsDir '1c-meta-compile\scripts\meta-compile.ps1'
+# Re-enter through the same PowerShell edition that runs this test. Hard-coding
+# powershell.exe makes every case fail before the tool starts under pwsh/Linux.
+$PowerShellHost = (Get-Process -Id $PID).Path
 
 foreach ($required in @($MetaEdit, $MetaCompile, (Join-Path $FixturesDir 'config-dump'))) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Missing prerequisite: $required" }
@@ -137,7 +140,7 @@ function Invoke-Tool([string]$Script, [string[]]$ToolArgs, [string]$WorkDir) {
         foreach ($a in $ToolArgs) {
             if ($a -match '\s') { $psArgs += "`"$a`"" } else { $psArgs += $a }
         }
-        $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $psArgs `
+        $proc = Start-Process -FilePath $PowerShellHost -ArgumentList $psArgs `
             -WorkingDirectory $WorkDir -NoNewWindow -Wait -PassThru `
             -RedirectStandardOutput $stdout -RedirectStandardError $stderr
         return [pscustomobject]@{
