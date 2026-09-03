@@ -52,6 +52,8 @@ For **non-trivial** code changes (the full-cycle vs quick-fix boundary), run the
 
 ## Delivery summary — what the user sees
 
+**Final-verdict rule.** A required tool, validator, implementation step, or verification that failed or never produced clean evidence remains visible in the verdict. Never collapse a mixed result into overall success: identify what completed, what failed, and which artifact remains unverified. An allowed graceful fallback is reported under **Risks** as specified by its gate; it is not silently rewritten as a pass.
+
 After all gates pass, the delivery report MUST contain:
 
 1. **What was done** — 1–3 lines, no preamble.

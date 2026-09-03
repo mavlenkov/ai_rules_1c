@@ -35,18 +35,18 @@
 
 ### Fallback: Linux/bash-установщик (основной CLI этого форка)
 
-Под Linux/macOS детерминированный CLI-путь этого форка — `scripts/install.sh`. Поддерживает пять tools (cursor, claude-code, opencode, codex, kimi), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — переопределяет хост docker-MCP-серверов (`MCP_HOST` из `.dev.env`, затем `localhost`) в URL из `content/mcp-servers.json`; и `--publish-url` — подставляет URL веб-публикации ИБ в сервер `1c-data-mcp` (`{INFOBASE_PUBLISH_URL}/hs/mcp`, с обрезкой концевого `/` и сегмента локали `/ru`). Без `--publish-url` плейсхолдер сохраняется и выводится предупреждение.
+Под Linux/macOS детерминированный CLI-путь этого форка — `scripts/install.sh`. Поддерживает восемь tools (`cursor`, `claude-code`, `opencode`, `codex`, `kimi`, `kilocode`, `qwen`, `koda`), читает те же `adapters/*.yaml`, генерирует тот же манифест `.ai-rules.json`. Дополнительно умеет `--host` — переопределяет хост docker-MCP-серверов (`MCP_HOST` из `.dev.env`, затем `localhost`) в URL из `content/mcp-servers.json`; и `--publish-url` — подставляет URL веб-публикации ИБ в сервер `1c-data-mcp` (`{INFOBASE_PUBLISH_URL}/hs/mcp`, с обрезкой концевого `/` и сегмента локали `/ru`). Без `--publish-url` плейсхолдер сохраняется и выводится предупреждение.
 
 ```bash
 git clone https://github.com/mavlenkov/ai_rules_1c.git /tmp/1c-rules
 /tmp/1c-rules/scripts/install.sh ~/Проекты/МойПроект1С --host mcp-host --publish-url 'http://localhost/МойПроект1С/ru/'
 ```
 
-Если активные tools не указаны (`--tools`), скрипт сам определяет их по detection rules адаптеров (`.cursor/` / `.claude/` / `.opencode/`). Реализует те же frontmatter-операции, что и `install.ps1` (включая OpenCode `permission` и подстановку моделей субагентов по ярусам). Codex и Kilo Code не поддерживаются — для них используй `install.ps1` под `pwsh`.
+Если активные tools не указаны (`--tools`), скрипт сам определяет поддерживаемые клиенты по detection rules их адаптеров. Реализует те же frontmatter-операции, что и `install.ps1` (включая OpenCode `permission` и подстановку моделей субагентов по ярусам). Для `command-code`, `cline`, `pi`, `other` и полного набора операций управления установкой используй `install.ps1` под `pwsh`.
 
-### Fallback: PowerShell-установщик (Windows; Codex / Kilo Code на любой ОС)
+### Fallback: PowerShell-установщик (Windows и полный набор адаптеров)
 
-На Windows, либо когда нужны не покрытые bash-скриптом инструменты (Codex, Kilo Code), — тот же протокол реализован как PowerShell-скрипт `install.ps1` (работает и под `pwsh` на Linux):
+На Windows либо когда нужен один из не покрытых bash-скриптом адаптеров тот же протокол реализован как PowerShell-скрипт `install.ps1` (работает и под `pwsh` на Linux):
 
 ```powershell
 git clone https://github.com/mavlenkov/ai_rules_1c.git $env:TEMP\1c-rules
@@ -68,6 +68,8 @@ git clone https://github.com/mavlenkov/ai_rules_1c.git $env:TEMP\1c-rules
 Если MCP-серверы уже установлены дистрибутивом MCP по его `INSTALL.md` в мультипроектном режиме (каталог `GLOBAL_ROOT`, `projects.registry.json`, динамические порты по проектам), установщик правил это **автоматически обнаруживает** (переменная окружения `BASESAI_MCP_GLOBAL_ROOT` либо `MCP_GLOBAL_ROOT` в `.dev.env` + файл `install.manifest.json`) и **не трогает** `mcp.json` — ни проектный, ни глобальный. Вместо этого он записывает в `USER-RULES.md` секцию `mcp:install_forme` с фактическими серверами, url и портами из артефактов установки. Правильный порядок: **сначала MCP по `INSTALL.md`, затем правила** — повторные `init` / `update` правил рабочую MCP-схему не ломают. Принудительное поведение — флаг `-McpMode auto|managed|external` (по умолчанию `auto`). Подробности — в `AGENT-INSTALL.md → External MCP installation`.
 
 ## Что внутри
+
+Текущий исходный набор: 48 on-demand правил, 13 ролей субагентов, 29 команд, 11 скиллов и каталог из 8 MCP-серверов.
 
 - **Корневой свод правил** — `AGENTS.md`: исходный always-on контекст для ИИ-агента: персона, процедура разработки, принципы, перечень MCP-инструментов и их использование, стандарты кода, дисциплина вызовов инструментов. В этом репозитории он хранится в корне для удобного просмотра и поддерживается как читаемый документ без обязательных плейсхолдеров путей.
 - **Пользовательские правила** — `USER-RULES.md`: пустой по умолчанию файл для команды/проекта. Установщик его не перезаписывает.

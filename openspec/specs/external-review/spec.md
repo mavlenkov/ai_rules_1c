@@ -44,4 +44,3 @@ TBD - created by archiving change multi-client-routing. Update Purpose after arc
 
 - **WHEN** формируется промпт для Codex-критика
 - **THEN** в него включаются `anti-patterns.md`, индекс `coding-standards.md` и diff изменённых файлов
-

@@ -24,3 +24,10 @@ preserve original 1C identifiers (objects, modules, attributes) as-is:
 ### 2026-08-07 — Preserve MCP endpoint addresses during rules updates
 
 - Mass deployment of 1c-rules must preserve each project's existing MCP server URLs and hosts. The managed MCP host for the nine deployed projects is `mcp-host` (`MCP_HOST=mcp-host`). Do not regenerate MCP configs from catalog defaults (`localhost`) unless the user explicitly requests it; verify the existing per-project addresses before updating.
+
+### 2026-09-03 — Keep modernization stages in separate workspaces
+
+- **Scope:** Repository modernization roadmap.
+- **Rule:** Update `ai_rules_1c` first; modernize MCP in its own Workspace; then add minimal DSH support here. Pilot DSH on a real 1C task only in a separate Workspace bound to that specific 1C project. Do not build a new dispatcher or heavy agent-bus architecture.
+- **Why:** Keeps infrastructure changes isolated from production project work and prevents the research prototype from expanding before a real pilot validates it.
+- **Source:** Direct user clarification during the foundation refresh.

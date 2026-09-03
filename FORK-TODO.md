@@ -11,6 +11,35 @@
 нейтральные плейсхолдеры из карты замен filter-repo: `LocalProject*`,
 `TestBase`, `TestBaseExt`, `mcp-host`, `dbsrvhost`, `OrderServicesDemo`.
 
+## Активное состояние (2026-09-03)
+
+- **Upstream актуален:** текущий `comol/main` = `4aef5ca`; его содержимое
+  представлено в форке patch-equivalent коммитом `20f1c65`. На maintenance-ветке
+  создан ancestry-only merge `787342f` с неизменным tree id, чтобы последующие
+  сравнения и merge снова имели общий предок. До переноса этого merge в `main`
+  обычные ahead/behind для публичной ветки остаются неприменимы.
+- **Сохраняемые fork-возможности:** Linux + 1CFilesConverter, `scripts/install.sh`,
+  `MCP_HOST` / `--publish-url`, per-client model routing, Koda/Kimi/OpenSpec 1.4,
+  Linux-first deployment и внешний critic с graceful fallback.
+- **Активный долг:** крупные fork-команды деплоя ещё не переведены на тонкую
+  upstream-модель «команда → правило-канон»; делать это отдельным OpenSpec change.
+- **Разница каналов:** `install.ps1` поддерживает 12 адаптеров; `install.sh` —
+  восемь (`cursor`, `claude-code`, `opencode`, `codex`, `kimi`, `kilocode`,
+  `qwen`, `koda`) и не создаёт `.dev.env` автоматически.
+- **OpenCode:** прежний fork-фикс массива `tools` больше не является активным
+  расхождением — upstream уже принял `toolsToPermission` и hard gate.
+- **Model tiers:** действуют только `coding`, `analysis`, `light`; исторический
+  `reasoning` удалён и не должен появляться в актуальных примерах.
+- **CI:** upstream workflow присутствует, но на `mavlenkov` намеренно отключён
+  repository guard; обязательная проверка форка — локальный
+  `pwsh tools/validate-rules.ps1` плюс metadata regressions.
+- **Следующие отдельные этапы:** актуализация MCP выполняется в отдельном
+  Workspace; минимальная поддержка DSH — только после неё; реальный 1С-пилот —
+  в отдельном Workspace соответствующего проекта.
+
+Ниже — **исторический журнал** синков и решений. Числа и формулировки в нём
+описывают состояние на дату записи и не являются текущей спецификацией.
+
 ## После мержа upstream (2026-08-26, upstream `81cc1d5`)
 
 Слит upstream `410951e..81cc1d5` (11 коммитов): вынос 22 стандартов в Help-MCP-корпус
@@ -400,9 +429,9 @@ MCP-серверов (Docker-команды per-server, config.env merge) не �
 (`⚠ MCP warnings`). `--host` (docker-серверы, `localhost`-URL) и `--publish-url`
 (публикация ИБ) работают независимо. Протестировано прогоном обоих сценариев.
 
-### 4. `scripts/install.sh` — покрытие новых tools/файлов
+### 4. ✅ ИСТОРИЯ, ЗАМЕНЕНО (2026-09-03): прежнее покрытие `install.sh`
 
-`install.sh` поддерживает только `cursor` / `claude-code` / `opencode`.
+На момент записи `install.sh` поддерживал только `cursor` / `claude-code` / `opencode`; актуальное покрытие — восемь tools из раздела «Активное состояние».
 Upstream добавил адаптер `adapters/other.yaml` (универсальный fallback) и
 много нового контента (агент `explorer`, скиллы `mcp-1c-tools`, `caveman`,
 `handoff`, `md-to-docx`, `prompt-enhancer`, `transcribe`). Адаптеры

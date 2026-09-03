@@ -45,10 +45,14 @@ TBD - created by archiving change multi-client-routing. Update Purpose after arc
 
 ### Requirement: Обратная совместимость общего параметра яруса
 
-Общий `SUBAGENT_MODEL_<TIER>` без суффикса SHALL продолжать работать как дефолт для всех клиентов; отсутствие per-client суффиксов НЕ должно ломать установку.
+Общий `SUBAGENT_MODEL_<TIER>` без суффикса SHALL продолжать работать как дефолт для всех клиентов; отсутствие per-client суффиксов НЕ должно ломать установку. Поддерживаемые ярусы — `CODING`, `ANALYSIS` и `LIGHT`; удалённый исторический `REASONING` не является действующим параметром.
 
 #### Scenario: Одноклиентный проект без суффиксов
 
-- **WHEN** в `.dev.env` заданы только `SUBAGENT_MODEL_REASONING/CODING/LIGHT` без суффиксов и активен один клиент
-- **THEN** установка проходит и модели подставляются как раньше
+- **WHEN** в `.dev.env` заданы только `SUBAGENT_MODEL_CODING`, `SUBAGENT_MODEL_ANALYSIS` и `SUBAGENT_MODEL_LIGHT` без суффиксов и активен один клиент
+- **THEN** установка проходит и модели подставляются из общих параметров ярусов
 
+#### Scenario: Устаревший REASONING отсутствует
+
+- **WHEN** документация или пример описывает действующие параметры model-tier routing
+- **THEN** он перечисляет `CODING`, `ANALYSIS` и `LIGHT` и не представляет `SUBAGENT_MODEL_REASONING` как поддерживаемый ключ

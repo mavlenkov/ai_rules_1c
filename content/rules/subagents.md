@@ -40,6 +40,8 @@ category: workflow
 
 **Economy mode.** When `.dev.env` has `ORCHESTRATION=economy` (toggled by `/economymode`; empty / missing = `standard`), load `content/rules/orchestrator-economy.md`: delegation of execution becomes the default — the parent keeps decisions, specs, and verification, subagents do the reading and writing. Check the key when loading this file for a non-trivial task. The mode only widens delegation; every constraint of this file stays intact, and model selection still resolves from `SUBAGENT_MODEL_*` per tier.
 
+**Background lifecycle and context budget.** When the host reports background completion through notifications, do not poll a running subagent; continue independent work and collect its result only when the next dependent step needs it. A launch that returned a job id is not a failure and must not be repeated. Reuse the subagent's report and validator evidence instead of rereading the same source or re-running unchanged checks. If the remaining work no longer fits a reviewable session, stop at a stable boundary and use the `handoff` skill rather than carrying an ever-growing transcript into implementation.
+
 ## Host-tool built-in explorers (hard ban)
 
 Cursor (and some other hosts) ship a **built-in** Explore helper — e.g. Cursor Task `subagent_type: "explore"` — with a fixed, non-overridable system prompt. That helper is **not** this project's explorer. It does not run the MCP-first fallback chain, does not prefer 1C graph / code-metadata tools, and does not return the structured report from `content/agents/explorer.md`.
@@ -124,6 +126,7 @@ Routing rules:
 - **Good candidates for the `light` tier** (when the active tool supports a per-invocation model override, the parent may route these down even to a `coding`-tier agent): initial project-source scouting and candidate lists; navigation / reference gathering for objects, modules, forms, procedures; impact lists ("where is X used"); mechanical verification after edits; small bounded edits in strictly assigned files.
 - **Never use the `light` tier as the final authority** for architecture, metadata / form design, transactions, registers, complex queries, security, data integrity, or release-critical decisions. Output of a light-tier run is working material, not a source of truth — the parent agent owns decomposition, source boundaries, the final decision, verification, and integration.
 - **Do not delegate trivial single-step tasks at all** — the launch overhead exceeds the saving.
+- **Routine work uses one route.** Pick one suitable tier/model for a bounded routine task. Do not automatically convene a multi-model panel or ask several senior models to restate the same judgement. Joint evaluation is reserved for a material, hard-to-reverse decision, an explicit comparison experiment, or a direct user request; the parent still integrates the decision.
 - The tier system does not change validation obligations: whatever tier produced the change, the applicable validator chain and closing gate from `verification-checklist.md` still apply, including quick-fixes.
 
 ## Bounded sidecar task templates
