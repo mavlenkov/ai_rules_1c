@@ -376,6 +376,8 @@ Servers are listed in order of importance per `INSTALL.md`. For each server in t
 | 6 | SyntaxCheckServer       | `servers/06_SyntaxCheckServer.md`       | `1c_syntax_checker_mcp`    | 8002 | — (optional sources mount, see below) |
 | 7 | 1CCodeChecker           | `servers/07_1CCodeChecker.md`           | `1c_code_checker_mcp`      | 8007 | `ONEC_AI_TOKEN` |
 
+> В таблице — канонические stable-порты вендора. Наш контур — **beta-канал с изоляцией 81xx** (8100/8102/8103/8104/8106/8107/8108, loopback; доступ со станций — SSH-туннель, см. `REMOTE-ACCESS.md` в репо mcp). В mcp.json проектов всегда 81xx.
+
 **SyntaxCheckServer, two optional switches.** Mounting the project sources read-only and setting `FILES_DIR` registers the `syntaxcheck_file` tool — the default form of the syntax gate, because a check by path costs a path instead of the whole module body; without the mount only `syntaxcheck` (code as text) exists. On the **beta** channel `FULLINDEX=true` plus an index volume (`/index`, `INDEX_DIR` moves it) makes the container index those sources at start-up and answer `UnresolvedMethodCall`, `UnresolvedField` and `QueryToMissingMetadata`, which are switched off in every other state; it costs about 8 minutes of indexing at start-up (calls are answered throughout) and about 11 s per file check against ~200 ms. Offer both when the per-server file allows them; never switch the channel to beta just to obtain the second one.
 
 For every server:
@@ -414,13 +416,13 @@ Canonical fragments (Cursor / Claude Code — `mcpServers`):
 ```json
 {
   "mcpServers": {
-    "1c-docs-mcp":          { "url": "http://localhost:8003/mcp", "connection_id": "1c_docs_service_001" },
-    "1c-graph-metadata-mcp":{ "url": "http://localhost:8006/mcp", "connection_id": "1c_graph_metadata_001" },
-    "1c-code-metadata-mcp": { "url": "http://localhost:8000/mcp", "connection_id": "1c_metadata_service_001" },
-    "1c-ssl-mcp":           { "url": "http://localhost:8008/mcp", "connection_id": "1c_ssl_service_001" },
-    "1c-templates-mcp":     { "url": "http://localhost:8004/mcp", "connection_id": "1c_templates_service_001", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
-    "1c-syntax-checker-mcp":{ "url": "http://localhost:8002/mcp", "connection_id": "1c_lsp_service_001" },
-    "1c-code-checker-mcp":  { "url": "http://localhost:8007/mcp", "connection_id": "1c_code_checker_001" }
+    "1c-docs-mcp":          { "url": "http://localhost:8103/mcp", "connection_id": "1c_docs_service_001" },
+    "1c-graph-metadata-mcp":{ "url": "http://localhost:8106/mcp", "connection_id": "1c_graph_metadata_001" },
+    "1c-code-metadata-mcp": { "url": "http://localhost:8100/mcp", "connection_id": "1c_metadata_service_001" },
+    "1c-ssl-mcp":           { "url": "http://localhost:8108/mcp", "connection_id": "1c_ssl_service_001" },
+    "1c-templates-mcp":     { "url": "http://localhost:8104/mcp", "connection_id": "1c_templates_service_001", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
+    "1c-syntax-checker-mcp":{ "url": "http://localhost:8102/mcp", "connection_id": "1c_lsp_service_001" },
+    "1c-code-checker-mcp":  { "url": "http://localhost:8107/mcp", "connection_id": "1c_code_checker_001" }
   }
 }
 ```
@@ -430,13 +432,13 @@ Kilo Code (`mcp` key, per-server `type` + `enabled`, see https://kilo.ai/docs/au
 ```json
 {
   "mcp": {
-    "1c-docs-mcp":           { "type": "remote", "url": "http://localhost:8003/mcp", "enabled": true },
-    "1c-graph-metadata-mcp": { "type": "remote", "url": "http://localhost:8006/mcp", "enabled": true },
-    "1c-code-metadata-mcp":  { "type": "remote", "url": "http://localhost:8000/mcp", "enabled": true },
-    "1c-ssl-mcp":            { "type": "remote", "url": "http://localhost:8008/mcp", "enabled": true },
-    "1c-templates-mcp":      { "type": "remote", "url": "http://localhost:8004/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" }, "enabled": true },
-    "1c-syntax-checker-mcp": { "type": "remote", "url": "http://localhost:8002/mcp", "enabled": true },
-    "1c-code-checker-mcp":   { "type": "remote", "url": "http://localhost:8007/mcp", "enabled": true }
+    "1c-docs-mcp":           { "type": "remote", "url": "http://localhost:8103/mcp", "enabled": true },
+    "1c-graph-metadata-mcp": { "type": "remote", "url": "http://localhost:8106/mcp", "enabled": true },
+    "1c-code-metadata-mcp":  { "type": "remote", "url": "http://localhost:8100/mcp", "enabled": true },
+    "1c-ssl-mcp":            { "type": "remote", "url": "http://localhost:8108/mcp", "enabled": true },
+    "1c-templates-mcp":      { "type": "remote", "url": "http://localhost:8104/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" }, "enabled": true },
+    "1c-syntax-checker-mcp": { "type": "remote", "url": "http://localhost:8102/mcp", "enabled": true },
+    "1c-code-checker-mcp":   { "type": "remote", "url": "http://localhost:8107/mcp", "enabled": true }
   }
 }
 ```
@@ -448,13 +450,13 @@ OpenCode (`mcp` key) — **the server key MUST start with a letter**. OpenCode n
 ```json
 {
   "mcp": {
-    "onec-docs-mcp":           { "type": "remote", "url": "http://localhost:8003/mcp" },
-    "onec-graph-metadata-mcp": { "type": "remote", "url": "http://localhost:8006/mcp" },
-    "onec-code-metadata-mcp":  { "type": "remote", "url": "http://localhost:8000/mcp" },
-    "onec-ssl-mcp":            { "type": "remote", "url": "http://localhost:8008/mcp" },
-    "onec-templates-mcp":      { "type": "remote", "url": "http://localhost:8004/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
-    "onec-syntax-checker-mcp": { "type": "remote", "url": "http://localhost:8002/mcp" },
-    "onec-code-check-mcp":     { "type": "remote", "url": "http://localhost:8007/mcp" }
+    "onec-docs-mcp":           { "type": "remote", "url": "http://localhost:8103/mcp" },
+    "onec-graph-metadata-mcp": { "type": "remote", "url": "http://localhost:8106/mcp" },
+    "onec-code-metadata-mcp":  { "type": "remote", "url": "http://localhost:8100/mcp" },
+    "onec-ssl-mcp":            { "type": "remote", "url": "http://localhost:8108/mcp" },
+    "onec-templates-mcp":      { "type": "remote", "url": "http://localhost:8104/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
+    "onec-syntax-checker-mcp": { "type": "remote", "url": "http://localhost:8102/mcp" },
+    "onec-code-check-mcp":     { "type": "remote", "url": "http://localhost:8107/mcp" }
   }
 }
 ```
@@ -464,13 +466,13 @@ Qwen Code (merge only `mcpServers` into `.qwen/settings.json`; HTTP uses `httpUr
 ```json
 {
   "mcpServers": {
-    "1c-docs-mcp":           { "httpUrl": "http://localhost:8003/mcp" },
-    "1c-graph-metadata-mcp": { "httpUrl": "http://localhost:8006/mcp" },
-    "1c-code-metadata-mcp": { "httpUrl": "http://localhost:8000/mcp" },
-    "1c-ssl-mcp":            { "httpUrl": "http://localhost:8008/mcp" },
-    "1c-templates-mcp":      { "httpUrl": "http://localhost:8004/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
-    "1c-syntax-checker-mcp": { "httpUrl": "http://localhost:8002/mcp" },
-    "1c-code-check-mcp":     { "httpUrl": "http://localhost:8007/mcp" }
+    "1c-docs-mcp":           { "httpUrl": "http://localhost:8103/mcp" },
+    "1c-graph-metadata-mcp": { "httpUrl": "http://localhost:8106/mcp" },
+    "1c-code-metadata-mcp": { "httpUrl": "http://localhost:8100/mcp" },
+    "1c-ssl-mcp":            { "httpUrl": "http://localhost:8108/mcp" },
+    "1c-templates-mcp":      { "httpUrl": "http://localhost:8104/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
+    "1c-syntax-checker-mcp": { "httpUrl": "http://localhost:8102/mcp" },
+    "1c-code-check-mcp":     { "httpUrl": "http://localhost:8107/mcp" }
   }
 }
 ```

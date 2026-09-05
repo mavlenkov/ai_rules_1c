@@ -25,13 +25,13 @@ This fork runs on Linux. Docker commands (`docker ps`, `docker start`, `docker l
 
 | id | Port | Docker image | Purpose | Requires data |
 |---|---|---|---|---|
-| `1c-syntax-checker-mcp` | 8002 | `comol/1c_syntaxcheck_mcp:latest` | BSL syntax (BSL Language Server) | No |
-| `1c-templates-mcp` | 8004 | `comol/template-search-mcp:latest` | Templates and project memory (`remember`/`recall`) | No |
-| `1c-ssl-mcp` | 8008 | `comol/mcp_ssl_server:latest` | BSP/SSL search | No (`SSL_VERSION`) |
-| `1C-docs-mcp` | 8003 | `comol/1c_help_mcp:latest` | 1C platform help (RAG) + the `1c-standards` and `1c-format-specs` collections, which ship inside the image | Yes — platform `bin` folder |
-| `1c-code-metadata-mcp` | 8000 | `comol/1c_code_metadata_mcp:latest` | Metadata/code/forms/XSD | Yes — configuration dump |
-| `1c-graph-metadata-mcp` | 8006 | `comol/1c_graph_metadata:latest` | Graph search (Neo4j) | Yes — dump + Neo4j |
-| `1c-code-check-mcp` | 8007 | `comol/1c-code-checker:latest` | 1C:Assistant, ITS | No (Assistant token) |
+| `1c-syntax-checker-mcp` | 8102 | `comol/1c_syntaxcheck_mcp:latest` | BSL syntax (BSL Language Server) | No |
+| `1c-templates-mcp` | 8104 | `comol/template-search-mcp:latest` | Templates and project memory (`remember`/`recall`) | No |
+| `1c-ssl-mcp` | 8108 | `comol/mcp_ssl_server:latest` | BSP/SSL search | No (`SSL_VERSION`) |
+| `1C-docs-mcp` | 8103 | `comol/1c_help_mcp:latest` | 1C platform help (RAG) + the `1c-standards` and `1c-format-specs` collections, which ship inside the image | Yes — platform `bin` folder |
+| `1c-code-metadata-mcp` | 8100 | `comol/1c_code_metadata_mcp:latest` | Metadata/code/forms/XSD | Yes — configuration dump |
+| `1c-graph-metadata-mcp` | 8106 | `comol/1c_graph_metadata:latest` | Graph search (Neo4j) | Yes — dump + Neo4j |
+| `1c-code-check-mcp` | 8107 | `comol/1c-code-checker:latest` | 1C:Assistant, ITS | No (Assistant token) |
 | `1c-data-mcp` | 80 / project | — (HTTP service on the infobase, **not** docker) | 1C data management and analysis (HTTP service published on the infobase itself) | Yes — `INFOBASE_PUBLISH_URL` in `.dev.env` + `mcp` HTTP service published on the infobase **with anonymous access** |
 
 > Exact image names may differ by version. If `docker pull` fails with `manifest unknown`, check the current list at [docs.onerpa.ru/mcp-servery-1c/servery.md](https://docs.onerpa.ru/mcp-servery-1c/servery.md).
@@ -67,7 +67,7 @@ This fork runs on Linux. Docker commands (`docker ps`, `docker start`, `docker l
 
 1. **External first.** Read `.ai-rules.json` → `integrations.mcp`. If `mode = "external"` (or env `BASESAI_MCP_GLOBAL_ROOT` + `<GLOBAL_ROOT>/install.manifest.json` exists):
    - Resolve paths from the manifest contract (`artifacts.registry`, `consumers.cursor_global_mcp`, `consumers.cursor_project_mcp`); `integrations.mcp` already carries the resolved `registryPath` / `globalMcpConfig` / `projectMcpConfig`.
-   - Parse the resolved **project** and **global** mcp.json → list `{ id, url, port-from-url }`; merge (project keys win on duplicate id). **Do not** assume ports 8000/8006 for project servers.
+   - Parse the resolved **project** and **global** mcp.json → list `{ id, url, port-from-url }`; merge (project keys win on duplicate id). **Do not** assume ports 8100/8106 for project servers.
    - Docker container names for Step 4 — from the registry's project row (`containers.*`, matched by `resolution.project_match`, default `path_code` == workspace root), **not** the default names below.
 
    Helper (PowerShell) — build the probe list from the resolved mcp.json files:
@@ -112,13 +112,13 @@ For servers with **TOOLS_MISSING**, call the HTTP endpoint. **External mode:** p
 
 ```powershell
 $servers = @(
-    @{ Id = '1c-code-metadata-mcp';   Port = 8000 },
-    @{ Id = '1c-syntax-checker-mcp';  Port = 8002 },
-    @{ Id = '1C-docs-mcp';            Port = 8003 },
-    @{ Id = '1c-templates-mcp';       Port = 8004 },
-    @{ Id = '1c-graph-metadata-mcp';  Port = 8006 },
-    @{ Id = '1c-code-check-mcp';      Port = 8007 },
-    @{ Id = '1c-ssl-mcp';             Port = 8008 }
+    @{ Id = '1c-code-metadata-mcp';   Port = 8100 },
+    @{ Id = '1c-syntax-checker-mcp';  Port = 8102 },
+    @{ Id = '1C-docs-mcp';            Port = 8103 },
+    @{ Id = '1c-templates-mcp';       Port = 8104 },
+    @{ Id = '1c-graph-metadata-mcp';  Port = 8106 },
+    @{ Id = '1c-code-check-mcp';      Port = 8107 },
+    @{ Id = '1c-ssl-mcp';             Port = 8108 }
 )
 foreach ($s in $servers) {
     $url = "http://localhost:$($s.Port)/mcp"
@@ -135,8 +135,8 @@ foreach ($s in $servers) {
 **Linux (bash + `curl`):**
 
 ```bash
-for entry in 1c-code-metadata-mcp:8000 1c-syntax-checker-mcp:8002 1C-docs-mcp:8003 \
-             1c-templates-mcp:8004 1c-graph-metadata-mcp:8006 1c-code-check-mcp:8007 1c-ssl-mcp:8008; do
+for entry in 1c-code-metadata-mcp:8100 1c-syntax-checker-mcp:8102 1C-docs-mcp:8103 \
+             1c-templates-mcp:8104 1c-graph-metadata-mcp:8106 1c-code-check-mcp:8107 1c-ssl-mcp:8108; do
     id="${entry%%:*}"; port="${entry##*:}"
     code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://localhost:$port/mcp")
     if [ -z "$code" ] || [ "$code" = "000" ]; then code=down; fi
@@ -227,7 +227,7 @@ Possible outcomes:
 
 ### Step 5. Install missing server
 
-**External mode:** install/recreate missing servers via the MCP distribution's **`INSTALL.md`** (it owns the registry, port assignment, and container naming) — do not `docker run` on port 8000 when the registry says 8200. The templates below apply to managed installs.
+**External mode:** install/recreate missing servers via the MCP distribution's **`INSTALL.md`** (it owns the registry, port assignment, and container naming) — do not `docker run` on port 8100 when the registry says 8200. The templates below apply to managed installs.
 
 **Do not run `docker run` silently.** First ask the user for:
 
@@ -255,34 +255,34 @@ Command templates (minimal set without data preparation):
 # (the container answers calls throughout) and ~11 s per file check against ~200 ms.
 # Never move a container to beta just to obtain it — the channel is decided in
 # /installmcp / /updatemcp, and enabling the mode is an operator decision.
-docker run -d -p 8002:8002 --name 1c_syntaxcheck_mcp `
+docker run -d -p 8102:8002 --name 1c_syntaxcheck_mcp `
   -e LICENSE_KEY={LICENSE_KEY} `
   -e FILES_DIR=/files `
   -v "{PROJECT_ROOT}:/files:ro" `
   comol/1c_syntaxcheck_mcp:latest
 
 # 1c-templates-mcp
-docker run -d -p 8004:8004 --name 1c_templates_mcp `
+docker run -d -p 8104:8004 --name 1c_templates_mcp `
   -e LICENSE_KEY={LICENSE_KEY} `
   -v "{DATA_ROOT}\mcp_templates:/app/chroma_db" `
   comol/template-search-mcp:latest
 
 # 1c-ssl-mcp
-docker run -d -p 8008:8008 --name mcp_ssl_server `
+docker run -d -p 8108:8008 --name mcp_ssl_server `
   -e LICENSE_KEY={LICENSE_KEY} `
   -e SSL_VERSION={SSL_VERSION} `
   -v "{DATA_ROOT}\mcp_ssl:/app/chroma_db" `
   comol/mcp_ssl_server:latest
 
 # 1C-docs-mcp
-docker run -d -p 8003:8003 --name 1c_help_mcp `
+docker run -d -p 8103:8003 --name 1c_help_mcp `
   -e LICENSE_KEY={LICENSE_KEY} `
   -v "{PLATFORM_BIN}:/1c_docs" `
   -v "{DATA_ROOT}\mcp_docs:/app/chroma_db" `
   comol/1c_help_mcp:latest
 
 # 1c-code-metadata-mcp
-docker run -d -p 8000:8000 --name 1c_code_metadata_mcp `
+docker run -d -p 8100:8000 --name 1c_code_metadata_mcp `
   -e LICENSE_KEY={LICENSE_KEY} `
   -v "{EXPORT_PATH}:/app/configuration" `
   -v "{DATA_ROOT}\mcp_code_metadata:/app/chroma_db" `
@@ -292,7 +292,7 @@ docker run -d -p 8000:8000 --name 1c_code_metadata_mcp `
 # https://docs.onerpa.ru/mcp-servery-1c/servery/graph-metadata-search.md
 
 # 1c-code-check-mcp
-docker run -d -p 8007:8007 --name 1c_code_checker_mcp `
+docker run -d -p 8107:8007 --name 1c_code_checker_mcp `
   -e NAPARNIK_TOKEN={NAPARNIK_TOKEN} `
   comol/1c-code-checker:latest
 ```

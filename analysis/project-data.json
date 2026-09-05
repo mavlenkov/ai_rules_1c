@@ -1,0 +1,2627 @@
+{
+  "_meta": {
+    "generated_at": "2026-08-19T10:45:11.872190+00:00",
+    "script": "analysis/collect_project_data.py"
+  },
+  "repo": {
+    "root": "/home/l7777/Проекты/ai_rules_1c",
+    "name": "ai_rules_1c",
+    "branch": "main",
+    "head": "97cd3c29de349955c0ae4a36613bf5782b18331f",
+    "head_short": "97cd3c2",
+    "total_commits": 109,
+    "first_commit_date": "2025-08-31 21:43:07 +0300",
+    "last_commit_date": "2026-08-12 14:52:50 +0300",
+    "working_tree_clean": false,
+    "status_porcelain": "?? analysis/",
+    "remotes": "mavlenkov\tgit@github.com:mavlenkov/ai_rules_1c.git (fetch)\nmavlenkov\tgit@github.com:mavlenkov/ai_rules_1c.git (push)\norigin\thttps://github.com/comol/ai_rules_1c.git (fetch)\norigin\thttps://github.com/comol/ai_rules_1c.git (push)",
+    "tracked_files": 289
+  },
+  "git": {
+    "authors": "37\tOleg Philippov <comol@mail.ru>\n    33\tmavlenkov <23328420+mavlenkov@users.noreply.github.com>\n    24\tfilippov.o <comol@mail.ru>\n    10\tcomol <56004685+comol@users.noreply.github.com>\n     2\tAndrey Lebedev <36698670+permblackshark@users.noreply.github.com>\n     1\tRoman Starchenko <roman_starch@mail.ru>\n     1\tVladimir <33487200+Eraserhp@users.noreply.github.com>\n     1\tpermblackshark <36698670+permblackshark@users.noreply.github.com>",
+    "branches": "backup/pre-v4-merge-20260525\n  codex/merge-upstream-20260812\n  feat/multi-client-routing\n  fix/opencode-tools-frontmatter\n* main\n  migration/v2-ai-rules\n  remotes/mavlenkov/HEAD -> mavlenkov/main\n  remotes/mavlenkov/codex/merge-upstream-20260812\n  remotes/mavlenkov/cursor/development-environment-setup-8572\n  remotes/mavlenkov/feat/multi-client-routing\n  remotes/mavlenkov/fix/opencode-tools-frontmatter\n  remotes/mavlenkov/main\n  remotes/origin/HEAD -> origin/main\n  remotes/origin/main",
+    "last_commits": "97cd3c2|2026-08-12 14:52:50 +0300|mavlenkov|feat(kimi): добавить OpenSpec skills bundle\n091a139|2026-08-12 14:34:20 +0300|mavlenkov|Merge upstream comol/ai_rules_1c through 410951e\n636b566|2026-08-08 07:32:57 +0300|mavlenkov|fix(mcp): сохранять проектный хост серверов при обновлении\neee8a4e|2026-08-07 19:35:32 +0300|mavlenkov|fix(koda): привести адаптер к фактическому контракту Koda CLI\n4561f00|2026-08-07 19:17:02 +0300|mavlenkov|feat(koda): полная поддержка Koda CLI — адаптер, конвертация агентов, MCP setup\n410951e|2026-08-01 03:43:07 +0300|Oleg Philippov|fix(rules): ПродолжитьВызов только для &Вместо, не для &ИзменениеИКонтроль\n5f3d3f0|2026-07-31 15:36:05 +0300|Oleg Philippov|Правила и metadata-manage: профили моделей, UI-тесты, support/XDTO/UUID, CI\n10cb524|2026-07-30 13:57:20 +0300|mavlenkov|fix(metadata-manage): platform note про pwsh на Linux (fork) + FORK-TODO п.14 (OpenSpec schema, pwsh 7.6.4)\n4268831|2026-07-30 13:35:45 +0300|mavlenkov|docs(FORK-TODO): раскатка kimi-канала в 9 проектов\nb343605|2026-07-30 13:30:51 +0300|mavlenkov|feat(install.sh): поддержка kimi — детект, rulesDir-приоритет, help; generic-пути без изменений\n25108bd|2026-07-29 18:41:46 +0300|mavlenkov|feat(install.sh): поддержка codex — rebuild-toml агенты, TOML MCP, user-scope команды, детект по .codex/\ned54032|2026-07-27 14:27:34 +0300|mavlenkov|docs: форк-секция .dev.env 3 → 5 в AGENTS.md и deploy-командах (после ре-нумерации upstream)\n9ecdb3c|2026-07-27 14:02:09 +0300|mavlenkov|Merge upstream comol/ai_rules_1c (7266528..5ae333e) в форк\n5ae333e|2026-07-25 21:50:32 +0300|Oleg Philippov|fix(opencode): hard gate against tools array in agent frontmatter\n1b6e2ed|2026-07-24 15:46:46 +0300|Oleg Philippov|fix(claude-code): on-demand rules в .claude/rules-1c вместо автозагружаемой .claude/rules/\nf33d240|2026-07-23 03:39:42 +0300|Oleg Philippov|Усиление правил: hard gate metadata-manage, platform-first, MCP-first search\n369d51a|2026-07-21 11:58:27 +0300|mavlenkov|feat(install.sh): OpenCode MCP — нормализация ключей, строгая схема, merge, legacy-очистка\n4f59dad|2026-07-20 22:15:12 +0300|mavlenkov|Merge upstream comol/ai_rules_1c (a421cf4..7266528) в форк\n7266528|2026-07-19 23:44:08 +0300|Oleg Philippov|Add adapters for Qwen, Command Code, Cline, and Pi.\n525be79|2026-07-19 20:28:01 +0300|Oleg Philippov|Add Kimi Code adapter\nb4d9875|2026-07-16 04:09:44 +0300|Oleg Philippov|fix(install): kilocode ставит одну папку .kilo вместо .kilo + .kilocode\n01d39ed|2026-07-16 00:18:39 +0300|Oleg Philippov|Скилл caveman: переключение через .dev.env (CAVEMAN) и команда /caveman\ndc8cca4|2026-07-15 23:54:03 +0300|Oleg Philippov|Реструктуризация правил: разделение dev-standards и verification, новые команды\n6f2c35d|2026-06-29 22:29:04 +0300|mavlenkov|fix(rules): correct transaction method НачалоТранзакции -> НачатьТранзакцию\n07ce6d1|2026-06-29 22:29:04 +0300|mavlenkov|docs(rules): require delegating full-cycle /opsx:apply implementation to a coding-tier subagent"
+  },
+  "content": {
+    "rules": [
+      {
+        "path": "content/rules/anti-patterns.md",
+        "bytes": 20222,
+        "lines": 490,
+        "body_lines": 485,
+        "frontmatter": {
+          "description": "1C anti-patterns, performance guidelines, and code review scoring",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/async-methods.md",
+        "bytes": 8817,
+        "lines": 212,
+        "body_lines": 207,
+        "frontmatter": {
+          "description": "1C asynchronous methods (`Асинх` / `Ждать` / `Обещание`) — patterns and pitfalls for platform 8.3.18+. Load when writing or reviewing client-side async code.",
+          "alwaysApply": false,
+          "category": "forms"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/bsp-access-rights.md",
+        "bytes": 14572,
+        "lines": 182,
+        "body_lines": 177,
+        "frontmatter": {
+          "description": "Programmatic work with БСП access-group profiles and rights — `ПрофилиГруппДоступа` structure, the `Роли.Роль` reference type, extension roles, assigning profiles to users, and the right / role / RLS check API. Load when code creates or updates access profiles, assigns them, or checks rights on a БСП-based configuration.",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/coding-standards.md",
+        "bytes": 7385,
+        "lines": 75,
+        "body_lines": 70,
+        "frontmatter": {
+          "description": "Coding standards — forbidden constructs, comments, code review, module regions, queries, data access, performance (headlines + pointers)",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/dcs-advanced-composition.md",
+        "bytes": 15120,
+        "lines": 155,
+        "body_lines": 150,
+        "frontmatter": {
+          "description": "Advanced programmatic composition in СКД — two-pass preprocessing of detail records before roll-up (hiding zero-total crosstab rows / columns), and executing the composition query directly instead of the DCS output processor for memory-heavy reports. Load only when the standard `ПриКомпоновкеРезультата` override of `dcs-design.md §5` is not enough.",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/dcs-design.md",
+        "bytes": 11170,
+        "lines": 134,
+        "body_lines": 129,
+        "frontmatter": {
+          "description": "1C Data Composition System (СКД / DCS) design rules — data sets, computed fields vs resources, parameters, settings, variants, programmatic override patterns. Load when designing or reviewing a DCS-based report.",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/dev-standards-architecture.md",
+        "bytes": 17173,
+        "lines": 228,
+        "body_lines": 223,
+        "frontmatter": {
+          "description": "Development standards — architecture patterns, extensions, platform standards, code smells",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/dev-standards-change-markers.md",
+        "bytes": 3708,
+        "lines": 82,
+        "body_lines": 76,
+        "frontmatter": {
+          "description": "Modification markers and metadata naming — typical-code change banners, new-object placement comments, naming rules, and object-type selection",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/dev-standards-code-style.md",
+        "bytes": 10584,
+        "lines": 174,
+        "body_lines": 169,
+        "frontmatter": {
+          "description": "BSL code style — formatting, quality metrics, forbidden constructs, naming, public API documentation, typography, comments, and internal review",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/dev-standards-core.md",
+        "bytes": 4639,
+        "lines": 153,
+        "body_lines": 148,
+        "frontmatter": {
+          "description": "Router for development standards — directs project parameters, BSL style, and modification/naming work to focused companion rules",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/dev-standards-env.md",
+        "bytes": 23764,
+        "lines": 174,
+        "body_lines": 168,
+        "frontmatter": {
+          "description": "Project and process parameters from .dev.env — code generation, infobase operations, UI testing, subagent models, the active-model profile, orchestration, and verification depth",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/extension-patterns.md",
+        "bytes": 9139,
+        "lines": 197,
+        "body_lines": 192,
+        "frontmatter": {
+          "description": "1C configuration extension (CFE) patterns — interceptor types (`&Перед` / `&После` / `&Вместо` / `&ИзменениеИКонтроль`), `ПродолжитьВызов` rules, change markers, adopted-object constraints. Load when writing or reviewing extension code.",
+          "alwaysApply": false,
+          "category": "architecture"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/external-review.md",
+        "bytes": 5556,
+        "lines": 68,
+        "body_lines": 63,
+        "frontmatter": {
+          "description": "Automatic external critic (Codex) at the verification gate — trigger, per-client detection, graceful fallback to 1c-code-reviewer, rule context for Codex",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/form-module.md",
+        "bytes": 5367,
+        "lines": 93,
+        "body_lines": 88,
+        "frontmatter": {
+          "description": "Form-module code (`Form.Module.bsl` / ФормаМодуль) — client-server interaction, wiring event handlers into `Form.xml`, reserved property names forbidden as local variables, async pointers, form-data conversion. Load from `forms.md` when editing form-module logic or adding event handlers.",
+          "alwaysApply": false,
+          "category": "forms"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/form-patterns.md",
+        "bytes": 10158,
+        "lines": 215,
+        "body_lines": 210,
+        "frontmatter": {
+          "description": "Managed-form layout patterns — archetypes (document, data processor, list, catalog item, wizard), naming conventions, layout principles, and advanced ERP patterns. Load when designing a form layout from scratch or when the requirements do not specify element placement.",
+          "alwaysApply": false,
+          "category": "forms"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/forms-add.md",
+        "bytes": 3611,
+        "lines": 64,
+        "body_lines": 59,
+        "frontmatter": {
+          "description": "Generating or significantly altering a managed 1C form (`Form.xml` + `Form.Module.bsl`), including form-presentation rules — programmatic modification of typical forms, element placement, fill checking, form commands. Load from `forms.md` for any form-creation or form-presentation task.",
+          "alwaysApply": false,
+          "category": "forms"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/forms.md",
+        "bytes": 2499,
+        "lines": 28,
+        "body_lines": 23,
+        "frontmatter": {
+          "description": "Entry point for managed-form work — pick the exact companion rules for `Form.xml`, `Form.Module.bsl`, events, async code, reserved names, and XML validation. Load first for any form task; load companions only via the routing table below.",
+          "alwaysApply": false,
+          "category": "forms"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/getconfigfiles.md",
+        "bytes": 3784,
+        "lines": 64,
+        "body_lines": 59,
+        "frontmatter": {
+          "description": "Exporting configuration objects (metadata) from an infobase to the repository — `ibcmd infobase config export` (preferred) or Designer `/DumpConfigToFiles` fallback. Load when extracting source from a live infobase.",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/integrations-add.md",
+        "bytes": 5038,
+        "lines": 57,
+        "body_lines": 52,
+        "frontmatter": {
+          "description": "when writing code that integrates 1C with another system (HTTP services, REST, message queues, webhooks)",
+          "alwaysApply": false,
+          "category": "integrations"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/locks-and-transactions.md",
+        "bytes": 14115,
+        "lines": 221,
+        "body_lines": 216,
+        "frontmatter": {
+          "description": "Managed locks, transaction boundaries, lock ordering, deadlock prevention, shared / exclusive lock modes, monitoring via the technological log. Load when designing posting / multi-document operations, debugging lock conflicts, or extending an existing transactional path.",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/logging-strategy.md",
+        "bytes": 10178,
+        "lines": 144,
+        "body_lines": 139,
+        "frontmatter": {
+          "description": "Positive logging strategy for 1C — when to write to the event log, which severity levels and category names to use, structured payload via `ДанныеЖурналаРегистрации`, secrets / PII bans. Complements the bans in `dev-standards-code-style.md → \"Forbidden Calls and Constructs\"` and `dev-standards-architecture.md §3 → \"Error Handling\"`.",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/mcp-first-search.md",
+        "bytes": 11412,
+        "lines": 106,
+        "body_lines": 100,
+        "frontmatter": {
+          "description": "MCP-first search discipline — bounded priority of MCP project-index tools over native discovery tools (Grep, Glob / file search, directory listing, Read-scanning, full-module Read), with a mandatory \"what was tried\" note before fallback. Not a ban — without exposed servers or after an MCP miss, native tools apply immediately. Load before any code / metadata / usage / file-location search in a 1C project.",
+          "alwaysApply": false,
+          "globs": [
+            "**/*.bsl",
+            "**/*.xml"
+          ],
+          "category": "tooling"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/metadata-xml-workarounds.md",
+        "bytes": 4159,
+        "lines": 85,
+        "body_lines": 80,
+        "frontmatter": {
+          "description": "Common XML generation pitfalls for 1C metadata and managed forms (`TabularSection` `LineNumber`, `PagesGroupExtInfo` typo, `Page.enabled`, UID uniqueness, post-edit validation). Load when authoring or fixing metadata XML or `Form.xml` by hand.",
+          "alwaysApply": false,
+          "category": "metadata"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/model-adaptation.md",
+        "bytes": 11157,
+        "lines": 87,
+        "body_lines": 82,
+        "frontmatter": {
+          "description": "Active-model adaptation — how AGENT_MODEL in .dev.env selects a model profile (opus5 | sonnet5 | fable5 | gpt56), what a profile may and may not change, and the model-agnostic prompting baseline that always holds",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/model-fable5.md",
+        "bytes": 10097,
+        "lines": 89,
+        "body_lines": 84,
+        "frontmatter": {
+          "description": "Model profile for Claude Fable 5 / Mythos 5 (AGENT_MODEL=fable5) — act instead of overplanning, evidence-audited progress claims, stated boundaries and checkpoints, no self-narrated reasoning (reasoning_extraction risk), parallel subagents, memory-first, readable final summaries",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/model-gpt56.md",
+        "bytes": 7674,
+        "lines": 59,
+        "body_lines": 54,
+        "frontmatter": {
+          "description": "Model profile for GPT-5.6 (AGENT_MODEL=gpt56) — lean context and each instruction once, reasoning-effort and verbosity calibration, autonomy boundaries for local vs. external actions, intent-level briefs, no contradictory instructions",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/model-opus5.md",
+        "bytes": 7670,
+        "lines": 67,
+        "body_lines": 62,
+        "frontmatter": {
+          "description": "Model profile for Claude Opus 5 (AGENT_MODEL=opus5) — verbosity and report shape, narration cadence, no self-invented extra verification, damped subagent spawning, correction narration, effort and thinking settings",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/model-sonnet5.md",
+        "bytes": 6967,
+        "lines": 57,
+        "body_lines": 52,
+        "frontmatter": {
+          "description": "Model profile for Claude Sonnet 5 (AGENT_MODEL=sonnet5) — literal instruction following and explicit scope, effort calibration, keeping adaptive thinking on for tool use, coverage-first review briefs, token-budget awareness",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/module-structure.md",
+        "bytes": 3343,
+        "lines": 85,
+        "body_lines": 80,
+        "frontmatter": {
+          "description": "Canonical region templates for common modules, object / manager modules, and form modules. Single source of truth for `#Область` names, preprocessor directives, and mandatory regions. Load before creating a new module or restructuring an existing one.",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/orchestrator-economy.md",
+        "bytes": 6603,
+        "lines": 67,
+        "body_lines": 62,
+        "frontmatter": {
+          "description": "Orchestrator economy mode — while ORCHESTRATION=economy in .dev.env (toggled by /economymode), the parent agent delegates execution to cheaper-tier subagents and keeps decisions, specs, and verification",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/platform-solutions.md",
+        "bytes": 18383,
+        "lines": 352,
+        "body_lines": 347,
+        "frontmatter": {
+          "description": "Case book of common 1C platform pitfalls and proven fix templates",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/query-design.md",
+        "bytes": 4867,
+        "lines": 48,
+        "body_lines": 43,
+        "frontmatter": {
+          "description": "Entry point for 1C query work — pick the exact companion rules and skill docs for writing, optimizing, and reviewing queries. Load first for any non-trivial query task; load companions only via the routing table below.",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/registers-design.md",
+        "bytes": 9857,
+        "lines": 98,
+        "body_lines": 93,
+        "frontmatter": {
+          "description": "Designing 1C registers — dimensions, resources, attributes, periodicity, indexes, balances vs turnovers, posting / reposting / sequence restoration. Load when creating or restructuring an information / accumulation / accounting register.",
+          "alwaysApply": false,
+          "category": "development"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/sdd-integrations.md",
+        "bytes": 24470,
+        "lines": 215,
+        "body_lines": 210,
+        "frontmatter": {
+          "description": "OpenSpec integration. Load when working with the openspec/ workspace (specs and change proposals).",
+          "alwaysApply": false,
+          "category": "integrations"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/subagent-pipeline.md",
+        "bytes": 20971,
+        "lines": 246,
+        "body_lines": 241,
+        "frontmatter": {
+          "description": "Formalized subagent pipeline for delegated full-cycle 1C changes — planner → developer → spec-compliance review → optional code-reviewer → verification gate",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/subagents.md",
+        "bytes": 18287,
+        "lines": 190,
+        "body_lines": 185,
+        "frontmatter": {
+          "description": "Subagent catalog — when to delegate to a specialized subagent vs. execute directly; model-tier routing and bounded sidecar task templates",
+          "alwaysApply": false,
+          "category": "workflow"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/systematic-debugging.md",
+        "bytes": 14539,
+        "lines": 160,
+        "body_lines": 155,
+        "frontmatter": {
+          "description": "Systematic 4-phase debugging methodology adapted for 1C (reproduce → hypothesize → experiment → fix), with a fast path for directly evidenced root causes (DEBUG_FAST_PATH in .dev.env)",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/tooling-playbooks.md",
+        "bytes": 17095,
+        "lines": 171,
+        "body_lines": 166,
+        "frontmatter": {
+          "description": "Per-task MCP tool playbooks (writing code, review, refactoring — including the safe-refactoring method and mandatory pre-refactor impact analysis, error fixing, performance, forms, integrations, documentation)",
+          "alwaysApply": false,
+          "category": "tooling"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/ui-testing-tools.md",
+        "bytes": 6093,
+        "lines": 75,
+        "body_lines": 70,
+        "frontmatter": {
+          "description": "Preferred tooling for 1C UI testing — agent-browser for web (token-efficient), Windows-MCP only as last-resort desktop automation; bans home-grown screenshot/OCR",
+          "alwaysApply": false,
+          "category": "tooling"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/verification-checklist.md",
+        "bytes": 3243,
+        "lines": 93,
+        "body_lines": 88,
+        "frontmatter": {
+          "description": "Router for 1C verification — directs triage, hard gates, and delivery checks to focused companion rules",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/verification-delivery.md",
+        "bytes": 7512,
+        "lines": 78,
+        "body_lines": 73,
+        "frontmatter": {
+          "description": "Verification delivery gates — reproduction, plan adherence, explicit review, UI testing, final report, and anti-patterns",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/verification-gates.md",
+        "bytes": 10940,
+        "lines": 115,
+        "body_lines": 110,
+        "frontmatter": {
+          "description": "Verification execution gates for BSL and metadata — evidence reuse, syntax, logic, style, impact analysis, and XML validation",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/verification-policy.md",
+        "bytes": 6634,
+        "lines": 64,
+        "body_lines": 59,
+        "frontmatter": {
+          "description": "Verification policy — depth levels, quick-fix eligibility, promotion triggers, and the quick-fix gate",
+          "alwaysApply": false,
+          "category": "quality"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/rules/web-client-driving.md",
+        "bytes": 11540,
+        "lines": 113,
+        "body_lines": 108,
+        "frontmatter": {
+          "description": "Driving the 1C web client during UI tests — what the accessibility snapshot shows, how lists / trees / grids / reports behave, field filling, dialogs, keyboard shortcuts, and the anti-loop discipline. Load after the `ui-testing-tools.md` preflight, before the first action against `INFOBASE_PUBLISH_URL`.",
+          "alwaysApply": false,
+          "category": "tooling"
+        },
+        "frontmatter_parse_error": null
+      }
+    ],
+    "rules_stats": {
+      "count": 44,
+      "total_lines": 5930,
+      "total_bytes": 450112
+    },
+    "agents": [
+      {
+        "path": "content/agents/analytic.md",
+        "bytes": 7615,
+        "lines": 189,
+        "body_lines": 181,
+        "frontmatter": {
+          "name": "1c-analytic",
+          "description": "Expert 1C business analyst agent. Analyzes existing code and metadata structure, writes PRD (Product Requirements Document), specifications, and answers architectural questions. Creates technical documentation in 1C terms without writing code. Use PROACTIVELY when analyzing requirements or creating specifications.",
+          "modelTier": "analysis",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/arch-reviewer.md",
+        "bytes": 8957,
+        "lines": 233,
+        "body_lines": 225,
+        "frontmatter": {
+          "name": "1c-arch-reviewer",
+          "description": "Expert 1C architecture reviewer agent. Reviews architectural decisions, evaluates design patterns, identifies scalability issues, and assesses compliance with 1C best practices. Provides confidence-scored feedback on architectural solutions. Use when an architectural design already exists and the user (or pipeline stage 2) requests its validation before implementation — do not auto-trigger.",
+          "modelTier": "analysis",
+          "tools": [
+            "Read",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/architect.md",
+        "bytes": 7207,
+        "lines": 180,
+        "body_lines": 172,
+        "frontmatter": {
+          "name": "1c-architect",
+          "description": "Expert 1C solution architect agent. Designs architecture for complex 1C modifications, analyzes existing patterns and conventions, and defines component boundaries, data flows, risks, and build sequence. Detailed executable task plans remain the 1c-planner responsibility.",
+          "modelTier": "coding",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/code-reviewer.md",
+        "bytes": 7977,
+        "lines": 194,
+        "body_lines": 186,
+        "frontmatter": {
+          "name": "1c-code-reviewer",
+          "description": "Expert 1C code reviewer agent. Reviews code for bugs, readability, standards compliance using confidence-based filtering to report only genuinely important issues. Use only when the user explicitly asks for a code review.",
+          "modelTier": "analysis",
+          "tools": [
+            "Read",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/developer.md",
+        "bytes": 9591,
+        "lines": 121,
+        "body_lines": 113,
+        "frontmatter": {
+          "name": "1c-developer",
+          "description": "Expert 1C code developer agent. Creates modules, procedures, functions, queries, and forms. Uses MCP tools for documentation, syntax checking, and metadata verification. Use PROACTIVELY for bulk or multi-module 1C code work; trivial single-file edits stay with the parent agent (see subagents.md).",
+          "modelTier": "coding",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/doc-writer.md",
+        "bytes": 9718,
+        "lines": 224,
+        "body_lines": 216,
+        "frontmatter": {
+          "name": "1c-doc-writer",
+          "description": "Expert 1C documentation specialist for end-user and administrator documentation. Creates user guides, admin manuals, tutorials, codemaps, and API references. NOT for inline code documentation (module/procedure comments - that's developer responsibility). Use PROACTIVELY when user-facing documentation needs to be created or updated.",
+          "modelTier": "analysis",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/error-fixer.md",
+        "bytes": 8017,
+        "lines": 174,
+        "body_lines": 166,
+        "frontmatter": {
+          "name": "1c-error-fixer",
+          "description": "Expert 1C error resolution specialist. Fixes syntax errors, runtime errors, and BSL Language Server warnings quickly with minimal changes. Focuses on getting code working without architectural modifications. Use PROACTIVELY when errors occur in 1C code.",
+          "modelTier": "light",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/explorer.md",
+        "bytes": 11563,
+        "lines": 151,
+        "body_lines": 143,
+        "frontmatter": {
+          "name": "1c-explorer",
+          "description": "Read-only 1C codebase exploration specialist — the project's ONLY exploration subagent. Prefer this over any host built-in Explore / explore / generic scout (Cursor Task explore, etc.): those prompts are not overridable and skip the project's MCP-first chain. Quickly finds files, code patterns, metadata objects, dependencies, and answers questions about the configuration without modifying anything. Strictly follows the project's MCP fallback chain (graph metadata → code metadata → templates → SSL → docs → ITS → grep) and returns structured findings with file/line references and qualified 1C names. Supports thoroughness levels: quick, medium, thorough. Use PROACTIVELY when the parent needs to gather context across many files, locate code, map a subsystem, or answer 'where is X / how does Y work / who calls Z' questions before planning, coding, or refactoring. Never substitute a host built-in explorer for this agent.",
+          "modelTier": "light",
+          "tools": [
+            "Read",
+            "Grep",
+            "Glob",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/metadata-manager.md",
+        "bytes": 9451,
+        "lines": 128,
+        "body_lines": 120,
+        "frontmatter": {
+          "name": "1c-metadata-manager",
+          "description": "1C metadata management specialist. Creates, edits, validates, and removes configuration objects (catalogs, documents, registers, enums), managed forms, DCS/SKD schemas, MXL layouts, roles, EPF/ERF, extensions (CFE), configurations (CF), databases, subsystems, command interfaces, and templates. Use PROACTIVELY when working with 1C metadata structure — creating, scaffolding, compiling, or editing metadata objects, forms, reports, layouts, roles, or extensions.",
+          "modelTier": "coding",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/performance-optimizer.md",
+        "bytes": 8410,
+        "lines": 173,
+        "body_lines": 165,
+        "frontmatter": {
+          "name": "1c-performance-optimizer",
+          "description": "Expert 1C performance optimization specialist. Analyzes code for performance issues, optimizes queries, identifies bottlenecks, and provides concrete improvements. Use when the user reports slowness, when query / loop optimization is the explicit task, or when a review run at the user's request has identified slow code.",
+          "modelTier": "coding",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/planner.md",
+        "bytes": 7603,
+        "lines": 232,
+        "body_lines": 224,
+        "frontmatter": {
+          "name": "1c-planner",
+          "description": "Expert 1C planning specialist. Creates comprehensive, actionable implementation plans for complex features and refactoring. Analyzes requirements, breaks down tasks, identifies dependencies and risks. Use PROACTIVELY when users request feature implementation, architectural changes, or complex refactoring.",
+          "modelTier": "analysis",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/refactoring.md",
+        "bytes": 9805,
+        "lines": 203,
+        "body_lines": 195,
+        "frontmatter": {
+          "name": "1c-refactoring",
+          "description": "Expert 1C code refactoring specialist. Focuses on dead code cleanup, code consolidation, structure simplification, and technical debt reduction. Identifies and safely removes unused code and duplicates. Use for code cleanup and refactoring tasks; explicit performance-optimization tasks go to 1c-performance-optimizer.",
+          "modelTier": "coding",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/agents/tester.md",
+        "bytes": 10712,
+        "lines": 212,
+        "body_lines": 204,
+        "frontmatter": {
+          "name": "1c-tester",
+          "description": "Expert 1C testing agent. Tests code and functions using web browser automation and the /deploy-and-test command. Deploys configuration to test infobase, performs UI testing with human-like interactions, validates functionality. Use when the user asks to run deployment, UI testing, or verification against a test infobase.",
+          "modelTier": "analysis",
+          "tools": [
+            "Read",
+            "Write",
+            "Edit",
+            "Grep",
+            "Glob",
+            "Shell",
+            "MCP"
+          ],
+          "isSubagent": true,
+          "allowParallel": true
+        },
+        "frontmatter_parse_error": null
+      }
+    ],
+    "agents_stats": {
+      "count": 13,
+      "total_lines": 2414,
+      "total_bytes": 116626
+    },
+    "commands": [
+      {
+        "path": "content/commands/caveman.md",
+        "bytes": 4453,
+        "lines": 48,
+        "body_lines": 44,
+        "frontmatter": {
+          "description": "Toggle the caveman communication style — set CAVEMAN (on|auto|off) in .dev.env for the whole project; on|off|auto persist, lite|full|ultra switch the session level",
+          "argumentHint": "[on|off|auto|status|lite|full|ultra]"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/check-uuid.md",
+        "bytes": 2731,
+        "lines": 44,
+        "body_lines": 40,
+        "frontmatter": {
+          "description": "Check a 1C XML configuration dump for duplicate UUIDs, and optionally regenerate them",
+          "argumentHint": "[path] [--fix] [--include-intra]"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/checkmcp.md",
+        "bytes": 23123,
+        "lines": 315,
+        "body_lines": 312,
+        "frontmatter": {
+          "description": "Check availability of 1C MCP servers and install/start the missing ones"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/dataprocessors.md",
+        "bytes": 4980,
+        "lines": 177,
+        "body_lines": 174,
+        "frontmatter": {
+          "description": "Операции с внешними обработками и отчётами EPF/ERF (Linux + 1CFilesConverter)"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/deploy-and-test.md",
+        "bytes": 16079,
+        "lines": 334,
+        "body_lines": 331,
+        "frontmatter": {
+          "description": "Развёртывание конфигурации/расширения в ИБ и веб-тестирование (Linux, 1CFilesConverter Mode 1 / Designer Mode 2)"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/doctor.md",
+        "bytes": 18085,
+        "lines": 180,
+        "body_lines": 177,
+        "frontmatter": {
+          "description": "Diagnose whether 1c-rules is installed, connected, configured, and usable by the current agent"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/economymode.md",
+        "bytes": 11731,
+        "lines": 89,
+        "body_lines": 85,
+        "frontmatter": {
+          "description": "Toggle orchestrator economy mode via ORCHESTRATION in .dev.env; on enable, offers to configure per-tier subagent models and to set up the rtk output-compression proxy",
+          "argumentHint": "[on|off|status|models|rtk]"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/evolve.md",
+        "bytes": 7270,
+        "lines": 92,
+        "body_lines": 88,
+        "frontmatter": {
+          "description": "Aggregate accumulated rule-friction signals into user-approved behavior rules in LLM-RULES.md (ruleset self-improvement loop)",
+          "argumentHint": "[note <text>|show]"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/extensions.md",
+        "bytes": 5488,
+        "lines": 178,
+        "body_lines": 175,
+        "frontmatter": {},
+        "frontmatter_parse_error": "mapping values are not allowed here\n  in \"<unicode string>\", line 1, column 40:\n     ... tion: Операции с расширениями 1С: загрузка, выгрузка, сборка CFE ... \n                                         ^"
+      },
+      {
+        "path": "content/commands/getconfigfiles.md",
+        "bytes": 6638,
+        "lines": 137,
+        "body_lines": 134,
+        "frontmatter": {
+          "description": "Выгрузка объектов конфигурации/расширения из ИБ в файлы (Linux + 1CFilesConverter)"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/install-agent-browser.md",
+        "bytes": 5298,
+        "lines": 148,
+        "body_lines": 145,
+        "frontmatter": {
+          "description": "Install agent-browser (token-efficient headless browser CLI + MCP) for 1C web UI testing"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/install-windows-mcp.md",
+        "bytes": 5080,
+        "lines": 145,
+        "body_lines": 142,
+        "frontmatter": {
+          "description": "Install Windows-MCP (desktop UI automation MCP) as a last-resort alternative to home-grown screenshot/OCR"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/installmcp.md",
+        "bytes": 31891,
+        "lines": 418,
+        "body_lines": 415,
+        "frontmatter": {
+          "description": "Download the 1C MCP server distribution from vibecoding1c.ru and install all servers from it"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/litemode.md",
+        "bytes": 6959,
+        "lines": 59,
+        "body_lines": 55,
+        "frontmatter": {
+          "description": "Toggle lightweight QA mode — set VERIFICATION_DEPTH (full|standard|lite) in .dev.env and, at level lite, disable UI testing (UI_TESTING=off)",
+          "argumentHint": "[on|off|full|standard|lite|status]"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/loadfrom1cbase.md",
+        "bytes": 7188,
+        "lines": 119,
+        "body_lines": 116,
+        "frontmatter": {
+          "description": "Dump the configuration from the infobase defined in .dev.env into the current repository files (Linux + Windows)"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/rulesmodel.md",
+        "bytes": 8744,
+        "lines": 62,
+        "body_lines": 58,
+        "frontmatter": {
+          "description": "Adapt the ruleset to the model that is actually running — normalize a free-form model name to a profile slug and write AGENT_MODEL (opus5|sonnet5|fable5|gpt56) into .dev.env",
+          "argumentHint": "[opus5|sonnet5|fable5|gpt56|<any model name>|auto|status|off]"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/update1cbase.md",
+        "bytes": 10698,
+        "lines": 132,
+        "body_lines": 129,
+        "frontmatter": {
+          "description": "Load current repository files into the infobase defined in .dev.env and update the DB structure (Linux + Windows)"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/updatemcp.md",
+        "bytes": 21233,
+        "lines": 299,
+        "body_lines": 296,
+        "frontmatter": {
+          "description": "Re-download the 1C MCP server distribution from vibecoding1c.ru, pull new images, refresh keys, and restart installed servers"
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/commands/updaterules.md",
+        "bytes": 6924,
+        "lines": 100,
+        "body_lines": 97,
+        "frontmatter": {
+          "description": "Update the 1c-rules ruleset from GitHub (fork mavlenkov/ai_rules_1c)"
+        },
+        "frontmatter_parse_error": null
+      }
+    ],
+    "commands_stats": {
+      "count": 19,
+      "total_lines": 3076,
+      "total_bytes": 204593
+    },
+    "skills": [
+      {
+        "path": "content/skills/1c-metadata-manage/SKILL.md",
+        "bytes": 10890,
+        "lines": 94,
+        "body_lines": 90,
+        "frontmatter": {
+          "name": "1c-metadata-manage",
+          "description": "1C metadata management — create, edit, validate, and remove configuration objects (catalogs, documents, registers, enums), managed forms, data composition schemas (SKD), spreadsheet layouts (MXL), roles, external processors (EPF/ERF), extensions (CFE), configurations (CF), databases, subsystems, command interfaces, templates. Use when working with 1C metadata structure."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/caveman/SKILL.md",
+        "bytes": 11678,
+        "lines": 139,
+        "body_lines": 127,
+        "frontmatter": {
+          "name": "caveman",
+          "description": "Ultra-compressed communication mode. Cuts output tokens ~65–75% by using a terse \"caveman\" style while keeping full technical accuracy. Active by default for ALL tasks (`.dev.env` `CAVEMAN=on`, the default). `CAVEMAN=auto` restricts it to development tasks and turns it off for analysis / documentation / review; `CAVEMAN=off` disables auto-activation entirely. Force-on with \"caveman\", \"как пещерный\", \"use caveman\", \"be brief\", \"коротко\", `/caveman`. Force-off with \"stop caveman\" / \"normal mode\" / \"обычный режим\". Levels: `lite` / `full` (default) / `ultra`. Explicit force commands work in every mode."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/handoff/SKILL.md",
+        "bytes": 5492,
+        "lines": 93,
+        "body_lines": 88,
+        "frontmatter": {
+          "name": "handoff",
+          "description": "Compact the current conversation into a self-contained handoff document so a fresh agent (new chat, another machine, another AI client) can continue the work without re-discovering the context. References durable artifacts (`openspec/`, `memory.md`, commits, `1c-templates-mcp` notes) instead of duplicating them. Use when the user says 'handoff', 'compact session', 'save context for continuation', or invokes `/handoff`.",
+          "argument-hint": "Optional: focus of the next session, or a target path/folder for the handoff file."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/img-grid-analysis/SKILL.md",
+        "bytes": 2482,
+        "lines": 71,
+        "body_lines": 67,
+        "frontmatter": {
+          "name": "img-grid-analysis",
+          "description": "Overlay a numbered grid on an image to determine column proportions for layout generation. Use when creating MXL spreadsheet layouts from screenshots or scanned print forms."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/mcp-1c-tools/SKILL.md",
+        "bytes": 11500,
+        "lines": 87,
+        "body_lines": 83,
+        "frontmatter": {
+          "name": "mcp-1c-tools",
+          "description": "Catalog of MCP servers for 1C development — search, code navigation, metadata, code review, docs, ITS, templates. Use whenever a 1C task requires calling tools from any 1c-*-mcp / 1C-*-mcp server. Each server has its own detail file under `docs/` — load it when you are about to call tools from that server, and only if the server is actually available in the current session."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/md-to-docx/SKILL.md",
+        "bytes": 3177,
+        "lines": 74,
+        "body_lines": 70,
+        "frontmatter": {
+          "name": "md-to-docx",
+          "description": "Convert a Markdown file to DOCX (Word). Use when the user asks to convert .md to .docx, generate a Word document from Markdown, or export Markdown notes to Word."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/mermaid-diagrams/SKILL.md",
+        "bytes": 6265,
+        "lines": 228,
+        "body_lines": 224,
+        "frontmatter": {
+          "name": "mermaid-diagrams",
+          "description": "Practical guide for creating human-readable and agent-parseable diagrams using Mermaid. Includes conservative, renderer-compatible templates and when-to-use guidance."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/powershell-windows/SKILL.md",
+        "bytes": 3303,
+        "lines": 109,
+        "body_lines": 105,
+        "frontmatter": {
+          "name": "powershell-windows",
+          "description": "PowerShell scripting rules for Windows environment. Use when running shell commands, Docker operations, or HTTP requests on Windows PowerShell."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/prompt-enhancer/SKILL.md",
+        "bytes": 8594,
+        "lines": 126,
+        "body_lines": 122,
+        "frontmatter": {
+          "name": "prompt-enhancer",
+          "description": "Improve and structure short, unstructured prompts and task statements, turning them into detailed imperative specifications with numbered analysis steps, explicit edge cases, and a clearly described expected output format. Preserves all terms and conditions from the source, does not add new requirements. Use when the user asks to: improve a prompt, refine a task statement, expand a task description, structure a spec, turn a note into a detailed instruction, make a prompt more precise or detailed, prepare a spec from a draft, polish a task, convert a short note into a clear specification. Accepts text as a command argument or a path to a .md file."
+        },
+        "frontmatter_parse_error": null
+      },
+      {
+        "path": "content/skills/v8unpack-cf/SKILL.md",
+        "bytes": 5106,
+        "lines": 151,
+        "body_lines": 147,
+        "frontmatter": {
+          "name": "v8unpack-cf",
+          "description": "Unpack and repack 1C binary files (CF / CFE / EPF) with the Python `v8unpack` utility — no 1C platform required. Use when you need to extract a configuration, extension or data processor into human-readable sources (JSON + BSL), or build a binary back from sources, and the 1C:Enterprise platform is not available."
+        },
+        "frontmatter_parse_error": null
+      }
+    ],
+    "skills_stats": {
+      "count": 10,
+      "total_lines": 1172,
+      "total_bytes": 68487
+    },
+    "skills_inventory": {
+      "1c-metadata-manage": {
+        "files": [
+          "content/skills/1c-metadata-manage/SKILL.md",
+          "content/skills/1c-metadata-manage/docs/bsp-manage.md",
+          "content/skills/1c-metadata-manage/docs/cf-manage.md",
+          "content/skills/1c-metadata-manage/docs/cfe-manage.md",
+          "content/skills/1c-metadata-manage/docs/db-manage.md",
+          "content/skills/1c-metadata-manage/docs/epf-manage.md",
+          "content/skills/1c-metadata-manage/docs/form-compile-dsl.md",
+          "content/skills/1c-metadata-manage/docs/form-manage.md",
+          "content/skills/1c-metadata-manage/docs/form-patterns.md",
+          "content/skills/1c-metadata-manage/docs/help-manage.md",
+          "content/skills/1c-metadata-manage/docs/interface-manage.md",
+          "content/skills/1c-metadata-manage/docs/meta-manage.md",
+          "content/skills/1c-metadata-manage/docs/mxl-manage.md",
+          "content/skills/1c-metadata-manage/docs/query-optimization.md",
+          "content/skills/1c-metadata-manage/docs/query-writing.md",
+          "content/skills/1c-metadata-manage/docs/role-manage.md",
+          "content/skills/1c-metadata-manage/docs/skd-manage.md",
+          "content/skills/1c-metadata-manage/docs/ssl-patterns.md",
+          "content/skills/1c-metadata-manage/docs/subsystem-manage.md",
+          "content/skills/1c-metadata-manage/docs/support-manage.md",
+          "content/skills/1c-metadata-manage/docs/template-manage.md",
+          "content/skills/1c-metadata-manage/docs/uuid-check.md",
+          "content/skills/1c-metadata-manage/docs/v8unpack-cf.md",
+          "content/skills/1c-metadata-manage/docs/web-manage.md",
+          "content/skills/1c-metadata-manage/docs/xdto-manage.md",
+          "content/skills/1c-metadata-manage/tools/1c-cf-manage/cf-edit-reference.md",
+          "content/skills/1c-metadata-manage/tools/1c-cf-manage/scripts/cf-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cf-manage/scripts/cf-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cf-manage/scripts/cf-init.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cf-manage/scripts/cf-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cfe-manage/scripts/cfe-borrow.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cfe-manage/scripts/cfe-diff.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cfe-manage/scripts/cfe-init.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cfe-manage/scripts/cfe-patch-method.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-cfe-manage/scripts/cfe-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-create.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-dump-cf.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-dump-dt.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-dump-xml.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-load-cf.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-load-dt.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-load-git.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-load-xml.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-run.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-update.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-epf-build/scripts/epf-build.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-epf-build/scripts/stub-db-create.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-epf-dump/scripts/epf-dump.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-epf-scaffold/scripts/init.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-epf-validate/scripts/epf-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-erf-scaffold/scripts/init.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-form-compile/form-dsl-spec.md",
+          "content/skills/1c-metadata-manage/tools/1c-form-compile/presets/README.md",
+          "content/skills/1c-metadata-manage/tools/1c-form-compile/presets/erp-standard.json",
+          "content/skills/1c-metadata-manage/tools/1c-form-compile/scripts/form-compile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-form-edit/scripts/form-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-form-info/scripts/form-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-form-scaffold/scripts/form-add.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-form-scaffold/scripts/remove-form.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-form-validate/scripts/form-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-help-manage/scripts/add-help.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-interface-manage/reference.md",
+          "content/skills/1c-metadata-manage/tools/1c-interface-manage/scripts/interface-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-interface-manage/scripts/interface-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-meta-compile/meta-dsl-spec.md",
+          "content/skills/1c-metadata-manage/tools/1c-meta-compile/scripts/meta-compile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-meta-edit/child-operations.md",
+          "content/skills/1c-metadata-manage/tools/1c-meta-edit/json-dsl.md",
+          "content/skills/1c-metadata-manage/tools/1c-meta-edit/properties-reference.md",
+          "content/skills/1c-metadata-manage/tools/1c-meta-edit/scripts/meta-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-meta-info/scripts/meta-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-meta-remove/scripts/meta-remove.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-meta-validate/scripts/meta-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-mxl-compile/scripts/mxl-compile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-mxl-decompile/scripts/mxl-decompile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-mxl-info/scripts/mxl-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-mxl-validate/scripts/mxl-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-role-compile/dsl-reference.md",
+          "content/skills/1c-metadata-manage/tools/1c-role-compile/scripts/role-compile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-role-info/scripts/role-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-role-validate/scripts/role-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-skd-compile/scripts/skd-compile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-skd-compile/skd-dsl-spec.md",
+          "content/skills/1c-metadata-manage/tools/1c-skd-decompile/scripts/skd-decompile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-skd-edit/scripts/skd-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-skd-info/modes-reference.md",
+          "content/skills/1c-metadata-manage/tools/1c-skd-info/scripts/skd-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-skd-validate/scripts/skd-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-subsystem-manage/scripts/subsystem-compile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-subsystem-manage/scripts/subsystem-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-subsystem-manage/scripts/subsystem-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-subsystem-manage/scripts/subsystem-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-support-manage/scripts/support-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-template-manage/scripts/add-template.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-template-manage/scripts/remove-template.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-uuid-check/scripts/uuid-check.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-web-ops/scripts/web-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-web-ops/scripts/web-publish.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-web-ops/scripts/web-stop.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-web-ops/scripts/web-unpublish.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-xdto-manage/scripts/xdto-compile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-xdto-manage/scripts/xdto-decompile.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-xdto-manage/scripts/xdto-edit.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-xdto-manage/scripts/xdto-info.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-xdto-manage/scripts/xdto-validate.ps1",
+          "content/skills/1c-metadata-manage/tools/1c-xdto-manage/xsd-reference.md",
+          "content/skills/1c-metadata-manage/tools/_common/DevEnv.ps1"
+        ],
+        "count": 107,
+        "total_bytes": 3441624
+      },
+      "caveman": {
+        "files": [
+          "content/skills/caveman/SKILL.md"
+        ],
+        "count": 1,
+        "total_bytes": 11678
+      },
+      "handoff": {
+        "files": [
+          "content/skills/handoff/SKILL.md"
+        ],
+        "count": 1,
+        "total_bytes": 5492
+      },
+      "img-grid-analysis": {
+        "files": [
+          "content/skills/img-grid-analysis/SKILL.md",
+          "content/skills/img-grid-analysis/scripts/overlay-grid.py"
+        ],
+        "count": 2,
+        "total_bytes": 6309
+      },
+      "mcp-1c-tools": {
+        "files": [
+          "content/skills/mcp-1c-tools/SKILL.md",
+          "content/skills/mcp-1c-tools/docs/1C-docs-mcp.md",
+          "content/skills/mcp-1c-tools/docs/1c-code-check-mcp.md",
+          "content/skills/mcp-1c-tools/docs/1c-code-metadata-mcp.md",
+          "content/skills/mcp-1c-tools/docs/1c-data-mcp.md",
+          "content/skills/mcp-1c-tools/docs/1c-graph-metadata-mcp.md",
+          "content/skills/mcp-1c-tools/docs/1c-ssl-mcp.md",
+          "content/skills/mcp-1c-tools/docs/1c-syntax-checker-mcp.md",
+          "content/skills/mcp-1c-tools/docs/1c-templates-mcp.md"
+        ],
+        "count": 9,
+        "total_bytes": 65703
+      },
+      "md-to-docx": {
+        "files": [
+          "content/skills/md-to-docx/SKILL.md",
+          "content/skills/md-to-docx/package-lock.json",
+          "content/skills/md-to-docx/package.json",
+          "content/skills/md-to-docx/scripts/md_to_docx.js"
+        ],
+        "count": 4,
+        "total_bytes": 28770
+      },
+      "mermaid-diagrams": {
+        "files": [
+          "content/skills/mermaid-diagrams/SKILL.md"
+        ],
+        "count": 1,
+        "total_bytes": 6265
+      },
+      "powershell-windows": {
+        "files": [
+          "content/skills/powershell-windows/SKILL.md"
+        ],
+        "count": 1,
+        "total_bytes": 3303
+      },
+      "prompt-enhancer": {
+        "files": [
+          "content/skills/prompt-enhancer/SKILL.md",
+          "content/skills/prompt-enhancer/examples/before-after-1.md"
+        ],
+        "count": 2,
+        "total_bytes": 10817
+      },
+      "v8unpack-cf": {
+        "files": [
+          "content/skills/v8unpack-cf/SKILL.md"
+        ],
+        "count": 1,
+        "total_bytes": 5106
+      }
+    },
+    "total_stats": {
+      "count": 86,
+      "total_lines": 12592,
+      "total_bytes": 839818
+    }
+  },
+  "adapters": [
+    {
+      "file": "claude-code.yaml",
+      "tool": "claude-code",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".claude/"
+        },
+        {
+          "exists": "CLAUDE.md"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".claude/rules-1c/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".claude/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "tools",
+              "modelHint",
+              "isSubagent",
+              "allowParallel"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "reasoningEffort"
+            ]
+          }
+        },
+        "commands": {
+          "copyTo": ".claude/commands/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "argumentHint",
+              "allowedTools"
+            ],
+            "rename": {
+              "argumentHint": "argument-hint",
+              "allowedTools": "allowed-tools"
+            }
+          }
+        },
+        "skills": {
+          "copyTo": ".claude/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".mcp.json",
+          "schema": "mcpServers",
+          "format": "json"
+        }
+      }
+    },
+    {
+      "file": "cline.yaml",
+      "tool": "cline",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".cline/"
+        },
+        {
+          "exists": ".clinerules/"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".cline/rules-1c/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".cline/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "modelHint"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "tools",
+              "allowParallel",
+              "reasoningEffort",
+              "isSubagent"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".cline/skills/{name}/",
+          "mode": "verbatim"
+        }
+      }
+    },
+    {
+      "file": "codex.yaml",
+      "tool": "codex",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".codex/"
+        },
+        {
+          "exists": "AGENTS.md"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".codex/rules/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".codex/agents/{name}.toml",
+          "mode": "rebuild-toml",
+          "template": "name = \"{name}\"\ndescription = \"{description}\"\nmodel = \"{modelHint}\"\nmodel_reasoning_effort = \"{reasoningEffort}\"\ndeveloper_instructions = \"\"\"\n{body}\n\"\"\"\n"
+        },
+        "commands": {
+          "copyTo": "~/.codex/prompts/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description"
+            ],
+            "drop": [
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".codex/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".codex/config.toml",
+          "schema": "[mcp_servers.<id>]",
+          "format": "toml"
+        }
+      }
+    },
+    {
+      "file": "command-code.yaml",
+      "tool": "command-code",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".commandcode/"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".commandcode/rules-1c/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".commandcode/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "modelHint"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "tools",
+              "allowParallel",
+              "reasoningEffort",
+              "isSubagent"
+            ]
+          }
+        },
+        "commands": {
+          "copyTo": ".commandcode/commands/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description"
+            ],
+            "drop": [
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".commandcode/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".mcp.json",
+          "schema": "mcpServers-claude",
+          "format": "json"
+        }
+      }
+    },
+    {
+      "file": "cursor.yaml",
+      "tool": "cursor",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".cursor/"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".cursor/rules/{name}.mdc",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "globs",
+              "alwaysApply"
+            ],
+            "drop": [
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".cursor/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "tools",
+              "modelHint",
+              "allowParallel",
+              "isSubagent"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "reasoningEffort"
+            ]
+          }
+        },
+        "commands": {
+          "copyTo": ".cursor/commands/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "argumentHint"
+            ],
+            "drop": [
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".cursor/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".cursor/mcp.json",
+          "schema": "mcpServers",
+          "format": "json"
+        }
+      }
+    },
+    {
+      "file": "kilocode.yaml",
+      "tool": "kilocode",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".kilo/"
+        },
+        {
+          "exists": ".kilocode/"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".kilo/rules-1c/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".kilo/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "modelHint"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "tools",
+              "allowParallel",
+              "reasoningEffort"
+            ],
+            "addIf": {
+              "isSubagent": {
+                "mode": "subagent"
+              },
+              "!isSubagent": {
+                "mode": "all"
+              }
+            }
+          }
+        },
+        "commands": {
+          "copyTo": ".kilo/commands/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description"
+            ],
+            "drop": [
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".kilo/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".kilo/kilo.json",
+          "schema": "kilo-mcp",
+          "format": "json",
+          "merge": true,
+          "legacyTargets": [
+            ".kilocode/mcp.json"
+          ]
+        }
+      }
+    },
+    {
+      "file": "kimi.yaml",
+      "tool": "kimi",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".kimi-code/"
+        },
+        {
+          "exists": ".kimi/"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".kimi-code/rules-1c/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".kimi-code/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "tools",
+              "modelHint",
+              "isSubagent"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "allowParallel",
+              "reasoningEffort"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".kimi-code/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".kimi-code/mcp.json",
+          "schema": "mcpServers",
+          "format": "json"
+        }
+      }
+    },
+    {
+      "file": "koda.yaml",
+      "tool": "koda",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".kodacli/"
+        },
+        {
+          "exists": ".koda/"
+        },
+        {
+          "exists": "KODA.md"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".koda/rules/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".koda/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description"
+            ],
+            "drop": [
+              "modelTier",
+              "tools",
+              "isSubagent",
+              "allowParallel",
+              "reasoningEffort"
+            ]
+          }
+        },
+        "commands": {
+          "copyTo": ".koda/commands/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description"
+            ],
+            "drop": [
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".koda/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "target": ".kodacli/mcp-setup.md",
+          "format": "koda-mcp-commands"
+        }
+      }
+    },
+    {
+      "file": "opencode.yaml",
+      "tool": "opencode",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".opencode/"
+        },
+        {
+          "exists": "opencode.json"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".opencode/rules/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".opencode/agent/{name}.md",
+          "frontmatter": {
+            "toolsToPermission": {
+              "source": "tools",
+              "grant": "allow",
+              "deny": "deny",
+              "map": {
+                "Read": "read",
+                "Write": "edit",
+                "Edit": "edit",
+                "Grep": "grep",
+                "Glob": "glob",
+                "Shell": "bash"
+              }
+            },
+            "keep": [
+              "name",
+              "description",
+              "modelHint",
+              "permission"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "addIf": {
+              "isSubagent": {
+                "mode": "subagent"
+              },
+              "!isSubagent": {
+                "mode": "primary"
+              }
+            }
+          }
+        },
+        "commands": {
+          "copyTo": ".opencode/command/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description"
+            ],
+            "drop": [
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".claude/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": "opencode.json",
+          "schema": "mcp[id]={ type: 'remote', url, enabled: true } | { type: 'local', command: [...], enabled: true }",
+          "format": "json",
+          "merge": true,
+          "legacyTargets": [
+            ".opencode/opencode.json"
+          ],
+          "keyNormalization": "leading-1c-to-onec"
+        }
+      }
+    },
+    {
+      "file": "other.yaml",
+      "tool": "other",
+      "schemaVersion": 1,
+      "detection": [],
+      "sections": {
+        "rules": {
+          "copyTo": ".ai-agent/rules/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".ai-agent/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "tools",
+              "modelHint",
+              "isSubagent"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "allowParallel",
+              "reasoningEffort"
+            ]
+          }
+        },
+        "commands": {
+          "copyTo": ".ai-agent/commands/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".ai-agent/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".ai-agent/mcp.json",
+          "schema": "mcpServers",
+          "format": "json"
+        }
+      }
+    },
+    {
+      "file": "pi.yaml",
+      "tool": "pi",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".pi/"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".pi/rules-1c/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "commands": {
+          "copyTo": ".pi/prompts/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description"
+            ],
+            "drop": [
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".pi/skills/{name}/",
+          "mode": "verbatim"
+        }
+      }
+    },
+    {
+      "file": "qwen.yaml",
+      "tool": "qwen",
+      "schemaVersion": 1,
+      "detection": [
+        {
+          "exists": ".qwen/"
+        },
+        {
+          "exists": "QWEN.md"
+        }
+      ],
+      "sections": {
+        "rules": {
+          "copyTo": ".qwen/rules-1c/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description",
+              "alwaysApply"
+            ],
+            "drop": [
+              "globs",
+              "category"
+            ]
+          }
+        },
+        "agents": {
+          "copyTo": ".qwen/agents/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "name",
+              "description",
+              "tools",
+              "modelHint",
+              "isSubagent"
+            ],
+            "rename": {
+              "modelHint": "model"
+            },
+            "drop": [
+              "allowParallel",
+              "reasoningEffort"
+            ]
+          }
+        },
+        "commands": {
+          "copyTo": ".qwen/commands/{name}.md",
+          "frontmatter": {
+            "keep": [
+              "description"
+            ],
+            "drop": [
+              "argumentHint",
+              "allowedTools"
+            ]
+          }
+        },
+        "skills": {
+          "copyTo": ".qwen/skills/{name}/",
+          "mode": "verbatim"
+        },
+        "mcp": {
+          "source": "content/mcp-servers.json",
+          "target": ".qwen/settings.json",
+          "schema": "qwen-mcp",
+          "format": "json",
+          "merge": true,
+          "mergeKey": "mcpServers"
+        }
+      }
+    }
+  ],
+  "mcp_servers": {
+    "servers": [
+      {
+        "id": "1c-code-metadata-mcp",
+        "description": "1C metadata search, code navigation, forms inspection, XSD schemas and validation",
+        "transport": "http",
+        "url": "http://localhost:8000/mcp",
+        "connectionId": "1c_metadata_service_001",
+        "required": false
+      },
+      {
+        "id": "1c-syntax-checker-mcp",
+        "description": "BSL syntax validation via BSL Language Server",
+        "transport": "http",
+        "url": "http://localhost:8002/mcp",
+        "connectionId": "1c_lsp_service_001",
+        "required": false
+      },
+      {
+        "id": "1C-docs-mcp",
+        "description": "1C platform documentation search (docsearch, docinfo)",
+        "transport": "http",
+        "url": "http://localhost:8003/mcp",
+        "connectionId": "1c_docs_service_001",
+        "required": false
+      },
+      {
+        "id": "1c-templates-mcp",
+        "description": "Code templates library and implementation examples search",
+        "transport": "http",
+        "url": "http://localhost:8004/mcp",
+        "connectionId": "1c_templates_service_001",
+        "required": false
+      },
+      {
+        "id": "1c-graph-metadata-mcp",
+        "description": "Graph-based metadata queries and impact analysis (Neo4j / Cypher)",
+        "transport": "http",
+        "url": "http://localhost:8006/mcp",
+        "connectionId": "1c_graph_metadata_service_001",
+        "required": false
+      },
+      {
+        "id": "1c-code-check-mcp",
+        "description": "1C code review and quality checking (1С:Напарник) — check_1c_code, review_1c_code, ITS docs",
+        "transport": "http",
+        "url": "http://localhost:8007/mcp",
+        "connectionId": "1c_code_check_service_001",
+        "required": false
+      },
+      {
+        "id": "1c-ssl-mcp",
+        "description": "Standard Subsystems Library (БСП / SSL) function search",
+        "transport": "http",
+        "url": "http://localhost:8008/mcp",
+        "connectionId": "1c_ssl_service_001",
+        "required": false
+      },
+      {
+        "id": "1c-data-mcp",
+        "description": "1C data management and analysis (HTTP service published on the infobase; URL is derived from INFOBASE_PUBLISH_URL in .dev.env by the installer). The endpoint MUST be reachable without a password — configure anonymous access in default.vrd (technical user with empty password), otherwise the MCP client receives HTTP 401/403 and the tools do not appear.",
+        "transport": "http",
+        "url": "{INFOBASE_PUBLISH_URL}/hs/mcp",
+        "connectionId": "1c_data_mcp_001",
+        "required": false
+      }
+    ]
+  },
+  "openspec": {
+    "project_md": "# Project Context\n\n> This file is normally generated by the `1c-rules` installer from real 1C metadata.\n> Keep the sections below as a stable fallback when the project has no exported\n> `Configuration.xml` / `ConfigurationExtension.xml` yet.\n\n## Configuration\n\n- Name: unknown\n- Synonym: unknown\n- Vendor: unknown\n- Version: unknown\n- CompatibilityMode: unknown\n- Form mode: unknown\n- Project kind: unknown\n\n## Standard Subsystems Library\n\n- BSP/SSL detected: unknown\n- Version: unknown\n\n## Top-Level Subsystems\n\n- unknown\n\n## Metadata Counts\n\n- Catalogs: unknown\n- Documents: unknown\n- Information registers: unknown\n- Accumulation registers: unknown\n- Accounting registers: unknown\n- Calculation registers: unknown\n- Common modules: unknown\n- Reports: unknown\n- Data processors: unknown\n\n## Notes for AI Agents\n\n- Treat `.dev.env` as the source of truth for operational parameters:\n  platform path, infobase connection, web publication URL, prefix, developer,\n  modification comments, and placement policy for new objects.\n- If this file still contains `unknown` values and the task depends on project\n  metadata or platform version, inspect real metadata first or ask the user.\n",
+    "specs": [
+      "openspec/specs/README.md",
+      "openspec/specs/external-review/spec.md",
+      "openspec/specs/subagent-model-routing/spec.md"
+    ],
+    "changes_archive": [
+      "openspec/changes/archive/2026-06-29-multi-client-routing/design.md",
+      "openspec/changes/archive/2026-06-29-multi-client-routing/proposal.md",
+      "openspec/changes/archive/2026-06-29-multi-client-routing/tasks.md",
+      "openspec/changes/archive/2026-06-29-multi-client-routing/specs/external-review/spec.md",
+      "openspec/changes/archive/2026-06-29-multi-client-routing/specs/subagent-model-routing/spec.md"
+    ]
+  },
+  "fork_todo": {
+    "headings": [
+      "## После мержа upstream (2026-07-27, upstream `5ae333e`)",
+      "## После мержа upstream (2026-06-27, upstream `a421cf4`)",
+      "## После мержа upstream «версия 4» (2026-05-25, upstream `5b246bc`)"
+    ],
+    "subheadings": [
+      "### 11. Отложено после мержа `5ae333e`",
+      "### 12. ✅ РЕШЕНО (2026-07-27): `scripts/install.sh` поддерживает codex",
+      "### 13. ✅ РЕШЕНО (2026-07-29): `scripts/install.sh` поддерживает kimi",
+      "### 14. ✅ РЕШЕНО (2026-07-29): OpenSpec `schema: proposal` + pwsh для скилла",
+      "### 7. ✅ ЗАКРЫТО (2026-07-20): ярус `reasoning` упразднён — принята upstream-схема",
+      "### 8. Удалён скилл `transcribe` (форк)",
+      "### 9. Per-client модели субагентов + автоматический внешний критик (форк)",
+      "### 10. Merge upstream 7266528 (2026-07-20): принятое и отложенное",
+      "### 5. ✅ РЕШЕНО (2026-06-27): `scripts/install.sh` реализует `toolsToPermission`",
+      "### 6. ✅ РЕШЕНО (2026-06-27): `scripts/install.sh` подставляет модель по `modelTier`",
+      "### 0. ✅ РЕШЕНО (2026-05-26): OpenCode adapter — формат `tools`",
+      "### 1. ✅ РЕШЕНО (2026-05-26): миграция форк-команд на `.dev.env`",
+      "### 2. ✅ РЕШЕНО (2026-05-26): Linux-адаптация команд upstream",
+      "### 3. ✅ РЕШЕНО (2026-05-26): `install.sh` обрабатывает `1c-data-mcp`",
+      "### 4. `scripts/install.sh` — покрытие новых tools/файлов"
+    ]
+  },
+  "agents_md": {
+    "sections": [
+      "## Persona",
+      "## Core Principles",
+      "## Active model adaptation",
+      "## Development Procedure",
+      "## Project info",
+      "## MCP Tool Calling",
+      "## Coding Standards",
+      "## Skills and Subagents",
+      "## Project memory",
+      "## Rules self-improvement (`/evolve` + `LLM-RULES.md`)",
+      "## Editing discipline",
+      "## Development standards",
+      "## Model adaptation",
+      "## Subagents",
+      "## Forms",
+      "## Tooling",
+      "## Workflow and integrations",
+      "## Metadata",
+      "## Quality"
+    ],
+    "subsections": [
+      "### Triage: Quick-fix vs Docs-fix vs Spec-authoring vs Full-cycle",
+      "### 1. Think Before Coding — Clarify Scope First",
+      "### 2. Simplicity First — Minimal Code Only",
+      "### 3. Surgical Changes — Locate the Exact Insertion Point",
+      "### 4. Goal-Driven Verification — Double-Check Everything",
+      "### 5. Deliver Clearly",
+      "### Path convention — source vs. installed copies",
+      "### Infobase deployment (Linux + 1CFilesConverter — fork)",
+      "### Koda CLI — MCP setup",
+      "### A. Priority and obligation",
+      "### B. Limits and non-determinism",
+      "### C. Call discipline (no duplication)",
+      "### Supplementary skills (load on demand)"
+    ],
+    "rule_references": [
+      "anti-patterns",
+      "coding-standards",
+      "dev-standards-env",
+      "mcp-first-search",
+      "model-adaptation",
+      "model-fable5",
+      "model-gpt56",
+      "model-opus5",
+      "model-sonnet5",
+      "orchestrator-economy",
+      "sdd-integrations",
+      "subagent-pipeline",
+      "subagents",
+      "tooling-playbooks",
+      "verification-policy"
+    ],
+    "additional_rules": [
+      {
+        "name": "coding-standards",
+        "cue_line": "- **coding-standards** — index of code-style detail files; load before writing or reviewing code."
+      },
+      {
+        "name": "dev-standards-core",
+        "cue_line": "- **dev-standards-core** — compatibility router for the focused development-standard rules below; load only when following a legacy reference."
+      },
+      {
+        "name": "dev-standards-env",
+        "cue_line": "- **dev-standards-env** — `.dev.env`, infobase / deployment, UI testing, subagent models, orchestration, and process-tuning parameters; load only when the curre"
+      },
+      {
+        "name": "dev-standards-code-style",
+        "cue_line": "- **dev-standards-code-style** — BSL formatting, quality limits, forbidden constructs, naming, public API documentation, typography, comments, and internal revi"
+      },
+      {
+        "name": "dev-standards-change-markers",
+        "cue_line": "- **dev-standards-change-markers** — typical-code modification markers, metadata naming, and object-type selection; load when modifying typical code or creating"
+      },
+      {
+        "name": "dev-standards-architecture",
+        "cue_line": "- **dev-standards-architecture** — architecture patterns, extensions, platform standards, code smells; load for architectural decisions or cross-module review."
+      },
+      {
+        "name": "module-structure",
+        "cue_line": "- **module-structure** — canonical region templates per module type; load before creating or restructuring a module."
+      },
+      {
+        "name": "extension-patterns",
+        "cue_line": "- **extension-patterns** — CFE interceptors, `ПродолжитьВызов`, change markers, adopted-object constraints; load for extension code."
+      },
+      {
+        "name": "dcs-design",
+        "cue_line": "- **dcs-design** — СКД report design; load when designing or reviewing a DCS-based report."
+      },
+      {
+        "name": "dcs-advanced-composition",
+        "cue_line": "- **dcs-advanced-composition** — two-pass СКД preprocessing (filtering detail records before roll-up) and direct query execution instead of the DCS engine; load"
+      },
+      {
+        "name": "bsp-access-rights",
+        "cue_line": "- **bsp-access-rights** — programmatic БСП access-group profiles (`Роли.Роль` is a reference; extension roles) and the right / role / RLS check API; load when c"
+      },
+      {
+        "name": "registers-design",
+        "cue_line": "- **registers-design** — register design (dimensions, resources, periodicity, indexing, posting); load when creating or restructuring a register."
+      },
+      {
+        "name": "query-design",
+        "cue_line": "- **query-design** — router for query work; load first for any non-trivial query."
+      },
+      {
+        "name": "logging-strategy",
+        "cue_line": "- **logging-strategy** — when / what / how to log, severity, category naming, secrets / PII bans; load when adding logging for integrations, background jobs, or"
+      },
+      {
+        "name": "locks-and-transactions",
+        "cue_line": "- **locks-and-transactions** — managed locks, transaction boundaries, deadlock prevention; load for posting / multi-document operations, lock conflicts, or exte"
+      },
+      {
+        "name": "model-adaptation",
+        "cue_line": "- **model-adaptation** — router of the active-model layer: `AGENT_MODEL` resolution, accepted spellings, what a profile may / may not change, and the model-agno"
+      },
+      {
+        "name": "model-opus5",
+        "cue_line": "- **model-opus5** / **model-sonnet5** / **model-fable5** / **model-gpt56** — behaviour profiles for Claude Opus 5, Claude Sonnet 5, Claude Fable 5 (Mythos 5) an"
+      },
+      {
+        "name": "subagents",
+        "cue_line": "- **subagents** — subagent catalog, delegation rules, common obligations, model-tier routing, task templates; load when a task may be worth delegating."
+      },
+      {
+        "name": "subagent-pipeline",
+        "cue_line": "- **subagent-pipeline** — full-cycle pipeline (planner → developer → spec-compliance review → optional user-requested code review → verification gate); load for"
+      },
+      {
+        "name": "orchestrator-economy",
+        "cue_line": "- **orchestrator-economy** — economy mode (`ORCHESTRATION=economy` in `.dev.env`, toggled by `/economymode`; a user phrase overrides for the session): parent de"
+      },
+      {
+        "name": "forms",
+        "cue_line": "- **forms** — router for all managed-form work; load first for any form task."
+      },
+      {
+        "name": "forms-add",
+        "cue_line": "- **forms-add** — creating or significantly altering a form (`Form.xml` + module) plus form-presentation rules."
+      },
+      {
+        "name": "form-patterns",
+        "cue_line": "- **form-patterns** — layout archetypes, naming conventions, advanced ERP patterns; load when designing a layout from scratch or when placement is unspecified."
+      },
+      {
+        "name": "form-module",
+        "cue_line": "- **form-module** — form-module code: event-handler wiring, reserved property names; load when editing form-module logic or adding event handlers."
+      },
+      {
+        "name": "async-methods",
+        "cue_line": "- **async-methods** — `Асинх` / `Ждать` / `Обещание` (8.3.18+); load for client-side async code."
+      },
+      {
+        "name": "tooling-playbooks",
+        "cue_line": "- **tooling-playbooks** — step-by-step MCP playbooks per task type; load at the start of a matching task; for any refactoring — before touching the first line."
+      },
+      {
+        "name": "mcp-first-search",
+        "cue_line": "- **mcp-first-search** — MCP-first search discipline (graph → code-metadata → `grep=true` retry → `Grep`) with a mandatory \"what was tried\" note; covers all nat"
+      },
+      {
+        "name": "ui-testing-tools",
+        "cue_line": "- **ui-testing-tools** — preferred browser / desktop automation for UI tests (`agent-browser` → built-in browser MCP → `Windows-MCP` last resort); **mandatory p"
+      },
+      {
+        "name": "web-client-driving",
+        "cue_line": "- **web-client-driving** — how the 1C web client behaves under a driver (snapshot reading, lists / trees / grids, reports, dialogs, anti-loop limits); load afte"
+      },
+      {
+        "name": "getconfigfiles",
+        "cue_line": "- **getconfigfiles** — extracting configuration objects (metadata) from an infobase into the repo."
+      },
+      {
+        "name": "integrations-add",
+        "cue_line": "- **integrations-add** — code integrating 1C with another system (HTTP services, REST, message queues)."
+      },
+      {
+        "name": "sdd-integrations",
+        "cue_line": "- **sdd-integrations** — OpenSpec guidelines; load whenever reading or updating files under `openspec/`."
+      },
+      {
+        "name": "metadata-xml-workarounds",
+        "cue_line": "- **metadata-xml-workarounds** — recurring metadata / form XML pitfalls; load when authoring or fixing metadata XML by hand outside the `1c-metadata-manage` ski"
+      },
+      {
+        "name": "anti-patterns",
+        "cue_line": "- **anti-patterns** — 1C anti-pattern catalog, performance guidelines, review scoring; load for code review, performance investigation, or anti-pattern check."
+      },
+      {
+        "name": "verification-checklist",
+        "cue_line": "- **verification-checklist** — compatibility router for verification policy, hard gates, and delivery checks; load only when following a legacy reference or whe"
+      },
+      {
+        "name": "verification-policy",
+        "cue_line": "- **verification-policy** — `VERIFICATION_DEPTH`, quick-fix eligibility, promotion triggers, and the quick-fix gate; load during triage."
+      },
+      {
+        "name": "verification-gates",
+        "cue_line": "- **verification-gates** — evidence reuse plus syntax, logic, style, impact, and metadata XML gates; load before validating BSL / metadata changes."
+      },
+      {
+        "name": "verification-delivery",
+        "cue_line": "- **verification-delivery** — reproduction, plan adherence, optional review / UI test, delivery report, and verification anti-patterns; load after applicable ha"
+      },
+      {
+        "name": "external-review",
+        "cue_line": "- **external-review** — automatic external critic (Codex) at the verification gate for non-trivial code: trigger, per-client detection, graceful fallback to `1c"
+      },
+      {
+        "name": "systematic-debugging",
+        "cue_line": "- **systematic-debugging** — 4-phase debugging methodology for 1C, with a fast path for directly evidenced root causes (`DEBUG_FAST_PATH` in `.dev.env`); load f"
+      },
+      {
+        "name": "platform-solutions",
+        "cue_line": "- **platform-solutions** — case book of platform pitfalls and proven fix templates; load when working on a matching topic."
+      }
+    ]
+  },
+  "dev_env": {
+    "sections": [
+      "Раздел 1. Параметры генерации кода (всегда обязательны для задач генерации)",
+      "Section 1. Code-generation parameters (mandatory for code-generation tasks)",
+      "Раздел 2. Параметры подключения к информационной базе (для команд и тестов)",
+      "Section 2. Infobase connection parameters (for commands and tests)",
+      "Раздел 3. Модель головного агента, модели субагентов и режим оркестрации",
+      "Section 3. Parent-agent model, subagent models and orchestration mode",
+      "Раздел 4. Параметры процесса разработки (триаж и отладка)",
+      "Section 4. Development-process parameters (triage and debugging)",
+      "Раздел 5. Linux + 1CFilesConverter (ТОЛЬКО форк mavlenkov/ai_rules_1c)",
+      "Section 5. Linux + 1CFilesConverter (FORK-ONLY: mavlenkov/ai_rules_1c)"
+    ],
+    "lines": 56730
+  },
+  "workflow": "name: validate-rules\n\n# Structural validation of the ruleset: frontmatter against the adapter schemas,\n# cross-reference and Markdown-link resolution, section anchors, and the\n# always-on byte budget of AGENTS.md. See tools/validate-rules.ps1.\n#\n# Runs on Windows: the validator builds a few paths with backslash separators and\n# the project is Windows-first anyway (install.ps1, the skill tool scripts).\n\non:\n  push:\n    branches: [main]\n  pull_request:\n  workflow_dispatch:\n\njobs:\n  validate:\n    runs-on: windows-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      # Windows PowerShell 5.1 — the interpreter the validator is tested against\n      # locally and the one install.ps1 targets.\n      - name: Validate ruleset structure\n        shell: powershell\n        run: .\\tools\\validate-rules.ps1\n",
+  "scripts": {
+    "install_sh_lines": 773,
+    "tools": [
+      {
+        "file": "koda-mcp-setup.ps1",
+        "lines": 54,
+        "bytes": 1618
+      },
+      {
+        "file": "refresh-openspec-bundle.ps1",
+        "lines": 216,
+        "bytes": 7440
+      },
+      {
+        "file": "validate-rules.ps1",
+        "lines": 445,
+        "bytes": 20396
+      }
+    ]
+  },
+  "bundle": {
+    "tools": [
+      "claude-code",
+      "codex",
+      "cursor",
+      "kilocode",
+      "kimi",
+      "opencode"
+    ],
+    "version": "1.4.1",
+    "files_per_tool": {
+      "claude-code": 16,
+      "codex": 10,
+      "cursor": 15,
+      "kilocode": 15,
+      "kimi": 10,
+      "opencode": 15
+    }
+  },
+  "data_quality_findings": [
+    {
+      "type": "frontmatter-parse-error",
+      "file": "content/commands/extensions.md",
+      "detail": "mapping values are not allowed here\n  in \"<unicode string>\", line 1, column 40:\n     ... tion: Операции с расширениями 1С: загрузка, выгрузка, сборка CFE ... \n                                         ^"
+    },
+    {
+      "type": "command-without-description",
+      "file": "content/commands/extensions.md"
+    }
+  ],
+  "root_files": [
+    {
+      "path": "AGENT-INSTALL.md",
+      "bytes": 55040,
+      "lines": 313,
+      "body_lines": 313,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 59466,
+      "lines": 329,
+      "body_lines": 329,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "CLAUDE.md",
+      "bytes": 9494,
+      "lines": 76,
+      "body_lines": 76,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "FORK-TODO.md",
+      "bytes": 28977,
+      "lines": 347,
+      "body_lines": 347,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "LLM-RULES.md",
+      "bytes": 320,
+      "lines": 9,
+      "body_lines": 9,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "README.md",
+      "bytes": 57022,
+      "lines": 279,
+      "body_lines": 279,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "References.md",
+      "bytes": 3052,
+      "lines": 30,
+      "body_lines": 30,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "USER-RULES.md",
+      "bytes": 125,
+      "lines": 6,
+      "body_lines": 6,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "install.ps1",
+      "bytes": 234885,
+      "lines": 5161,
+      "body_lines": 5161,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    },
+    {
+      "path": "memory.md",
+      "bytes": 1397,
+      "lines": 26,
+      "body_lines": 26,
+      "frontmatter": {},
+      "frontmatter_parse_error": null
+    }
+  ]
+}
