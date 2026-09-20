@@ -1,0 +1,58 @@
+# Adapter: Koda CLI (@kodadev/koda-cli)
+#
+# Describes how to copy and adapt files from content/ for Koda CLI.
+# Read by both installation channels (AI-agent installer and install.ps1).
+#
+# Schema: closed adapter schema described in AGENT-INSTALL.md (Lean placement)
+# and implemented by install.ps1.
+# Notes:
+#   - Koda loads project context from root KODA.md by default. A minimal stub
+#     points it to the shared root AGENTS.md.
+#   - Koda discovers project skills from .koda/skills/ (also from
+#     .kodacli/skills/ and .agents/skills/).
+#   - Koda has no project subagent-file format. Markdown role descriptions are
+#     copied under .koda/agents/ only as reference prompts; Koda does not
+#     auto-discover or execute them as subagents.
+#   - On-demand rules and command procedures are reference documents. Koda does
+#     not auto-discover these directories; AGENTS.md points to their paths.
+#   - Project settings live under .kodacli/. MCP servers are registered with
+#     `koda mcp add <name> <url> --transport http --scope project`; the installer
+#     generates a helper document rather than overwriting shared settings.json.
+
+tool: koda
+schemaVersion: 1
+
+detection:
+  - exists: ".kodacli/"
+  - exists: ".koda/"
+  - exists: "KODA.md"
+
+rules:
+  copyTo: ".koda/rules/{name}.md"
+  frontmatter:
+    keep: [description, alwaysApply]
+    drop: [globs, category]
+
+agents:
+  copyTo: ".koda/agents/{name}.md"
+  frontmatter:
+    keep: [name, description]
+    drop: [modelTier, tools, isSubagent, allowParallel, reasoningEffort]
+
+commands:
+  copyTo: ".koda/commands/{name}.md"
+  frontmatter:
+    keep: [description]
+    drop: [argumentHint, allowedTools]
+
+skills:
+  copyTo: ".koda/skills/{name}/"
+  mode: verbatim
+
+mcp:
+  target: ".kodacli/mcp-setup.md"
+  format: koda-mcp-commands
+
+entry:
+  target: "KODA.md"
+  template: "See @AGENTS.md for project instructions."

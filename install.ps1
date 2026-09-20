@@ -129,7 +129,7 @@ $script:DevEnvFileName = '.dev.env'
 $script:DevEnvExampleName = '.dev.env.example'
 $script:UseEdtKey = 'USE_EDT'
 $script:SupportKeys = @('SUPPORT_KEY', 'SUPPORT_EMAIL', 'SUPPORT_API_URL')
-$script:SupportedTools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'pi', 'other')
+$script:SupportedTools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'koda', 'pi', 'other')
 $script:ManagedBlocks = @('core', 'user-defined', 'openspec')
 $script:LastChannel = 'powershell'
 $script:Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -1164,6 +1164,37 @@ function New-McpConfig-Codex {
     return ($lines -join "`n")
 }
 
+# Koda MCP: generate project-scoped registration commands without overwriting
+# the shared .kodacli/settings.json file.
+function New-McpConfig-Koda {
+    param([array]$Servers)
+    $lines = @(
+        '# Koda MCP Setup',
+        '',
+        'Run these commands in a shell from the project root:',
+        ''
+    )
+    $count = 0
+    $hasUnresolvedUrl = $false
+    foreach ($s in $Servers) {
+        if (-not $s.url -or $s.transport -ne 'http') { continue }
+        if ($s.url -match '\{[^}]+\}') {
+            $hasUnresolvedUrl = $true
+            continue
+        }
+        $lines += '```bash'
+        $lines += "koda mcp add $($s.id) `"$($s.url)`" --transport http --scope project"
+        $lines += '```'
+        if ($s.description) { $lines += "`n> $($s.description)" }
+        $lines += ''
+        $count++
+    }
+    if ($count -eq 0) { $lines += 'No HTTP MCP servers configured.' }
+    if ($hasUnresolvedUrl) {
+        $lines += 'Regenerate this file after setting INFOBASE_PUBLISH_URL to include 1c-data-mcp.'
+    }
+    return ($lines -join "`n")
+}
 function New-McpConfig {
     param(
         [string]$ToolId,
@@ -1178,6 +1209,7 @@ function New-McpConfig {
         'kilocode' { return (New-McpConfig-Kilocode $Servers) }
         'kimi' { return (New-McpConfig-Other $Servers) }
         'qwen' { return (New-McpConfig-Qwen $Servers) }
+        'koda' { return (New-McpConfig-Koda $Servers) }
         'other' { return (New-McpConfig-Other $Servers) }
         default { throw "Unknown tool id: $ToolId" }
     }
@@ -1271,6 +1303,7 @@ function Get-ToolDetectionSignals {
         'qwen'         = @((Test-Path (Join-Path $Root '.qwen')), (Test-Path (Join-Path $Root 'QWEN.md')))
         'command-code' = @((Test-Path (Join-Path $Root '.commandcode')))
         'cline'        = @((Test-Path (Join-Path $Root '.cline')), (Test-Path (Join-Path $Root '.clinerules')))
+        'koda'         = @((Test-Path (Join-Path $Root '.kodacli')), (Test-Path (Join-Path $Root '.koda')), (Test-Path (Join-Path $Root 'KODA.md')))
         'pi'           = @((Test-Path (Join-Path $Root '.pi')))
         # 'other' is a manual-only fallback — never auto-detected.
         'other'        = @()
@@ -2572,7 +2605,7 @@ function Invoke-PlacePhase {
 # `other` is intentionally last: when combined with any "real" tool the real
 # tool's rules dir wins; `.ai-agent/rules/` becomes canonical only when
 # `other` is the only active tool.
-$script:RulesDirPriority = @('cursor', 'claude-code', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'opencode', 'codex', 'pi', 'other')
+$script:RulesDirPriority = @('cursor', 'claude-code', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'opencode', 'koda', 'codex', 'pi', 'other')
 
 function Resolve-CanonicalRulesLayout {
     # Returns @{ Dir = <path>; Ext = <ext-without-dot> } for the highest-priority
@@ -5179,6 +5212,7 @@ function Invoke-Remove {
             'kimi'          { $toolPrefixes = @('.kimi-code/', '.kimi/') }
             'qwen'          { $toolPrefixes = @('.qwen/', 'QWEN.md') }
             'cline'         { $toolPrefixes = @('.cline/', '.clinerules/') }
+            'koda'          { $toolPrefixes = @('.koda/', '.kodacli/', 'KODA.md') }
             'pi'            { $toolPrefixes = @('.pi/') }
             'cursor'        { $toolPrefixes = @('.cursor/') }
             'other'         { $toolPrefixes = @('.ai-agent/') }
@@ -5284,6 +5318,7 @@ function Invoke-Remove {
                 'claude-code'  { $cleanupDirs += '.claude' }
                 'qwen'         { $cleanupDirs += '.qwen' }
                 'cline'        { $cleanupDirs += '.cline'; $cleanupDirs += '.clinerules' }
+                'koda'         { $cleanupDirs += '.koda'; $cleanupDirs += '.kodacli' }
                 'pi'           { $cleanupDirs += '.pi' }
                 default        { $cleanupDirs += ".$t" }
             }
