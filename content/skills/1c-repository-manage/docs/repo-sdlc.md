@@ -20,9 +20,11 @@ status ─→ lock(-Revised) ─→ [standard cycle: mutate → verify → updat
 |---|---|
 | `/update1cbase` (sources → IB, `/UpdateDBCfg`) | Loading changed objects into a repository-bound IB requires those objects **locked first**; otherwise the load fails or silently skips read-only objects. Lock before running; a "configuration is read-only / object locked" error in its log routes here, not to a retry loop. |
 | `/loadfrom1cbase`, `/getconfigfiles` (IB → sources) | Read-only with respect to the repository — no locks needed. |
-| `1c-metadata-manage` mutating tools | Same gate: the XML they edit corresponds to configuration objects that must be locked before the change lands in the IB. The mutation itself stays in that skill; this skill owns only the lock/commit envelope. |
+| `1c-metadata-manage` mutating tools | Same gate: the XML they edit corresponds to configuration objects that must be locked before the change lands in the IB. The mutation itself stays in that skill; this skill owns only the lock/commit envelope. Wrapper `-Preview` is not a repository step (`METADATA_PREVIEW`, default `auto`). |
 | `/build-release` | Prefer `dump -Version <N>` from the repository (fixed, team-visible version) over the local working copy when the release must match what the team committed. |
 | `/deploy-and-test` | Deploy steps inherit the `/update1cbase` rule above; test steps are unaffected. |
+
+**The lock list comes from the plan, not from a preview.** Lock every object the plan names, including the owner object of a form, layout, rights or module being changed. A wrapper `-Preview` is not a repository step; never hold locks across a write-then-rollback pause (`content/skills/1c-metadata-manage/docs/edit-preview.md → When preview runs`).
 
 ## Conflict and divergence handling
 

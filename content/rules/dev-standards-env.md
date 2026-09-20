@@ -6,9 +6,9 @@ category: development
 
 # Development Standards — Environment and Process Parameters
 
-**When to load this file:** only when the current task depends on a project parameter, infobase / deployment operation, EDT integration (`USE_EDT`), UI testing, subagent routing, the active-model profile (`AGENT_MODEL`), quick-fix limit, debugging mode, verification depth, the `caveman` communication-style toggle, or the support channel (`SUPPORT_KEY` / `SUPPORT_EMAIL`). Do not load it for a code-style-only question.
+**When to load this file:** only when the current task depends on a project parameter, infobase / deployment operation, EDT integration (`USE_EDT`), UI testing, subagent routing, the active-model profile (`AGENT_MODEL`), quick-fix limit, debugging mode, verification depth, metadata-tool preview (`METADATA_PREVIEW`), the `caveman` communication-style toggle, or the support channel (`SUPPORT_KEY` / `SUPPORT_EMAIL`). Do not load it for a code-style-only question.
 
-Section number 1 is preserved from the former monolithic `dev-standards-core.md` for stable references.
+Section number 1 is a stable anchor for `§1` references.
 
 ## 1. Project Parameters (.dev.env)
 
@@ -32,7 +32,7 @@ No field in `.dev.env` blocks the entire ruleset. **Every parameter is task-scop
 | `{PREFIX}` | Prefix for ALL new metadata objects, attributes, form elements, roles | Advisory | No prefix on new objects; `{PREFIX}` in templates → empty string |
 | `{COMPANY}` | Used in modification comment templates | Advisory | No modification markers emitted |
 | `{DEVELOPER}` | Used in modification comment templates | Advisory | No modification markers emitted |
-| `{PLATFORM_VERSION}` | Determines available platform features (e.g. `Асинх` / `Ждать` from 8.3.18 vs `ОписаниеОповещения` callbacks for older versions). See `dev-standards-architecture.md §3 → "Async and Modality"` | Highly desirable when generating platform-version-sensitive code | Ask only when the current task actually depends on version-specific behavior; otherwise proceed |
+| `{PLATFORM_VERSION}` | Determines available platform features (e.g. `Асинх` / `Ждать` from 8.3.18 vs `ОписаниеОповещения` callbacks for older versions). See `standards(name="dev-standards-architecture") §3 → "Async and Modality"` | Highly desirable when generating platform-version-sensitive code | Ask only when the current task actually depends on version-specific behavior; otherwise proceed |
 | `{COMMENT_OPEN}` / `{COMMENT_CLOSE}` | Modification comment templates with `{COMPANY}`, `{DEVELOPER}`, `{DATE}`, `{TASK}` placeholders | Highly desirable when markers are emitted | If `COMPANY` / `DEVELOPER` are also empty — markers are not emitted anyway; otherwise ask once |
 | `{NEW_OBJECTS_IN}` | Where to place new objects: `main_configuration` or `extension` | Defaulted | Defaults to `main_configuration` |
 
@@ -63,6 +63,7 @@ Used by `/loadfrom1cbase`, `/update1cbase`, `/getconfigfiles`, `/deploy-and-test
 | `{RELEASE_PATH}` | Output directory for `/build-release` artifacts (`.cf` / `.cfe` / `.cfu`) | Defaulted | Empty = the `release` directory at the repository root |
 | `{LOG_PATH}` | Designer log file (must be writable) | Defaulted | Empty = `$env:TEMP\1cv8.log` (Windows) / `$TMPDIR/1cv8.log` (POSIX). The directory always exists; any writable path works equally well — **never ask up front**. Re-ask only if the resolved path turns out to be non-writable at runtime. |
 | `{MCP_HOST}` | Hostname or IP of managed MCP servers rendered from `content/mcp-servers.json`; no scheme, port, or path | Defaulted | Empty = `localhost`; preserve the project value during rules updates |
+| `{RESULT_PATH}` | `/DumpResult` file of every Designer batch launch — the numeric verdict (`0` = success) read next to the exit code and the `/Out` log (`designer-batch-checks.md → The verdict is three signals`) | Defaulted | Empty = `$env:TEMP\1cv8.result` (Windows) / `$TMPDIR/1cv8.result` (POSIX). Deleted before each launch; a missing file after a launch is a failed launch — **never ask** |
 | `{INFOBASE_PUBLISH_URL}` | Web-publish URL of the test infobase for `1c-tester` UI tests | **Highly desirable** for UI testing | Empty = UI tests are silently skipped, the rest of `/deploy-and-test` still runs; only ask if the user explicitly requested UI tests |
 | `{UI_TESTING}` | Web UI-testing mode for `1c-tester` / `/deploy-and-test` Step 4: `manual` \| `auto` \| `off` | Defaulted | Empty = `manual` (see the classification below) |
 | `{IBCMD_CONFIG}` | Path to standalone-server `config.yml` for `ibcmd`-based ops | Defaulted | Empty = fallback to Designer (per `.dev.env.example`) |
@@ -105,7 +106,7 @@ Two behaviours are **not** configurable and apply in both modes:
 
 The parameter only chooses a place for a **new** entry; it never reorders objects already registered.
 
-> **`.dev.env` is the single source of truth for the skill's scripts too.** The `1c-metadata-manage` tools are vendored from upstream `cc-1c-skills`, which natively reads its own `.v8-project.json`. They are patched locally to read `.dev.env` **first** — `PLATFORM_PATH`, `PLATFORM_ARGS`, `IBCMD_ARGS`, `SUPPORT_GUARD`, `NEW_OBJECT_POSITION` — so a project never maintains a second config file. `.v8-project.json` remains supported only as a fallback for projects that deliberately keep the upstream multi-base registry.
+> **`.dev.env` is the single source of truth for the skill's scripts too.** The `1c-metadata-manage` tools are vendored from upstream `cc-1c-skills`, which natively reads its own `.v8-project.json`. They are patched locally to read `.dev.env` **first** — `PLATFORM_PATH`, `PLATFORM_ARGS`, `IBCMD_ARGS`, `SUPPORT_GUARD`, `NEW_OBJECT_POSITION` — so a project never maintains a second config file. `.v8-project.json` remains supported only as a fallback for projects that deliberately keep the upstream multi-base registry. The second local patch is the batch verdict: every Designer launch of the skill (`db-dump-*`, `db-load-*`, `db-update`, `epf-build`, `epf-dump`) passes `/DumpResult` beside `/Out` and fails the run when the result is non-zero or the file was never written, so a batch command that fails while `1cv8` exits 0 is not reported as success (`designer-batch-checks.md → The verdict is three signals`).
 
 #### `UI_TESTING` — web UI-testing mode
 
@@ -140,7 +141,7 @@ Consumed by the **installer** when rendering subagent files (source agents decla
 |---|---|---|---|
 | `{SUBAGENT_MODEL_CODING}` | Concrete model for tier `coding` (code / metadata authorship, architecture design: `1c-developer`, `1c-metadata-manager`, `1c-architect`, `1c-performance-optimizer`, `1c-refactoring`) | Defaulted | Empty = the model field is omitted from installed agent files; the AI client uses its default model. **Never ask at task time**; re-render via `install.ps1 update` after editing. |
 | `{SUBAGENT_MODEL_ANALYSIS}` | Concrete model for tier `analysis` (planning / analysis / review / testing / docs: `1c-planner`, `1c-analytic`, `1c-arch-reviewer`, `1c-code-reviewer`, `1c-doc-writer`, `1c-tester`) | Defaulted | Same as above. Legacy 2-tier `.dev.env` files with no `SUBAGENT_MODEL_ANALYSIS` key fall back to `SUBAGENT_MODEL_CODING` for this tier. |
-| `{SUBAGENT_MODEL_LIGHT}` | Concrete model for tier `light` (small bounded tasks: repo scouting, search, quick error fixes, mechanical checks: `1c-explorer`, `1c-error-fixer`) | Defaulted | Same as above |
+| `{SUBAGENT_MODEL_LIGHT}` | Concrete model for tier `light` (small bounded read-only tasks: repo scouting, search, impact lists, mechanical checks: `1c-explorer`) | Defaulted | Same as above |
 | `{SUBAGENT_MODEL_<TIER>__<TOOL>}` | Per-client override of a tier for one AI client (suffix `__<TOOL>`: `__OPENCODE`, `__CLAUDE_CODE`, `__CURSOR`, `__KILOCODE`) | Defaulted | Empty = fall back to the bare-tier value. |
 
 **Per-client resolution (fork).** Model names are client-specific (Claude Code / Cursor: short aliases like `sonnet`; OpenCode / Kilo Code: `provider/model`, e.g. `zai-coding-plan/glm-5.2`). The installer resolves each tier per target client by cascade `SUBAGENT_MODEL_<TIER>__<TOOL>` → `SUBAGENT_MODEL_<TIER>` → empty; for `provider/model` clients it skips a name without `/` and prints a WARNING. Tier semantics are billing-relative — per-token (Claude Code) = cost × capability; flat plan (OpenCode / Z.AI Coding Plan) = capability × latency (tiers may collapse to one model). See `content/rules/subagents.md → Model-tier routing` and `.dev.env.example`.
@@ -153,10 +154,11 @@ Selects the behaviour profile applied to the model that actually executes this r
 
 | Value | Meaning |
 |---|---|
-| `opus5` | Claude Opus 5 → `model-opus5.md` (shorter reports, less narration, no self-invented extra verification, damped subagent spawning, keep thinking on) |
-| `sonnet5` | Claude Sonnet 5 → `model-sonnet5.md` (literal instruction following — state scope explicitly, effort calibration, adaptive thinking stays on for tool use, coverage-first review briefs) |
-| `fable5` | Claude Fable 5 / Mythos 5 → `model-fable5.md` (act instead of overplanning, evidence-audited progress claims, stated boundaries and checkpoints, no self-narrated reasoning, parallel subagents, memory-first) |
+| `opus5` | Claude Opus 5 → `model-opus5.md` (shorter reports, less narration, no self-invented extra verification, damped subagent spawning, keep thinking on, lean context and described interfaces over examples) |
+| `sonnet5` | Claude Sonnet 5 → `model-sonnet5.md` (literal instruction following — state scope explicitly, described interfaces over examples, effort calibration, adaptive thinking stays on for tool use, coverage-first review briefs, lean context) |
+| `fable5` | Claude Fable 5 / Mythos 5 → `model-fable5.md` (act instead of overplanning, lean context and described interfaces over examples, evidence-audited progress claims, stated boundaries and checkpoints, no self-narrated reasoning, parallel subagents, memory-first) |
 | `gpt56` | GPT-5.6 → `model-gpt56.md` (lean context — each instruction once, reasoning-effort and verbosity calibration, autonomy boundaries, intent-level briefs) |
+| `gpt6` | GPT-6 Astra → `model-gpt6.md` (explicit completion criteria, follow-through within authorization, precise skill selection and progressive disclosure, concise prose, bounded delegation and verification) |
 | *empty / other* | No profile. The base ruleset is complete on its own; a model without a profile never borrows a neighbouring one. |
 
 **Boundary:** a profile tunes initiative and communication only (report length, narration cadence, planning depth, delegation eagerness, self-invented extra passes) and can never weaken a hard gate — metadata / infobase tooling gates, MCP-first search, the platform-capability check, `templatesearch` / `recall` and the memory gates, the validator chain and its budget, triage, `CONFUSION`, or the delivery report. Precedence and the model-agnostic prompting baseline — `model-adaptation.md → §4`, `§5`.
@@ -172,15 +174,16 @@ Controls how eagerly the parent agent delegates execution to subagents. It is **
 
 ### Process-tuning parameters
 
-Consumed by the triage and debugging rules at task time. Both are **Defaulted** — empty / missing / invalid resolves to the documented default; the agent **must not** ask for the values.
+Consumed by the triage and debugging rules at task time. All are **Defaulted** — empty / missing / invalid resolves to the documented default; the agent **must not** ask for the values.
 
 | Parameter | Effect | Class | Behavior when empty |
 |---|---|---|---|
 | `{QUICKFIX_MAX_LINES}` | Line budget of the quick-fix path (`AGENTS.md → Triage`): the maximum changed BSL lines for which a one-logical-change-in-one-module edit may stay quick-fix. Promotion triggers (`verification-policy.md → Triage details`) always win over the budget. | Defaulted | Empty / invalid = `40`. Raise for teams comfortable with larger direct edits; lower for stricter projects. |
-| `{DEBUG_FAST_PATH}` | Debugging fast-path mode (`systematic-debugging.md → Fast path`): `standard` \| `extended` \| `off`. Controls when a directly evidenced bug may skip the full 4-phase loop. | Defaulted | Empty / invalid = `standard` |
+| `{DEBUG_FAST_PATH}` | Debugging fast-path mode (`standards(name="systematic-debugging") → Fast path`): `standard` \| `extended` \| `off`. Controls when a directly evidenced bug may skip the full 4-phase loop. | Defaulted | Empty / invalid = `standard` |
 | `{VERIFICATION_DEPTH}` | Static code-verification depth (`verification-policy.md → "Verification depth levels"`): `full` \| `standard` \| `lite`. Tunes the depth of Gates 1–3 for low-risk edits. Toggled by `/litemode`. | Defaulted | Empty / invalid = `standard` |
-| `{CAVEMAN}` | caveman communication-style auto-activation (`content/skills/caveman/SKILL.md`): `on` \| `auto` \| `off`. Controls whether the terse style turns on automatically and for which tasks. Does not affect the mandatory report structure or verification. | Defaulted | Empty / invalid = `on` |
-| `{AGENT_MODEL}` | Active-model behaviour profile of the parent agent (`model-adaptation.md`): `opus5` \| `sonnet5` \| `fable5` \| `gpt56`. Tunes verbosity, narration, planning depth, delegation eagerness and self-invented extra passes; never weakens a hard gate. Toggled by `/rulesmodel`. Full description — `#### AGENT_MODEL` above. | Defaulted | Empty / unrecognised = no profile; the base model-neutral ruleset applies |
+| `{CAVEMAN}` | caveman communication-style auto-activation (`content/skills/caveman/SKILL.md`): `on` \| `auto` \| `off`. Controls whether the terse style turns on automatically and for which tasks. Does not affect the mandatory report structure or verification. | Defaulted | Empty / invalid = `auto` |
+| `{METADATA_PREVIEW}` | When wrapper `-Preview` on `Invoke-1CEdit.ps1` runs before a metadata write: `auto` \| `on` \| `off`. Toggled by `/previewmode`. Does not relax native `-DryRun` / `-Force` on deletions. | Defaulted | Empty / invalid = `auto` — preview only for DSL generation and an operation new to the project |
+| `{AGENT_MODEL}` | Active-model behaviour profile of the parent agent (`model-adaptation.md`): `opus5` \| `sonnet5` \| `fable5` \| `gpt56` \| `gpt6`. Tunes verbosity, narration, planning depth, delegation eagerness and self-invented extra passes; never weakens a hard gate. Toggled by `/rulesmodel`. Full description — `#### AGENT_MODEL` above. | Defaulted | Empty / unrecognised = no profile; the base model-neutral ruleset applies |
 
 #### `VERIFICATION_DEPTH` — static code-verification depth
 
@@ -188,23 +191,35 @@ Tunes **how deep** the validator chain (`syntaxcheck → check_1c_code → revie
 
 | Value | Meaning |
 |---|---|
-| `full` | All three validators; one clean pass on the latest state is required, with up to 3 calls total after blocking fixes (`AGENTS.md → MCP Tool Calling → B.1`). Always applied to promotion-trigger paths regardless of this setting. |
-| `standard` (default / empty) | All three validators; normally one clean pass, with exactly one mandatory confirmation after a blocking fix (2 calls total, no open-ended retry loop). |
-| `lite` | Low-risk edits: `syntaxcheck` stays mandatory, `check_1c_code` / `review_1c_code` run only for high-risk changes (promotion triggers) or on explicit request. |
+| `full` | All three validators on every change; up to 3 calls total per validator after blocking fixes. Always applied to promotion-trigger paths regardless of this setting. |
+| `standard` (default / empty) | Full-cycle: all three validators. Quick-fix-eligible edit: `syntaxcheck` + `check_1c_code`; `review_1c_code` on a promotion trigger or explicit request. One mandatory confirmation after a blocking fix (2 calls total). |
+| `lite` | Full-cycle: `syntaxcheck` + `check_1c_code`. Quick-fix-eligible edit: `syntaxcheck` only. `review_1c_code` on a promotion trigger or explicit request. |
 
 **Safety floor:** `syntaxcheck` is always run at every level, and any change on a promotion-trigger path (transactions, public `Экспорт` contracts, wired metadata, RLS, subscriptions / scheduled jobs — `verification-policy.md → Triage details`) always runs the full chain regardless of the level. `lite` / `standard` lighten only the checks already applied to low-risk edits; they do not weaken the control of dangerous paths. Gates 4 (impact) / 5 (XML) are unaffected.
 
 #### `CAVEMAN` — caveman auto-activation
 
-Controls **whether** the terse `caveman` communication style (`content/skills/caveman/SKILL.md`) turns on **automatically** and for **which** tasks. It is **Defaulted** — empty / invalid resolves to `on`, and the agent **must not** ask for the value. It affects only presentation: model selection, the five-step development procedure, verification depth, and the mandatory report structure are all unchanged.
+Controls **whether** the terse `caveman` communication style (`content/skills/caveman/SKILL.md`) turns on **automatically** and for **which** tasks. It is **Defaulted** — empty / invalid resolves to `auto`, and the agent **must not** ask for the value. It affects only presentation: model selection, the five-step development procedure, verification depth, and the mandatory report structure are all unchanged.
 
 | Value | Meaning |
 |---|---|
-| `on` (default / empty) | `caveman` is active for **all** tasks — development and analysis / review / documentation alike. Only the skill's safety switches apply (code, error text, destructive / security / ordered blocks stay in normal grammar). |
-| `auto` | The skill auto-classifies by task type: on for development (writing / editing / refactoring code, debugging, deploy, shell), off for analysis / review / documentation. |
+| `auto` (default / empty) | The skill auto-classifies by task type: on for development (writing / editing / refactoring code, debugging, deploy, shell), off for analysis / review / documentation — where readable prose is the deliverable. |
+| `on` | `caveman` is active for **all** tasks — development and analysis / review / documentation alike. Only the skill's safety switches apply (code, error text, destructive / security / ordered blocks stay in normal grammar). |
 | `off` | Automatic activation is disabled — `caveman` never turns on by itself on any task. It can still be enabled by an explicit in-session force ("caveman please"), which holds until session end. |
 
 **Precedence:** an explicit session force always wins over `CAVEMAN`; otherwise the `CAVEMAN` value applies (`on` → all tasks, `auto` → by task type, `off` → no auto-on). The persistent value is edited by the `/caveman on|auto|off` command (`content/commands/caveman.md`); session-only force uses the phrases "caveman please" / "stop caveman" or a `/caveman lite|full|ultra` level switch.
+
+#### `METADATA_PREVIEW` — wrapper dry-run before a metadata write
+
+Controls **when** `Invoke-1CEdit.ps1 -Preview` (run the tool, show a unified diff, restore the tree) precedes the same call without `-Preview`. It is **Defaulted** — empty / invalid resolves to `auto`, and the agent **must not** ask for the value. The canonical editor is the `/previewmode` slash command (`on` / `auto` / `off`, plus `once` for a single session-scoped preview).
+
+| Value | Meaning |
+|---|---|
+| `auto` (default / empty) | Preview only where the write's shape is unpredictable: generation from a DSL (`form-compile`, `meta-compile`, `role-compile`, `skd-edit` batches) and a tool or `-Operation` not yet run in this project. Everything else applies immediately. |
+| `on` | Preview before every wrapper-driven write. |
+| `off` | Only on an explicit user request (`/previewmode once`). |
+
+The wrapper previews its own script writes only; host-made edits and BSL rewrite proposals never pass through it, a dirty tree applies with a note, deletions keep native `-DryRun` / `-Force`, and no mode turns preview into a verification gate. Canon — `content/skills/1c-metadata-manage/docs/edit-preview.md → When preview runs`.
 
 Task number `{TASK}` is **only required when modification comment markers are produced** — i.e. when the change touches **typical (standard) configuration code** and the templates `{COMMENT_OPEN}` / `{COMMENT_CLOSE}` reference `{TASK}`. For new objects with `{PREFIX}` (no per-method markers), review / analysis / documentation tasks, and any task where `COMPANY` / `DEVELOPER` are empty (markers skipped) — `{TASK}` is **not required**. Do not block on it.
 
