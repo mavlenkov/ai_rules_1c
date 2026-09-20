@@ -1,6 +1,6 @@
 ---
 description: Load current repository files into the infobase defined in .dev.env and update the DB structure (Linux + Windows)
-argumentHint: "[all]"
+argumentHint: "[full|partial|git|all]"
 ---
 
 # /update1cbase — load repository into an infobase
@@ -10,6 +10,17 @@ Load the configuration (`/LoadConfigFromFiles`) from the current repository dire
 This command does not run tests and does not publish the infobase. Use `/deploy-and-test` to run tests after loading.
 
 This command is **cross-platform** (Linux-first in this fork). Platform paths, the `ibcmd` check and the command syntax differ between Linux and Windows — both are given below.
+
+Read `content/rules/getconfigfiles.md → Configuration file synchronization contract`. A partial load is a first-class branch of this update procedure: **load → checks → database apply → requested directory refresh**. Do not stop after importing files or merely offer the database update when the user has already requested it.
+
+## Select load scope
+
+- `full` / `all`: load a verified complete snapshot. A selected-object dump or a delta directory is not a full-load source.
+- `partial`: load the task's exact file selection and required dependencies using `-files` or `-listFile`. Never pass the metadata-name list `repoobjects.txt` as the load list.
+- `git`: use `db-load-git -DryRun` from `content/skills/1c-metadata-manage/docs/db-manage.md` to inspect the selected diff (`All`, `Staged`, `Unstaged` or `Commit`). Resolve deletions / renames and confirm the plan covers the requested change before loading. An empty plan ends as a no-op; it does not become a full load.
+- No explicit mode: use the already established task scope. A known bounded set of changed files can use `partial`; a requested complete deployment uses `full`. If completeness or removal semantics are uncertain, resolve the scope before modifying the infobase.
+
+Partial loads target the main configuration or **one named extension per pass**. Do not combine partial selection with `all` / platform `-AllExtensions`. Keep repository locks, support rules, validation and retry handling at the same strength as a full load. For a partial Designer load, add one selector fragment after `/LoadConfigFromFiles '{EXPORT_PATH}'` in the same launch — `-listFile '<validated UTF-8 file list>' -Format Hierarchical` or `-files "CommonModules/…/Ext/Module.bsl" -Format Hierarchical` (`Plain` for a flat dump) — and keep `-updateConfigDumpInfo` in both full and partial loads.
 
 ## Step 0. Check `.dev.env` parameters
 
@@ -31,8 +42,11 @@ Used `.dev.env` keys:
 | `EXTENSIONS_PATH` | Root of extension sources for the `all` mode: `{EXTENSIONS_PATH}\<Name>\` (empty = `cfe` at the repository root) |
 | `LOG_PATH` | Designer log file; empty resolves to `$env:TEMP\1cv8.log` (Windows) / `$TMPDIR/1cv8.log` (POSIX). Do not ask up front — re-ask only if the resolved path turns out to be non-writable |
 | `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`; empty = Designer fallback |
+| `RESULT_PATH` | Designer batch-result file (`/DumpResult`); delete a stale file before every launch |
 | `CONVERTER_PATH` | 1CFilesConverter path (fork Section 5); set = converter path available |
 | `REPOSITORY_PATH` | Configuration repository address (empty = not repository-bound, no extra steps) |
+
+**Dev/test gate:** this command forcibly terminates sessions while applying the DB configuration (`--session-terminate=force` / `-SessionTerminate force`). The target must be an explicitly identified dev/test infobase. If the current context does not establish that, stop before the apply stage and ask the user to confirm the target — never infer that an arbitrary `.dev.env` points to a test base. On production, drop the forced termination (`--session-terminate=prompt`, or omit `-SessionTerminate`) and agree on an update window with the user.
 
 **EDT gate:** when `.dev.env` `USE_EDT=true`, establish the source format before running. This command loads a **Designer XML dump**; it cannot load an EDT (`src/**/*.mdo`) tree. In an EDT-format project either produce a dump first (`export_configuration_to_xml`) or let EDT apply the change (`update_database`) — and keep **one deployment owner per run**, named in the `IB tooling:` line. Canon — `content/rules/edt-workflow.md → DB update, launches, external objects`.
 
@@ -115,6 +129,19 @@ V8_IB_USER='{IB_USER}' V8_IB_PWD='{IB_PASSWORD}' V8_UPDATE_DB=1 \
 
 For an extension use `ext2ib.sh` with `V8_EXT_NAME={EXTENSION_NAME}`. Continue to **Step 4**.
 
+## Step 2d. Applicability check — mandatory when an extension is loaded
+
+Whenever this run loads an extension (`EXTENSION_NAME` filled, or an extension pass of the full-snapshot mode), run the batch check ladder **between the load and the DB update** — canon `content/rules/designer-batch-checks.md → The check ladder`, verification contract `content/rules/verification-gates.md → Gate 6`:
+
+```bash
+# Linux; on Windows use & '{PLATFORM_PATH}\bin\1cv8.exe' DESIGNER … with backtick continuation
+"{PLATFORM_PATH}/1cv8" DESIGNER /F'{INFOBASE_PATH}' /N'{IB_USER}' /P'{IB_PASSWORD}' \
+    /DisableStartupMessages /CheckModules -ThinClient -Server -ExternalConnection -Extension {EXTENSION_NAME} \
+    /Out '{LOG_PATH}' /DumpResult '{RESULT_PATH}'
+```
+
+then the same launch with `/CheckCanApplyConfigurationExtensions -Extension {EXTENSION_NAME}` in place of `/CheckModules …`. Read the verdict from all three signals (`{RESULT_PATH}` = `0`, exit code, log) after each launch; stop at the first failure and do not apply the configuration. An interceptor pointing at a method the vendor renamed loads without complaint and only fails at apply time — or silently stops intercepting; this check is the only step in the pipeline that names it. `ibcmd` and the converter have no applicability check of their own, so this Designer ladder runs for them too. For the main configuration alone the ladder is optional — run `/CheckConfig` when the change is large (whole-snapshot deploy, release build) or when the Gate 1–3 MCP validators were not exposed in this session.
+
 ## Update retry loop — mandatory failure handling for Steps 2–3
 
 Loading and updating rarely succeed on a dirty state at the first attempt. Handle failures **iteratively**, never by re-running the same command blindly and never by declaring success from the exit code alone.
@@ -143,10 +170,12 @@ Loads the **effective snapshot**: main configuration + every extension from `EXT
 - If `EXTENSION_NAMES` is empty, fall back to the regular single-target run above and note that in the report.
 - **Pass 1 — main configuration:** Steps 2–3 as written, from `{EXPORT_PATH}`, without `-Extension` / `--extension`.
 - **Pass per extension**, in `EXTENSION_NAMES` order: the same Steps 2–3 with `-Extension <Name>` / `--extension=<Name>`, sources from `{EXTENSIONS_PATH}\<Name>\` (`EXTENSIONS_PATH` empty = `cfe` at the repository root).
-- **Every extension pass runs the applicability check between load and update** — `/CheckModules … -Extension <Name>` then `/CheckCanApplyConfigurationExtensions -Extension <Name>`, per `content/rules/designer-batch-checks.md → The check ladder` (verification contract: `verification-gates.md → Gate 6`). A failure stops that pass before `/UpdateDBCfg`; an interceptor whose target method the vendor renamed loads cleanly and fails only at apply time, or silently stops intercepting. This is also what `/restore-testbase` and `/build-release` inherit by calling this procedure.
+- **Every extension pass runs Step 2d between load and update** — `/CheckModules … -Extension <Name>` then `/CheckCanApplyConfigurationExtensions -Extension <Name>`, per `content/rules/designer-batch-checks.md → The check ladder` (verification contract: `verification-gates.md → Gate 6`). A failure stops that pass before `/UpdateDBCfg`; an interceptor whose target method the vendor renamed loads cleanly and fails only at apply time, or silently stops intercepting. This is also what `/restore-testbase` and `/build-release` inherit by calling this procedure.
 - A listed extension whose sources directory is missing or empty breaks the snapshot contract — stop and ask the user (skip it or abort); never skip silently.
 - The **Update retry loop** applies to every pass with its own 3-attempt budget. A pass that exhausts its budget stops the mode; report which passes completed and which failed.
 
 ## Step 4. Final report
 
 Briefly report which infobase was updated, which directory was loaded, which tool was used (1CFilesConverter / `ibcmd` / Designer), how many attempts the retry loop took and what was fixed between them, and whether dynamic update was applied or restructuring was required (visible in the log). In full-snapshot mode, list the passes (main + each extension) with their outcomes. List errors separately.
+
+If the task also requests refreshing the source directory after the update, first complete all required apply stages, then follow `/loadfrom1cbase` with the same targets and appropriate scopes. Do not overwrite local changes or perform an unconditional full return dump. Report the load scope (full / selected files / Git diff), the checks and the apply result separately: a successful load with a failed apply, or a successful apply with a failed return export, remains a partially completed workflow.

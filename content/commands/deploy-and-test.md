@@ -10,6 +10,8 @@ This is a fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). It r
 
 When `EXTENSION_NAMES` is filled and the user asked to deploy the full snapshot ("all" / "with extensions"), deployment runs as multiple passes — main configuration first, then each extension in order — per `/loadfrom1cbase → Full-snapshot mode` logic mirrored by `/update1cbase`; everything else in this command is unchanged.
 
+**Load scope is owned by `/update1cbase → Select load scope`.** For partial / Git deployment, follow that command's complete load → checks → apply sequence, including file-list validation and baseline handling, then continue here at the testing step. Do not execute the full-load examples below as well. A failed load or apply blocks UI tests. A requested return export follows `/loadfrom1cbase` after apply with the same target and scope guards (`content/rules/getconfigfiles.md → Configuration file synchronization contract`).
+
 ## Step 0. Settings (`.dev.env`)
 
 `.dev.env` lives at the project root and is created by the 1c-rules installer. If it is missing, ask the user to run `install.ps1 init` / `scripts/install.sh` or to copy `.dev.env.example` to `.dev.env`.
@@ -32,6 +34,7 @@ Read from `.dev.env`:
 | `INFOBASE_PUBLISH_URL` | Web-publish URL for UI tests; empty = skip UI tests |
 | `UI_TESTING` | Web UI-testing mode: `manual` (empty = default) / `auto` / `off` — governs whether Step 4 runs (see Step 4) |
 | `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
+| `RESULT_PATH` | Designer batch-result file (`/DumpResult`); delete a stale file before every launch |
 | **fork Section 5** | `CONVERTER_PATH`, `CONVERT_TOOL`, `IBCMD_TOOL`, `DB_SRV_*`, `REMOTE_*` — see `.dev.env.example` |
 
 Critical deploy fields are `INFOBASE_PATH` and `PLATFORM_PATH`. If either is empty, ask the user and write the value to `.dev.env`. **Do not** ask about `IB_USER` / `IB_PASSWORD` / `LOG_PATH` when they are empty; apply the documented defaults silently. If the project requires 1CFilesConverter (Mode 1), `CONVERTER_PATH` is also critical.
@@ -275,7 +278,7 @@ Server infobase (option B — explicit connection string, recommended):
 <V8_PATH> DESIGNER /IBConnectionString 'Srvr="servername";Ref="basename";' /DisableStartupMessages /N UserName /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
 ```
 
-Read `<LOG_PATH>` to confirm success.
+Add `/DumpResult '{RESULT_PATH}'` next to `/Out` in every Designer launch and read the verdict from all three signals (`{RESULT_PATH}` = `0`, exit code, log). Keep `-updateConfigDumpInfo` on `/LoadConfigFromFiles` so the version baseline stays usable for a later incremental dump.
 
 ---
 
@@ -288,7 +291,7 @@ Whenever this run loads an extension (`EXTENSION_NAME` filled, or a full-snapsho
 /CheckCanApplyConfigurationExtensions -Extension {EXTENSION_NAME}
 ```
 
-Stop at the first failure and do not proceed to the DB update. An interceptor pointing at a method the vendor renamed loads without complaint and only fails at apply time — or, worse, silently stops intercepting; the applicability check is the only thing in this pipeline that names it. Read the verdict from all three signals (exit code, `/DumpResult`, `/Out`), classifying success phrases before error stems.
+Canonical procedure — `/update1cbase → Step 2d` (`content/commands/update1cbase.md`); it applies to the `ibcmd` and converter paths as well. Stop at the first failure and do not proceed to the DB update. An interceptor pointing at a method the vendor renamed loads without complaint and only fails at apply time — or, worse, silently stops intercepting; the applicability check is the only thing in this pipeline that names it. Read the verdict from all three signals (exit code, `/DumpResult`, `/Out`), classifying success phrases before error stems.
 
 For the main configuration alone the ladder is optional — run `/CheckConfig` when the change is large (whole-snapshot deploy, release build) or when the Gate 1–3 MCP validators were not exposed in this session.
 

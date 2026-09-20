@@ -12,6 +12,8 @@ All paths and identifiers come from `.dev.env`. Only `INFOBASE_PATH` and `PLATFO
 
 - The `ibcmd` path requires both `{PLATFORM_PATH}/bin/ibcmd` (Linux) or `{PLATFORM_PATH}\bin\ibcmd.exe` (Windows) and a filled `IBCMD_CONFIG`; clustered server infobases always use Designer.
 - **EDT projects** (`.dev.env` `USE_EDT=true`): this command exports a Designer XML dump. If the working tree is an EDT (`src/**/*.mdo`) workspace, export to a separate directory and never mix the two trees — canon `content/rules/edt-workflow.md`.
+- Build `repoobjects.txt` from verified metadata names in the selected export tool's notation, one per line. Remove empty entries and duplicates; an empty selection must not trigger a full dump. Include separate development objects only when needed.
+- `/loadfrom1cbase partial` delegates its selected-object refresh here and retains the dirty-directory guard. After editing, `/update1cbase partial` loads a separate list of **file paths**, runs checks, then updates the database. Never reuse `repoobjects.txt` as the load list; follow the rule's synchronization contract.
 
 | Key | Purpose |
 |---|---|
