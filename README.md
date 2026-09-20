@@ -8,7 +8,7 @@
 
 Каталог — этот репозиторий. Плагин вызывает `install.ps1` и не копирует `content/rules` в always-on правила хоста.
 
-**Cursor** — Dashboard → Plugins → import `https://github.com/comol/ai_rules_1c`, затем плагин `1c-rules`.
+**Cursor** — Dashboard → Plugins → import `https://github.com/mavlenkov/ai_rules_1c`, затем плагин `1c-rules`.
 
 **Claude Code**
 
@@ -24,7 +24,7 @@ codex plugin marketplace add mavlenkov/ai_rules_1c --ref main
 codex plugin add 1c-rules@1c-rules
 ```
 
-В приложении Codex: Plugins → Add More → `https://github.com/comol/ai_rules_1c.git`.
+В приложении Codex: Plugins → Add More → `https://github.com/mavlenkov/ai_rules_1c.git`.
 
 **OpenCode**
 
