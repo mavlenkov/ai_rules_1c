@@ -69,7 +69,7 @@ Report changes, every modified file, checks and real limitations. For non-trivia
 - Read root `USER-RULES.md`, `memory.md` and, when present, `LLM-RULES.md`. Precedence: `USER-RULES.md`/`memory.md` → `LLM-RULES.md` → this file and on-demand rules. Missing optional `LLM-RULES.md`/`openspec/project.md` is valid. If a required rule is unreachable, report the gap and stop dependent work; continue only independent work.
 - **Language:** agent rules and `content/` prose are English; BSL identifiers/comments/literals, metadata synonyms and user-facing strings are Russian. Replies and human-facing top-level docs are Russian. The target configuration uses BSL.
 - Monthly maintenance: on the session's first non-trivial task, inspect `.ai-rules.json` `lastUpdatesCheckAt` (fallback `updatedAt`/`installedAt`). Missing or older than 30 days → `content/rules/support-feedback.md §4`; read-only `/checkupdates` once at the end, never auto-update tools/rules.
-- Fork routing: `SUBAGENT_MODEL_<TIER>__<TOOL>` overrides the bare tier for one client (`__OPENCODE`, `__CLAUDE_CODE`, etc.). Claude Code / Cursor accept aliases; OpenCode / Kilo require `provider/model` and skip invalid bare names with a warning. Linux deployment commands also read fork Section 5 (`CONVERTER_*`, `DB_SRV_*`, `REMOTE_*`).
+- Fork extras (Linux/1CFilesConverter deployment, per-client model routing, Koda CLI) — `content/rules/fork-linux-deploy.md`.
 
 ### Path convention — source vs. installed copies
 
@@ -77,21 +77,11 @@ Report changes, every modified file, checks and real limitations. For non-trivia
 
 `standards(name="<name>")` denotes a routed standard retrieved **only through 1C-docs-mcp**. Disk routers hold headings, not normative bodies. No GitHub/raw URL or local-copy runtime fallback; follow `content/rules/help-corpus-retrieval.md` for paging and unavailable standards.
 
-### Infobase deployment (Linux + 1CFilesConverter — fork)
-
-> Fork-specific (`mavlenkov/ai_rules_1c`). Commands `deploy-and-test`, `extensions`, `dataprocessors`, and `getconfigfiles` use `.dev.env` Section 5 and prefer 1CFilesConverter (`conf2ib.sh` / `ext2ib.sh`), with direct Designer as fallback. Their command files are the canonical executable procedures.
-
-Linux connection strings are `/F<path>` and `/S<server:port\base>` with no space after the flag. Detect extensions only by `<ConfigurationExtensionPurpose>` in `Configuration.xml`; `<ConfigurationExtensionCompatibilityMode>` is not a marker. For MSSQL server infobases on Linux, the converter may proxy `ibcmd` through the configured `REMOTE_*` SSH host. Never reconstruct these flows from memory — follow the matching command and `.dev.env.example`.
-
 # Tooling & Standards
 
 ## MCP Tool Calling
 
 Before selecting 1C MCP tools, load `content/rules/mcp-policy.md` (obligations, server answers → actions) and the router `content/skills/mcp-1c-tools/SKILL.md`, then the operation skill it names (`1c-code-search`, `1c-meta-info`, `1c-impact`, `1c-form-inspect`, `1c-validate`, `1c-platform-help`, `1c-templates-memory`, `1c-live-ib`) for exact argument names and calls. Availability means tools exposed in this session, not client configuration. Stable obligation references follow.
-
-### Koda CLI — MCP setup
-
-Koda stores project settings under `.kodacli/`. Register servers with `koda mcp add <name> <url> --transport http --scope project`; after installing 1c-rules for Koda, use the generated commands in `.kodacli/mcp-setup.md`. For `1c-data-mcp`, set `INFOBASE_PUBLISH_URL` before generating or running the command.
 
 ### A. Priority and obligation
 
@@ -169,7 +159,7 @@ Rule names below resolve to `content/rules/<name>.md`; load only matching trigge
 
 Additional domain standards, retrieved by MCP name: architecture → `dev-standards-architecture`; BSL style → `dev-standards-code-style`; extensions → `extension-patterns`; СКД → `dcs-design` (advanced two-pass work → `dcs-advanced-composition`); rights → `bsp-access-rights`; registers → `registers-design`; logging → `logging-strategy`; transactions/locks → `locks-and-transactions`; review/performance → `anti-patterns`; bugs/regressions → `systematic-debugging`; platform pitfalls → `platform-solutions`. Form layout/async companions come from `forms`.
 
-Fork addition: `external-review` — the automatic external critic (Codex, `1c-code-reviewer` fallback) at the verification gate for non-trivial code.
+Fork additions: `fork-linux-deploy` (see above); `external-review` — the automatic external critic (Codex, `1c-code-reviewer` fallback) at the verification gate for non-trivial code.
 
 # Spec-driven development workspace
 

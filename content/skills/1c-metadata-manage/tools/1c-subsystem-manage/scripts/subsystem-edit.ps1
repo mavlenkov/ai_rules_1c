@@ -696,7 +696,7 @@ if (-not $NoValidate) {
 	if (Test-Path $validateScript) {
 		Write-Host ""
 		Write-Host "--- Running subsystem-validate ---"
-		& powershell.exe -NoProfile -File $validateScript -SubsystemPath $resolvedPath
+		& ((Get-Process -Id $PID).Path) -NoProfile -File $validateScript -SubsystemPath $resolvedPath
 	}
 }
 
