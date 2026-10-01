@@ -148,7 +148,7 @@ After success, report:
 
 - Web client URL: `http://localhost:<Port>/<AppName>`.
 - OData: `http://localhost:<Port>/<AppName>/odata/standard.odata`.
-- HTTP services: `http://localhost:<Port>/<AppName>/hs/<RootUrl>/...`.
+- HTTP services: `http://localhost:<Port>/<AppName>/hs/<RootUrl>/...` — the configuration's and its extensions' (`publishExtensionsByDefault` in `default.vrd`).
 - Web services: `http://localhost:<Port>/<AppName>/ws/<Name>?wsdl`.
 
 ---

@@ -22,6 +22,10 @@ No script files were brought into `tools/` — the operations are pure module-te
 
 ## cf-manage.md
 
+### Local fix `2026-10-01` — sibling validators are found
+
+The auto-validation of `cf-edit`, `interface-edit`, `subsystem-compile` and `subsystem-edit` looked for the validator at upstream's `..\..\<validator>\scripts\` path, which does not exist in this layout, so it was skipped silently; `xdto-edit` looked for `xdto-decompile` / `xdto-compile` / `xdto-validate` the same way and refused every structural operation. All five now take the sibling script from their own `scripts` directory.
+
 ### Upstream sync `2026-07-30`
 
 Scripts refreshed from [Nikolay-Shirokov/cc-1c-skills](https://github.com/Nikolay-Shirokov/cc-1c-skills): `cf-edit` v1.4 → **v1.11**, `cf-info` v1.2 → **v1.4**, `cf-init` v1.2 → **v1.3**, `cf-validate` v1.3 → **v1.4**.
@@ -53,6 +57,10 @@ The PowerShell scripts under `tools/1c-cf-manage/scripts/` were refreshed from [
 - Platform 8.5 support — new compatibility-mode and interface-mode values plus the new XML header format. (Same upgrade in `cfe-validate`, `epf-validate`, `skd-validate`.)
 
 ## cfe-manage.md
+
+### Local fix `2026-10-01` — `BaseForm` keeps multi-line texts
+
+`cfe-borrow` shifted every line of the borrowed `AutoCommandBar` / `ChildItems` one tab deeper for `BaseForm`, including the continuation line of a multi-line `v8:content`, so the copy of the base form no longer matched the configuration (support ticket bc42b89c). Only line breaks between two tags are indentation now; the texts keep their bytes.
 
 ### Recent Additions (upstream sync `2026-07-30`)
 
@@ -123,6 +131,10 @@ The PowerShell script `tools/1c-epf-validate/scripts/epf-validate.ps1` was refre
 - The same script handles `erf-validate` — upstream `erf-validate` is a thin pass-through to `epf-validate.ps1`, the script auto-detects `ExternalReport` vs `ExternalDataProcessor` from the root XML element. No separate `erf-validate.ps1` is shipped.
 
 ## form-manage.md
+
+### Local fix `2026-10-01` — button and command order, command `Representation`
+
+`form-edit` wrote a button's `CommandName` before its `Representation`, a command's `Action` before its `Picture` and a command's picture-and-text `Representation` as `PictureAndText`; the platform refused such a borrowed form with «Исключение XDTO произошло при чтении файла» (support ticket bc42b89c, 8.3.27.2170). Button children now follow the platform order (`Type`, `Visible`, `Representation`, `DefaultButton`, `Enabled`, `CommandName`, `Picture`, `Title`, `LocationInCommandBar`) and command children `Title`, `Shortcut`, `Picture`, `Action`, `Representation`, taken from every `Form.xml` of the ZUP dump; a command's `PictureAndText` is written as `TextPicture` (and a button's `TextPicture` as `PictureAndText`). `form-validate` check 15 reports a `Representation` outside the element's own enumeration. `form-compile` still writes a command's `Action` before `Shortcut` / `Picture` and a button's `Representation` after `CommandName` — not changed here.
 
 ### Local fix `2026-09-25` — vendor-shaped defaults, closed enum values, Form.xml against Module.bsl
 
@@ -369,6 +381,10 @@ The PowerShell scripts under `tools/1c-subsystem-manage/scripts/` were refreshed
 Scripts refreshed from [Nikolay-Shirokov/cc-1c-skills](https://github.com/Nikolay-Shirokov/cc-1c-skills): `template-add` v1.5 → **v1.10**, `template-remove` → **v1.3**. `template-add` enforces the vendor support gate — it refuses to add a template to a locked object of a typical configuration ([support-manage.md](support-manage.md)). `template-remove` keeps the local hardening (preflight parse, atomic root-XML write, `-DryRun` / `-Force`).
 
 ## web-manage.md
+
+### Local fix `2026-10-01` — extension HTTP services are published
+
+`web-publish` (both runtimes) writes `publishExtensionsByDefault="true"` on `httpServices` in `default.vrd`, as the platform's own publication does; without it the HTTP services of the infobase's extensions were not published.
 
 ### Upstream sync `2026-07-30`
 

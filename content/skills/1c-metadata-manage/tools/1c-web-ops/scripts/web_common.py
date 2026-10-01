@@ -208,7 +208,9 @@ def vrd_content(args, name):
                       {"base": "/" + name, "ib": "".join(f'{key}="{value}";' for key, value in parts)})
     ET.SubElement(root, "standardOdata", {"enable": "true"})
     ET.SubElement(root, "ws", {"pointEnableCommon": "true"})
-    ET.SubElement(root, "httpServices", {"publishByDefault": "true"})
+    # Without publishExtensionsByDefault the HTTP services of the infobase's extensions
+    # answer 404; the Designer's own publication writes it too.
+    ET.SubElement(root, "httpServices", {"publishByDefault": "true", "publishExtensionsByDefault": "true"})
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
