@@ -1,339 +1,136 @@
 ---
-description: Развёртывание конфигурации/расширения в ИБ и веб-тестирование (Linux, 1CFilesConverter Mode 1 / Designer Mode 2)
+description: Load the configuration into the test infobase from .dev.env and check the result in the 1C interface — QA MCP first, the web client as fallback
 ---
 
-# /deploy-and-test — deploy to infobase + UI tests
+# /deploy-and-test — deploy to test infobase + UI tests
 
-Deploy the current configuration (or extension) into the infobase defined in `.dev.env`, then run UI tests in the web client at `INFOBASE_PUBLISH_URL`.
+**Linux/converter branch (fork):** load `content/rules/linux-converter.md` when running on Linux or when `CONVERTER_PATH` is configured. It supplies platform paths and converter routing; all source-selection, safety, verification and reporting requirements below remain authoritative.
 
-This is a fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). It reads all parameters from **`.dev.env`** (the single source of truth — see `.dev.env.example`).
 
-When `EXTENSION_NAMES` is filled and the user asked to deploy the full snapshot ("all" / "with extensions"), deployment runs as multiple passes — main configuration first, then each extension in order — per `/loadfrom1cbase → Full-snapshot mode` logic mirrored by `/update1cbase`; everything else in this command is unchanged.
+Deploy the current configuration to the test infobase defined in `.dev.env`, then check the result in the 1C interface: through QA MCP in the thin client when it is connected, otherwise in the web client at `INFOBASE_PUBLISH_URL`. UI testing is gated by `UI_TESTING`; see Step 4.
 
-## Step 0. Settings (`.dev.env`)
+Resolve project, main/named-extension target and source root through `content/rules/extension-workspace.md` before substitution. Keep that target through deployment, applicability checks and scenarios; a single-extension task uses its own root, and does not rewrite the primary `EXTENSION_NAME`. MCP-backed test preparation must use the same verified project/layer; confirm the live test connection is the intended infobase before attributing its results.
 
-`.dev.env` lives at the project root and is created by the 1c-rules installer. If it is missing, ask the user to run `install.ps1 init` / `scripts/install.sh` or to copy `.dev.env.example` to `.dev.env`.
+When the user asks to deploy the full snapshot ("all" / "with extensions"), resolve inventory even if `EXTENSION_NAMES` is empty, then run Steps 2–3 as main followed by each selected extension per `/update1cbase → Full-snapshot mode` (`content/commands/update1cbase.md`). Confirmed no extensions means main only; a stored single-extension default cannot narrow `all`.
 
-If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` (Section 2 + the fork Section 5), preserving already-filled `.dev.env` keys, and delete the legacy file after a successful migration. There is no other location for connection settings.
+**Load scope is owned by `/update1cbase → Select load scope`.** For partial / Git deployment, follow that command's complete load → checks → apply sequence, including file-list validation and baseline handling, then continue here at Step 4. Do not execute the full-load examples below as well. A failed load or apply blocks UI tests. A requested return export follows `/loadfrom1cbase` after apply with the same target and scope guards (`content/rules/getconfigfiles.md → Configuration file synchronization contract`).
 
-Read from `.dev.env`:
+## Step 0. Check `.dev.env` parameters
 
-| Key | Purpose |
-|---|---|
-| `PLATFORM_PATH` | Platform install dir. `V8_VERSION` = `basename(PLATFORM_PATH)`; the executable is `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows) |
-| `INFOBASE_KIND` | `file` or `server` (empty = `file`) |
-| `INFOBASE_PATH` | File path or server connection string (see "Connection string" below) |
-| `IB_USER` / `IB_PASSWORD` | Credentials; empty = no authentication, `/N` / `/P` (or `--user` / `--password`) are omitted. An empty password is a fully valid configuration for dev / test infobases — **do not ask up front**. Re-ask only if the platform itself returns an authentication error. |
-| `EXTENSION_NAME` | Extension name; empty = main configuration |
-| `EXTENSION_NAMES` | Full-snapshot extension list for the full-snapshot deploy — comma-separated, order = load order (empty = single-target mode) |
-| `EXPORT_PATH` | Source directory; empty means repository root |
-| `EXTENSIONS_PATH` | Root of extension sources for the full-snapshot deploy: `{EXTENSIONS_PATH}\<Name>\` (empty = `cfe` at the repository root) |
-| `LOG_PATH` | Designer / converter log file; empty resolves to `$TMPDIR/1cv8.log` (Linux) / `$env:TEMP\1cv8.log` (Windows). **Do not ask up front** — any writable path works equally well. Re-ask only if the resolved path turns out to be non-writable. |
-| `INFOBASE_PUBLISH_URL` | Web-publish URL for UI tests; empty = skip UI tests |
-| `UI_TESTING` | Web UI-testing mode: `manual` (empty = default) / `auto` / `off` — governs whether Step 4 runs (see Step 4) |
-| `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
-| **fork Section 5** | `CONVERTER_PATH`, `CONVERT_TOOL`, `IBCMD_TOOL`, `DB_SRV_*`, `REMOTE_*` — see `.dev.env.example` |
+`.dev.env` is the single source of truth for all parameters (created by the 1c-rules installer at the project root). If it is missing, ask the user to run `install.ps1 init` or copy `.dev.env.example` to `.dev.env`.
 
-Critical deploy fields are `INFOBASE_PATH` and `PLATFORM_PATH`. If either is empty, ask the user and write the value to `.dev.env`. **Do not** ask about `IB_USER` / `IB_PASSWORD` / `LOG_PATH` when they are empty; apply the documented defaults silently. If the project requires 1CFilesConverter (Mode 1), `CONVERTER_PATH` is also critical.
+If the project still has legacy `infobasesettings.md`, migrate values to `.dev.env`, preserving already-filled `.dev.env` keys, and delete the legacy file after successful migration. The ruleset has no other location for connection settings or the web publication URL.
 
-When substituting `.dev.env` values into the templates below: if `LOG_PATH` is empty, replace `{LOG_PATH}` with `"$TMPDIR/1cv8.log"` (Linux) / `"$env:TEMP\1cv8.log"` (Windows; PowerShell expands the env var inside a double-quoted string).
+Parameters, classes and defaults — `content/rules/dev-standards-env.md §1`; Defaulted keys are never asked for. Keys read: `PLATFORM_PATH`, `INFOBASE_PATH` (**blocking** — if either is empty, ask once and write the value to `.dev.env`), `INFOBASE_KIND`, `IB_USER` / `IB_PASSWORD`, `EXTENSION_NAME`, `EXTENSION_NAMES` (full-snapshot deploy), `EXPORT_PATH`, `EXTENSIONS_PATH`, `LOG_PATH`, `RESULT_PATH`, `INFOBASE_PUBLISH_URL`, `UI_TESTING`, `MCP_QA_CLIENT_VISIBLE` and `TOOL_QA` (Step 4), `IBCMD_CONFIG`.
 
-## Connection string (`<IB_CONNECTION>`)
+When substituting `.dev.env` values into the templates below, resolve `{INFOBASE_FLAG}` once from the effective `INFOBASE_KIND` (`/F` for `file`, `/S` for `server`; reject any other value), and substitute resolved `{LOG_PATH}` / `{RESULT_PATH}` values that contain `$env:` double-quoted — single quotes do not expand it. Delete a stale `{RESULT_PATH}` file before every Designer launch.
 
-Build it from `INFOBASE_KIND` + `INFOBASE_PATH`:
+Before running, inherit `/update1cbase`'s source-identity, completeness and selection preflight for every chosen target. A `Configuration.xml` somewhere under `EXPORT_PATH` alone is insufficient, and a partial dump cannot feed a full deployment.
 
-- `file` → `/F<INFOBASE_PATH>` (no space after `/F`, no quotes)
-- `server` → `/S<INFOBASE_PATH>` (e.g. `/Sserver:port\basename` — no space after `/S`, no quotes)
+**EDT gate:** when `.dev.env` `USE_EDT=true`, the same source-format check as `/update1cbase` applies — Steps 2–3 load a Designer XML dump, not an EDT `src/**/*.mdo` tree, and only one deployment owner (this command **or** EDT's `update_database`) may act on the infobase in a run. Canon — `content/rules/edt-workflow.md`.
 
-**EDT gate:** when `.dev.env` `USE_EDT=true`, the same source-format check as `/update1cbase` applies — this command loads a Designer XML dump, not an EDT `src/**/*.mdo` tree, and only one deployment owner (this command **or** EDT's `update_database`) may act on the infobase in a run. Canon — `content/rules/edt-workflow.md`.
+This command uses forced session termination while applying the DB configuration. The target must be an explicitly identified dev/test infobase: `.dev.env` `INFOBASE_ROLE=dev|test` identifies it, `prod` refuses the deploy steps (canon `content/rules/dev-standards-env.md → INFOBASE_ROLE`). If the role is empty and the current context does not establish it, stop before Step 3 and ask the user to confirm the target; never infer that an arbitrary `.dev.env` points to a test base.
 
-This command uses forced session termination while applying the DB configuration. The target must be an explicitly identified dev/test infobase. If the current context does not establish that, stop before the DB update and ask the user to confirm the target; never infer that an arbitrary `.dev.env` points to a test base.
+## Step 1. Choose tool: `ibcmd` or Designer
 
-**WARNING:** A space after `/F` or `/S` produces an invalid connection string. Designer exits with code 0 but fails silently.
+1. Check whether the utility exists: `Test-Path '{PLATFORM_PATH}\bin\ibcmd.exe'`.
+2. Check whether `IBCMD_CONFIG` is filled in `.dev.env`.
+3. If **both conditions are true**, use **Steps 2a and 3a (`ibcmd`)**.
+4. Otherwise use **Steps 2b and 3b (Designer)**.
 
-## Extension detection
+`ibcmd infobase config` does not apply to 1C cluster infobases; for server cluster infobases always use Designer.
 
-**Before loading**, check whether this project is a configuration extension:
+## Step 2a. Load configuration through `ibcmd` (preferred)
 
-1. Look for `Configuration.xml` in the project root.
-2. If it contains `<ConfigurationExtensionPurpose>` → this is an **extension** (NOTE: `<ConfigurationExtensionCompatibilityMode>` is NOT a reliable marker — it exists in all configurations).
-3. Take the extension name from the `<Name>` element of `Configuration.xml`, or from `.dev.env` `EXTENSION_NAME`.
-4. **Notify the user**: "This project is a configuration extension. Extension name: `<ExtName>`. Loading will use `ext2ib.sh` / `-Extension`. Please confirm."
-5. **Wait for confirmation** before proceeding. After confirmation, use extension mode automatically.
-
-If the user declines auto-detection, ask for a manual choice (configuration / extension + name).
-
-## Mode selection
-
-- `CONVERTER_PATH` is set **and** the path contains `scripts/conf2ib.sh` → use **Mode 1: 1CFilesConverter** (recommended).
-- Otherwise → use **Mode 2: Designer fallback**.
-
----
-
-# Mode 1: 1CFilesConverter (recommended)
-
-Use when `CONVERTER_PATH` is configured in `.dev.env`.
-
-## Prerequisites
-
-1) `CONVERTER_PATH` set; verify `{CONVERTER_PATH}/scripts/conf2ib.sh` exists.
-2) Derive `V8_VERSION` = `basename(PLATFORM_PATH)`.
-3) Read `CONVERT_TOOL` (designer/ibcmd), `IB_USER`, `IB_PASSWORD` from `.dev.env`.
-4) Detect OS (for `V8_UPDATE_DB` handling on Windows).
-
-## Parameter mapping (`.dev.env` → converter env vars)
-
-- `INFOBASE_KIND` + `INFOBASE_PATH` → `<ib_connection>` (`/F...` or `/S...`, see above)
-- `basename(PLATFORM_PATH)` → `V8_VERSION`
-- `CONVERT_TOOL` → `V8_CONVERT_TOOL`
-- `IBCMD_TOOL` → `IBCMD_TOOL` (overrides default `/opt/1cv8/x86_64/<version>/ibcmd`)
-- `IB_USER` → `V8_IB_USER`
-- `IB_PASSWORD` → `V8_IB_PWD` (empty string if not set)
-- `EXTENSION_NAME` → `V8_EXT_NAME` (when deploying an extension)
-- `DB_SRV_ADDR` → `V8_DB_SRV_ADDR` (named MSSQL instances like `DBSRVHOST\SQL2019`)
-- `DB_SRV_DBMS` → `V8_DB_SRV_DBMS` (`MSSQLServer` or `PostgreSQL`, for ibcmd + server infobase)
-- `DB_SRV_USR` → `V8_DB_SRV_USR`
-- `DB_SRV_PWD` → `V8_DB_SRV_PWD`
-- `REMOTE_HOST` → `V8_REMOTE_HOST` (SSH host with ibcmd, for MSSQL on Linux)
-- `REMOTE_IBCMD` → `V8_REMOTE_IBCMD` (default `C:\Program Files\1cv8\<version>\bin\ibcmd.exe`)
-- `REMOTE_TEMP` → `V8_REMOTE_TEMP` (default `C:\Temp\1c_conv`)
-
-## Tool selection (ibcmd)
-
-When `CONVERT_TOOL=ibcmd` and server infobase:
-
-```
-OS = Windows → ibcmd locally (any DBMS)
-OS = Linux + DBMS = PostgreSQL → ibcmd locally
-OS = Linux + DBMS = MSSQLServer:
-  REMOTE_HOST set → ibcmd via SSH (remote)
-  REMOTE_HOST not set → ERROR (ibcmd on Linux does not support MSSQL)
-File infobase → ibcmd locally (any OS)
-CONVERT_TOOL=designer → works via cluster, DBMS irrelevant, always local
+```powershell
+& '{PLATFORM_PATH}\bin\ibcmd.exe' infobase config import `
+    --config='{IBCMD_CONFIG}' `
+    --user='{IB_USER}' `
+    --password='{IB_PASSWORD}' `
+    --extension={EXTENSION_NAME} `
+    '{EXPORT_PATH}' *>&1 | Tee-Object -FilePath '{LOG_PATH}'
 ```
 
-Omit `IBCMD_TOOL` if empty (defaults to `/opt/1cv8/x86_64/<version>/ibcmd`).
-Omit `V8_DB_SRV_*` and `V8_REMOTE_*` variables when the corresponding `.dev.env` keys are empty.
+Remove empty optional keys (`--user`, `--password`, `--extension`). On errors, show the relevant log fragment and **do not run** Step 3a.
 
-## Commands
+## Step 3a. Update DB structure through `ibcmd`
 
-**If the project is an extension** (detected above), use `ext2ib.sh` instead of `conf2ib.sh`:
-
-```bash
-cd <project_root>
-V8_VERSION=<version> \
-V8_CONVERT_TOOL=<tool> \
-IBCMD_TOOL=<ibcmd_path> \
-V8_IB_USER=<user> \
-V8_IB_PWD=<pwd> \
-V8_EXT_NAME=<extension_name> \
-  <converter_path>/scripts/ext2ib.sh <project_root> <ib_connection> <extension_name>
+```powershell
+& '{PLATFORM_PATH}\bin\ibcmd.exe' infobase config apply `
+    --config='{IBCMD_CONFIG}' `
+    --user='{IB_USER}' `
+    --password='{IB_PASSWORD}' `
+    --force `
+    --dynamic=auto `
+    --session-terminate=force `
+    --extension={EXTENSION_NAME} *>&1 | Tee-Object -FilePath '{LOG_PATH}'
 ```
 
-**Otherwise (main configuration):**
+`--session-terminate=force` forcibly terminates active sessions. It is allowed only after the dev/test confirmation above. On production, replace it with `--session-terminate=prompt` (or remove the key; default is `auto`) and agree on an update window with the user.
 
-**Linux (with automatic DB update):**
+Read `{LOG_PATH}`. On errors, show the relevant log fragment and **do not run** UI tests. Continue to **Step 4**.
 
-```bash
-cd <project_root>
-V8_VERSION=<version> \
-V8_CONVERT_TOOL=<tool> \
-IBCMD_TOOL=<ibcmd_path> \
-V8_IB_USER=<user> \
-V8_IB_PWD=<pwd> \
-V8_UPDATE_DB=1 \
-  <converter_path>/scripts/conf2ib.sh <project_root> <ib_connection>
+## Step 2b. Load configuration through Designer (fallback)
+
+```powershell
+& '{PLATFORM_PATH}\bin\1cv8.exe' DESIGNER `
+    {INFOBASE_FLAG} '{INFOBASE_PATH}' `
+    /N '{IB_USER}' `
+    /P '{IB_PASSWORD}' `
+    /DisableStartupMessages `
+    /LoadConfigFromFiles '{EXPORT_PATH}' `
+    -updateConfigDumpInfo `
+    -Extension {EXTENSION_NAME} `
+    /Out '{LOG_PATH}' `
+    /DumpResult '{RESULT_PATH}'
 ```
 
-Example (file infobase — `INFOBASE_KIND=file`, `INFOBASE_PATH=/tmp/test_ib`):
-```bash
-V8_VERSION=8.3.27.1859 \
-V8_CONVERT_TOOL=designer \
-V8_IB_USER=Administrator \
-V8_IB_PWD="" \
-V8_UPDATE_DB=1 \
-  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . /F/tmp/test_ib
+Remove empty optional keys (`/N`, `/P`, `-Extension`).
+
+Read the verdict from all three signals (`{RESULT_PATH}` = `0`, exit code, `{LOG_PATH}` containing `Конфигурация успешно загружена` / `Configuration successfully loaded`). Wait 5-10 seconds.
+
+## Step 3b. Update DB structure through Designer
+
+```powershell
+& '{PLATFORM_PATH}\bin\1cv8.exe' DESIGNER `
+    {INFOBASE_FLAG} '{INFOBASE_PATH}' `
+    /N '{IB_USER}' `
+    /P '{IB_PASSWORD}' `
+    /DisableStartupMessages `
+    /UpdateDBCfg -Dynamic+ -SessionTerminate force `
+    -Extension {EXTENSION_NAME} `
+    /Out '{LOG_PATH}' `
+    /DumpResult '{RESULT_PATH}'
 ```
 
-Example (server infobase, designer — `INFOBASE_KIND=server`, `INFOBASE_PATH=dbsrvhost:1541\TestBase`):
-```bash
-V8_VERSION=8.3.27.1859 \
-V8_CONVERT_TOOL=designer \
-V8_IB_USER=Администратор \
-V8_IB_PWD="" \
-V8_UPDATE_DB=1 \
-  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . '/Sdbsrvhost:1541\TestBase'
-```
+`-SessionTerminate force` forcibly terminates active sessions. It is allowed only after the dev/test confirmation above. On production, remove this key and agree on an update window with the user.
 
-Example (server infobase, ibcmd, MSSQL on Linux via remote SSH):
-```bash
-V8_VERSION=8.3.27.1859 \
-V8_CONVERT_TOOL=ibcmd \
-V8_REMOTE_HOST=dbsrvhost \
-V8_DB_SRV_DBMS=MSSQLServer \
-V8_DB_SRV_ADDR='DBSRVHOST\SQL2019' \
-V8_DB_SRV_USR=sa \
-V8_DB_SRV_PWD=secretpwd \
-V8_UPDATE_DB=1 \
-  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . '/Sdbsrvhost/TEST_CONV'
-```
+Read the verdict from all three signals (`{RESULT_PATH}`, exit code, `{LOG_PATH}`). On errors, show the relevant log fragment and **do not run** UI tests.
 
-Example (server infobase, ibcmd, PostgreSQL on Linux — local):
-```bash
-V8_VERSION=8.3.27.1859 \
-V8_CONVERT_TOOL=ibcmd \
-IBCMD_TOOL=~/.local/bin/ibcmd \
-V8_DB_SRV_DBMS=PostgreSQL \
-V8_IB_USER=Администратор \
-V8_IB_PWD="" \
-V8_UPDATE_DB=1 \
-  ~/Проекты/1CFilesConverter/scripts/conf2ib.sh . '/Sdbsrvhost:1541\TestBase'
-```
+## Step 3c. Applicability check — mandatory when an extension is deployed
 
-**Windows (separate DB update):**
+Whenever this run loads an extension (`EXTENSION_NAME` filled, or a full-snapshot pass over `EXTENSION_NAMES`), run `/update1cbase → Step 2c` (`content/commands/update1cbase.md` — the `/CheckModules` → `/CheckCanApplyConfigurationExtensions` ladder with the three-signal verdict) **between the load (Step 2) and the DB update (Step 3)**, in the `ibcmd` path as well. Stop at the first failure and do not run Step 3. For the main configuration alone the ladder is optional — run `/CheckConfig` when the change is large (whole-snapshot deploy, release build) or when the Gate 1–3 MCP validators were not exposed in this session.
 
-```bash
-# Step 1: Load configuration
-V8_VERSION=<version> \
-V8_CONVERT_TOOL=<tool> \
-V8_IB_USER=<user> \
-V8_IB_PWD=<pwd> \
-  <converter_path>/scripts/conf2ib.sh <project_root> <ib_connection>
+## Failure handling for Steps 2–3 — retry loop
 
-# Step 2: Update DB (use Designer directly)
-<V8_PATH> DESIGNER <ib_connection> /DisableStartupMessages /N <user> /P <pwd> /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
-```
+Apply the **Update retry loop** from `/update1cbase` (`content/commands/update1cbase.md → Update retry loop`) verbatim: read `{LOG_PATH}` after every attempt (diagnostics in the log override exit code 0 — classify the platform's success phrases first, `content/rules/designer-batch-checks.md → The success-phrase trap`); on failure terminate the hung / failed Configurator by its own PID only (never blanket-kill `1cv8` processes); fix the logged cause before any retry (re-running unchanged is forbidden); after a failed load restart from Step 2; at most 3 full attempts, then stop and report. UI tests (Step 4) run only after a clean pass.
 
-Read the converter log at `<converter_path>/tmp/v8_designer_output.log` (or the `$V8_TEMP` location) to confirm success.
+## Step 4. UI tests
 
-**Wait 5-10 seconds** between configuration load and testing.
+UI testing is controlled by `UI_TESTING` (values and default — `dev-standards-env.md → "UI_TESTING — UI-testing mode"`). Resolve the effective value and act on it:
 
----
+- **`off`** — skip this step; report the effective policy and point to `/uitests essential`, `/uitests on` or `/uitests manual`. Apply an explicit enable-and-run instruction through `/uitests` before resolving this branch; it needs no second toggle confirmation.
+- **`manual`** — run this step **only if the user explicitly asked to run UI tests** in the current request. Otherwise skip it and finish with: "UI tests skipped: `UI_TESTING=manual` — run only on explicit request."
+- **`essential`** (default) — run automatically, limited to the important new or changed user-visible behaviour of the deployed change; name what was left unchecked.
+- **`auto`** — run every applicable scenario automatically.
 
-# Mode 2: Designer fallback
+Pick the route by `ui-testing-tools.md → Route order`: QA MCP (Step 4a) when its tools are exposed and `TOOL_QA` allows it, else the web client (Steps 4b–4c). If no route is available — no QA MCP and an empty `INFOBASE_PUBLISH_URL` — skip an automatic run and mark affected criteria unverified with this reason. For an explicitly requested UI run, ask for the missing prerequisite and continue independent work; do not claim the tests passed. Policy `off` takes precedence and does not trigger this question.
 
-Use when `CONVERTER_PATH` is empty or invalid.
+### Step 4a. QA MCP in the thin client (main route)
 
-## Environment detection
-**IMPORTANT** Before running commands, detect the environment automatically:
+Load `content/skills/1c-qa-testing/SKILL.md` and `content/rules/qa-testclient.md`. The DB update of Step 3 ended the infobase sessions, so a test client started before it is stale: check `qa-testclient.ps1 status`, close a client you started with `stop`, and start a fresh one for `INFOBASE_PATH` with the window from `MCP_QA_CLIENT_VISIBLE`. Then `qa_start`, run the scenarios by the skill's observe → act → assert loop with a journal, confirm data effects through `1c-data-mcp` where the form does not show them, and stop the client you started. A step QA MCP cannot cover falls back to the web client for that step only.
 
-1) **OS**: run `uname -s` (or check for Windows by the presence of `%PROGRAMFILES%`).
-2) **Platform path**: take it from `.dev.env` `PLATFORM_PATH`; if empty, find the latest installed 1C:Enterprise version.
-
-| OS | Platform executable | Default log path |
-|----|---------------------|------------------|
-| Linux | `{PLATFORM_PATH}/1cv8` (or `/opt/1cv8/x86_64/<version>/1cv8`) | `LOG_PATH` (e.g. `/tmp/1c/update.log`) |
-| Windows | `{PLATFORM_PATH}\bin\1cv8.exe` (or `C:\Program Files\1cv8\<version>\bin\1cv8.exe`) | `LOG_PATH` (e.g. `%TEMP%\1c\update.log`) |
-
-Store the result as `<V8_PATH>` and `<LOG_PATH>`.
-
-## Settings usage
-1) Replace `<V8_PATH>` with the detected platform executable.
-2) Replace `<LOG_PATH>` with `.dev.env` `LOG_PATH`.
-3) Replace `<IB_CONNECTION>` with the connection string built from `INFOBASE_KIND` + `INFOBASE_PATH` (`/F...` or `/S...` — no space after the flag, no quotes).
-4) If `IB_USER` / `IB_PASSWORD` are set, add `/N 'UserName' /P 'Password'` after `/DisableStartupMessages`. Omit `/P` if the password is empty — otherwise Designer consumes the next parameter as the password value.
-5) Replace the test URL with `.dev.env` `INFOBASE_PUBLISH_URL`. If empty — skip testing.
-6) Replace the source path with the current project root (or `.dev.env` `EXPORT_PATH` if set).
-
-## Testing and deployment
-
-**If the project is an extension**, add `-Extension <ExtName>` to the `LoadConfigFromFiles` and `UpdateDBCfg` commands below.
-
-### Step 1 — Load config to base:
-
-File infobase:
-```
-<V8_PATH> DESIGNER /F/path/to/InfoBase /DisableStartupMessages /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
-```
-
-Server infobase (option A — short format):
-```
-<V8_PATH> DESIGNER /Sservername:port\basename /DisableStartupMessages /N UserName /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
-```
-
-Server infobase (option B — explicit connection string, recommended):
-```
-<V8_PATH> DESIGNER /IBConnectionString 'Srvr="servername";Ref="basename";' /DisableStartupMessages /N UserName /LoadConfigFromFiles /path/to/project /Out <LOG_PATH>
-```
-
-Read `<LOG_PATH>` to confirm success.
-
-### Step 2 — Update DB structure:
-
-File infobase:
-```
-<V8_PATH> DESIGNER /F/path/to/InfoBase /DisableStartupMessages /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
-```
-
-Server infobase (option A — short format):
-```
-<V8_PATH> DESIGNER /Sservername:port\basename /DisableStartupMessages /N UserName /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
-```
-
-Server infobase (option B — explicit connection string, recommended):
-```
-<V8_PATH> DESIGNER /IBConnectionString 'Srvr="servername";Ref="basename";' /DisableStartupMessages /N UserName /UpdateDBCfg -Dynamic+ -SessionTerminate force /Out <LOG_PATH>
-```
-
-Read `<LOG_PATH>` to confirm success.
-
----
-
-## Applicability check before the DB update — mandatory when an extension is deployed
-
-Whenever this run loads an extension (`EXTENSION_NAME` filled, or a full-snapshot pass over `EXTENSION_NAMES`), run the batch check ladder **between the configuration load and the DB update** — canon `content/rules/designer-batch-checks.md → The check ladder`:
-
-```
-/CheckModules -ThinClient -Server -ExternalConnection -Extension {EXTENSION_NAME}
-/CheckCanApplyConfigurationExtensions -Extension {EXTENSION_NAME}
-```
-
-Stop at the first failure and do not proceed to the DB update. An interceptor pointing at a method the vendor renamed loads without complaint and only fails at apply time — or, worse, silently stops intercepting; the applicability check is the only thing in this pipeline that names it. Read the verdict from all three signals (exit code, `/DumpResult`, `/Out`), classifying success phrases before error stems.
-
-For the main configuration alone the ladder is optional — run `/CheckConfig` when the change is large (whole-snapshot deploy, release build) or when the Gate 1–3 MCP validators were not exposed in this session.
-
----
-
-## Failure handling — retry loop
-
-Apply the **Update retry loop** from `/update1cbase` (`content/commands/update1cbase.md → Update retry loop`) verbatim: read `{LOG_PATH}` after every attempt (diagnostics in the log override exit code 0 — classify the platform's success phrases first, `content/rules/designer-batch-checks.md → The success-phrase trap`); on failure terminate the hung / failed Configurator by its own PID only (never blanket-kill `1cv8` processes); fix the logged cause before any retry (re-running unchanged is forbidden); after a failed load restart from the load step; at most 3 full attempts, then stop and report. UI tests run only after a clean pass.
-
----
-
-# Diagnostics
-
-## Common issues after deployment
-
-| Log message | Meaning | Action |
-|-------------|---------|--------|
-| `Неопределена информационная база` | **Connection error** — invalid `/S` or `/F` format (likely a space after the flag or wrong server name) | Fix the connection string. No space after `/S` or `/F`. Check `INFOBASE_KIND` / `INFOBASE_PATH` in `.dev.env`. |
-| `Загрузка не должна менять принадлежность` | **Normal warning** for extensions — not an error | Ignore. Expected when loading extension XML. |
-| `Database configuration updated successfully` but no actual changes | Designer exited with code 0 but did nothing | Check the log for `Неопределена информационная база` — this is a silent failure. |
-
-## Important notes
-
-- **Exit code 0 does not guarantee success.** Designer may exit cleanly even when the operation failed. Always read the log file.
-- **1CFilesConverter logs are deleted** after script execution (temp directory cleaned up). For debugging, run with `bash -x` to see the full command trace and log contents.
-- **For extensions:** if you loaded XML without `-Extension <name>`, the code went into the main configuration, not the extension. The extension in the infobase remains unchanged.
-- **On any deploy error, do NOT run UI tests** — fix the deploy first.
-
----
-
-# Testing
-
-## To test the infobase use the following URL and rules:
-
-UI testing is opt-in and controlled by `UI_TESTING` (empty = `manual`):
-
-- `off` — skip UI tests;
-- `manual` or empty/invalid — run only when the user explicitly requested UI tests;
-- `auto` — run automatically after a clean deployment.
-
-Use `.dev.env` `INFOBASE_PUBLISH_URL` (e.g. `http://localhost/MyBase/ru/`). If empty, skip this step and finish with: "UI tests skipped: `INFOBASE_PUBLISH_URL` is not set in `.dev.env`."
-
-Otherwise open the URL through the MCP browser and run the test scenarios. Rules:
-
-### Step 4a. Browser-tool preflight (before any navigation)
+### Step 4b. Browser-tool preflight (web route, before any navigation)
 
 Load `content/rules/ui-testing-tools.md` and run its **Preflight before web UI tests** gate. Short form:
 
@@ -343,9 +140,9 @@ Load `content/rules/ui-testing-tools.md` and run its **Preflight before web UI t
 4. On no — continue with the built-in browser MCP; note the higher token cost once.
 5. Silent skip of this ask = defect.
 
-### Step 4b. Run scenarios
+### Step 4c. Run web scenarios
 
-Open `{INFOBASE_PUBLISH_URL}` with the tool chosen in 4a. Prefer **`agent-browser`** (a11y snapshots); built-in browser MCP only after decline / no-operator fallback; **`Windows-MCP`** (`/install-windows-mcp`) only for unavoidable desktop / thick-client automation — never as the default for the web client, never a home-grown screenshotter/OCR. Rules:
+Open `{INFOBASE_PUBLISH_URL}` with the tool chosen in 4b. Prefer **`agent-browser`** (a11y snapshots); built-in browser MCP only after decline / no-operator fallback; **`Windows-MCP`** (`/install-windows-mcp`) only for unavoidable desktop / thick-client automation — never as the default for the web client, never a home-grown screenshotter/OCR. Rules:
 
 - Prefer snapshot/refs observe loops over screenshot/vision.
 - **MUST** use delayed human-like typing when filling fields.
@@ -353,8 +150,12 @@ Open `{INFOBASE_PUBLISH_URL}` with the tool chosen in 4a. Prefer **`agent-browse
 - Wait for elements to load before interacting.
 - Take screenshots at key steps for documentation (evidence, not the observe loop).
 
-## Final report
+## Step 5. Final report
 
-Briefly report which infobase was updated, which mode/tool was used (1CFilesConverter Mode 1 — designer/ibcmd, or Designer Mode 2), which test scenarios passed/failed, and list errors separately with log fragments and screenshots.
+Briefly report which infobase was updated, which tool was used (`ibcmd` or Designer), which UI route ran (QA MCP with its executor, or the web client, and why), which test scenarios passed/failed or stayed unverified, the journal path, and list errors separately with log fragments and screenshots.
+
+Identify the project and each main/extension pass, its load/check/apply outcome and relevant active-extension mismatches. UI success does not prove that an omitted extension was deployed or that another MCP project's sources describe this infobase.
+
+Update the extension's existing README or delivery description with the checked combination and actual evidence per `content/rules/extension-workspace.md → Checked compatibility`. Keep source, loaded configuration, applied DB and MCP freshness distinct in any continuation handoff; skipped tests stay unrun, and this target's result does not certify other extensions.
 
 When scenarios failed and the user wants the failures driven to green, do not improvise ad-hoc retries — suggest `/test-fix-loop` (`content/commands/test-fix-loop.md`): the closed deploy → test → fix → redeploy loop with its own iteration budget and no-change-repeat rules. It runs only on explicit invocation.

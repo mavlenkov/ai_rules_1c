@@ -57,11 +57,13 @@ $FixturesDir = Join-Path $PSScriptRoot 'fixtures'
 $ToolsDir    = Join-Path $RepoRoot 'content\skills\1c-metadata-manage\tools'
 $MetaEdit    = Join-Path $ToolsDir '1c-meta-edit\scripts\meta-edit.ps1'
 $MetaCompile = Join-Path $ToolsDir '1c-meta-compile\scripts\meta-compile.ps1'
-# Re-enter through the same PowerShell edition that runs this test. Hard-coding
-# powershell.exe makes every case fail before the tool starts under pwsh/Linux.
-$PowerShellHost = (Get-Process -Id $PID).Path
+$MetaValidate = Join-Path $ToolsDir '1c-meta-validate\scripts\meta-validate.ps1'
+$FormAdd      = Join-Path $ToolsDir '1c-form-scaffold\scripts\form-add.ps1'
+$RemoveForm   = Join-Path $ToolsDir '1c-form-scaffold\scripts\remove-form.ps1'
+$FormCompile  = Join-Path $ToolsDir '1c-form-compile\scripts\form-compile.ps1'
 
-foreach ($required in @($MetaEdit, $MetaCompile, (Join-Path $FixturesDir 'config-dump'))) {
+foreach ($required in @($MetaEdit, $MetaCompile, $RemoveForm,
+        (Join-Path $FixturesDir 'config-dump'), (Join-Path $FixturesDir 'epf-with-form'))) {
     if (-not (Test-Path -LiteralPath $required)) { throw "Missing prerequisite: $required" }
 }
 
@@ -140,7 +142,7 @@ function Invoke-Tool([string]$Script, [string[]]$ToolArgs, [string]$WorkDir) {
         foreach ($a in $ToolArgs) {
             if ($a -match '\s') { $psArgs += "`"$a`"" } else { $psArgs += $a }
         }
-        $proc = Start-Process -FilePath $PowerShellHost -ArgumentList $psArgs `
+        $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $psArgs `
             -WorkingDirectory $WorkDir -NoNewWindow -Wait -PassThru `
             -RedirectStandardOutput $stdout -RedirectStandardError $stderr
         return [pscustomobject]@{
@@ -215,6 +217,79 @@ function Read-JsonFixture([string]$RelPath) {
     $bytes = [System.IO.File]::ReadAllBytes($path)
     $offset = if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { 3 } else { 0 }
     return ([System.Text.Encoding]::UTF8.GetString($bytes, $offset, $bytes.Length - $offset) | ConvertFrom-Json)
+}
+
+# --- helpers for the add-form / validator / event cases -------------------------
+
+function Get-TreeSnapshot([string]$Root) {
+    # Relative path -> content hash for every file under $Root. Used to assert
+    # that a refusal really happened before any mutation.
+    $map = @{}
+    foreach ($file in (Get-ChildItem -LiteralPath $Root -Recurse -File -Force)) {
+        $rel = $file.FullName.Substring($Root.Length).TrimStart('')
+        $map[$rel] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+    }
+    return $map
+}
+
+function Assert-TreeIdentical($Before, $After, [string]$What) {
+    $beforeKeys = @($Before.Keys | Sort-Object)
+    $afterKeys  = @($After.Keys | Sort-Object)
+    Assert-Equal ($beforeKeys -join '|') ($afterKeys -join '|') "$What : the file list changed"
+    foreach ($key in $beforeKeys) {
+        Assert-Equal $Before[$key] $After[$key] "$What : $key changed"
+    }
+}
+
+function New-BrokenToolTree([string]$Work, [string]$Name, [scriptblock]$Mutate) {
+    # A private copy of the tool tree, damaged by $Mutate, so a case can run the
+    # real entry point with a missing or failing validator next to it.
+    $root = Join-Path $Work $Name
+    Copy-Item -LiteralPath $ToolsDir -Destination $root -Recurse -Force
+    & $Mutate $root
+    return $root
+}
+
+function Add-ChildObjectsEntry([string]$Path, [string[]]$Lines) {
+    # Append raw ChildObjects entries, byte-preserving: the shapes under test are
+    # exactly the ones a generic child builder emits.
+    $bytes  = [System.IO.File]::ReadAllBytes($Path)
+    $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+    $offset = if ($hasBom) { 3 } else { 0 }
+    $text   = [System.Text.Encoding]::UTF8.GetString($bytes, $offset, $bytes.Length - $offset)
+    $eol    = if ($text -match "`r`n") { "`r`n" } else { "`n" }
+    $block  = ($Lines -join $eol) + $eol
+    $index  = $text.IndexOf('</ChildObjects>')
+    if ($index -lt 0) { Fail "no </ChildObjects> in $Path" }
+    $text = $text.Substring(0, $index) + $block + "`t`t" + $text.Substring($index)
+    $encoding = New-Object System.Text.UTF8Encoding($hasBom)
+    [System.IO.File]::WriteAllText($Path, $text, $encoding)
+}
+
+function Invoke-FormCompileCase([string]$Work, [string]$Tag, [string]$ElementKeysJson) {
+    # Compile a one-table form whose single element carries $ElementKeysJson, then
+    # read back the emitted Table/Events/Event pairs semantically - a substring
+    # match would pass on a handler that landed on the wrong element.
+    $dir = Join-Path $Work "fc-$Tag"
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $source = Join-Path $dir 'input.json'
+    $out    = Join-Path $dir 'Form.xml'
+    # Substring, not Trim: TrimEnd('}') would also eat the closing brace of a
+    # nested object such as "handlers":{...}.
+    $raw    = $ElementKeysJson.Trim()
+    $keys   = $raw.Substring(1, $raw.Length - 2)
+    $json   = '{"title":"Test","elements":[{"table":"T","columns":[],' + $keys + '}],"attributes":[],"commands":[]}'
+    [System.IO.File]::WriteAllText($source, $json, (New-Object System.Text.UTF8Encoding($false)))
+    $run = Invoke-Tool $FormCompile @('-JsonPath', $source, '-OutputPath', $out) $dir
+    $events = @()
+    if (Test-Path -LiteralPath $out) {
+        $xml = New-Object System.Xml.XmlDocument
+        $xml.Load($out)
+        foreach ($node in $xml.SelectNodes("//*[local-name()='Table']/*[local-name()='Events']/*[local-name()='Event']")) {
+            $events += [pscustomobject]@{ Name = $node.GetAttribute('name'); Handler = $node.InnerText.Trim() }
+        }
+    }
+    return [pscustomobject]@{ Run = $run; OutPath = $out; Events = @($events) }
 }
 
 function Write-DevEnv([string]$Dir, [string]$Body) {
@@ -321,15 +396,255 @@ Register-Case 'meta-edit: rename keeps the auto-synonym block on its own lines' 
     Assert-True ($after.Text -match '<Name>BazaNew</Name>') 'attribute was not renamed'
 }
 
-Register-Case 'meta-edit: downstream meta-validate invocation still runs' {
+Register-Case 'meta-edit: the mandatory meta-validate really runs and never degrades to [SKIP]' {
     param($Work)
+    # Defect C: the validator lives under the downstream directory name
+    # 1c-meta-validate, the upstream-relative path resolved to nothing, and the
+    # run printed [SKIP] on an otherwise successful edit. The previous version of
+    # this case matched the substring 'meta-validate' - which the string '[SKIP]
+    # meta-validate not found' also satisfies - and compared the result file with
+    # itself. Both halves are pinned properly here: a real banner, no [SKIP], and
+    # a baseline captured before the edit.
     Copy-Fixture 'config-dump' $Work "`n"
     $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+    $before = Get-FileFacts $target
 
     $run = Invoke-Tool $MetaEdit @('-ObjectPath', $target, '-Operation', 'add-attribute', '-Value', 'RegrFlag: Boolean') $Work
     Assert-Equal 0 $run.ExitCode "meta-edit exit code (stderr: $($run.StdErr))"
-    Assert-True ($run.StdOut -match 'meta-validate') 'meta-validate was not invoked after the edit'
-    Assert-StyleKept (Get-FileFacts $target) (Get-FileFacts $target) 'validated edit'
+
+    $combined = "$($run.StdOut)$($run.StdErr)"
+    Assert-True ($combined -match '--- Running meta-validate ---') "the validator banner never appeared: $combined"
+    Assert-True ($combined -notmatch '\[SKIP\]') "validation was skipped instead of run: $combined"
+    Assert-True ($combined -match '=== Validation: Catalog\.TestCatalog ===') "the validator printed no banner for the edited object: $combined"
+    Assert-True ($combined -match '=== Result: 0 errors') "the validator produced no clean result line: $combined"
+
+    $after = Get-FileFacts $target
+    Assert-True ($before.Text -ne $after.Text) 'baseline and result are the same bytes - the case asserts nothing'
+    Assert-True ($after.Text -match '<Name>RegrFlag</Name>') 'the attribute was not added'
+    Assert-StyleKept $before $after 'validated edit'
+}
+
+Register-Case 'meta-edit: add-form is refused before any mutation and names form-add' {
+    param($Work)
+    # Defect C, writer half: add-form registered the form as a nested ChildObjects
+    # descriptor with FormType=Ordinary and wrote no form file at all - a dump the
+    # Configurator refuses to load. The operation is now refused outright.
+    Copy-Fixture 'config-dump' $Work "`n"
+    $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+    $before = Get-TreeSnapshot $Work
+
+    $run = Invoke-Tool $MetaEdit @('-ObjectPath', $target, '-Operation', 'add-form', '-Value', 'TestForm') $Work
+    Assert-Equal 2 $run.ExitCode "add-form must exit 2 (stderr: $($run.StdErr))"
+    Assert-TreeIdentical $before (Get-TreeSnapshot $Work) 'refused add-form'
+    Assert-True ($run.StdErr -match 'form-add') "the refusal does not point at form-add: $($run.StdErr)"
+    Assert-True ($run.StdErr -match 'form-add\.ps1') 'the refusal names no PowerShell entry point to use instead'
+}
+
+Register-Case 'meta-edit: a missing validator is refused before the edit is written' {
+    param($Work)
+    $broken = New-BrokenToolTree $Work 'no-validator' { param($Root)
+        Remove-Item -LiteralPath (Join-Path $Root '1c-meta-validate\scripts\meta-validate.ps1') -Force
+    }
+    $dump = Join-Path $Work 'dump'
+    Copy-Fixture 'config-dump' $dump "`n"
+    $target = Join-Path $dump 'Catalogs\TestCatalog.xml'
+    $before = Get-TreeSnapshot $dump
+
+    $run = Invoke-Tool (Join-Path $broken '1c-meta-edit\scripts\meta-edit.ps1') @('-ObjectPath', $target, '-Operation', 'add-attribute', '-Value', 'RegrFlag: Boolean') $dump
+    Assert-True ($run.ExitCode -ne 0) "a missing validator exited 0 (stdout: $($run.StdOut))"
+    Assert-TreeIdentical $before (Get-TreeSnapshot $dump) 'edit with no validator available'
+    Assert-True ($run.StdErr -match 'meta-validate') "the refusal does not name the missing validator: $($run.StdErr)"
+    Assert-True ("$($run.StdOut)$($run.StdErr)" -notmatch '\[SKIP\]') 'a missing validator is still degraded to a [SKIP]'
+}
+
+Register-Case 'meta-edit: -NoValidate is the explicit opt-out and the only one' {
+    param($Work)
+    $broken = New-BrokenToolTree $Work 'no-validator-optout' { param($Root)
+        Remove-Item -LiteralPath (Join-Path $Root '1c-meta-validate\scripts\meta-validate.ps1') -Force
+    }
+    $dump = Join-Path $Work 'dump'
+    Copy-Fixture 'config-dump' $dump "`n"
+    $target = Join-Path $dump 'Catalogs\TestCatalog.xml'
+    $before = Get-FileFacts $target
+
+    $run = Invoke-Tool (Join-Path $broken '1c-meta-edit\scripts\meta-edit.ps1') @('-ObjectPath', $target, '-Operation', 'add-attribute', '-Value', 'RegrFlag: Boolean', '-NoValidate') $dump
+    Assert-Equal 0 $run.ExitCode "-NoValidate exit code (stderr: $($run.StdErr))"
+    $after = Get-FileFacts $target
+    Assert-True ($after.Text -match '<Name>RegrFlag</Name>') '-NoValidate did not apply the edit'
+    Assert-StyleKept $before $after '-NoValidate edit'
+}
+
+Register-Case 'meta-edit: a validator that reports errors propagates its non-zero exit' {
+    param($Work)
+    $broken = New-BrokenToolTree $Work 'failing-validator' { param($Root)
+        $stub = Join-Path $Root '1c-meta-validate\scripts\meta-validate.ps1'
+        Set-Content -LiteralPath $stub -Encoding ASCII -Value @(
+            'param([string]$ObjectPath)',
+            'Write-Host "stub validator: refusing"',
+            'exit 3')
+    }
+    $dump = Join-Path $Work 'dump'
+    Copy-Fixture 'config-dump' $dump "`n"
+    $target = Join-Path $dump 'Catalogs\TestCatalog.xml'
+
+    $run = Invoke-Tool (Join-Path $broken '1c-meta-edit\scripts\meta-edit.ps1') @('-ObjectPath', $target, '-Operation', 'add-attribute', '-Value', 'RegrFlag: Boolean') $dump
+    Assert-True ($run.ExitCode -ne 0) "a failing validator was summarized as success (stdout: $($run.StdOut))"
+    Assert-True ("$($run.StdOut)$($run.StdErr)" -match '--- Running meta-validate ---') 'the validator banner never appeared'
+    Assert-True ($run.StdErr -match '3') "the child exit code is not reported: $($run.StdErr)"
+}
+
+# ---------------------------------------------------------------- C. meta-validate form checks
+
+Register-Case 'meta-validate: an inline ChildObjects/Form descriptor is rejected (6a)' {
+    param($Work)
+    Copy-Fixture 'config-dump' $Work "`n"
+    $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+    Add-ChildObjectsEntry $target @(
+        "`t`t`t<Form uuid=`"11111111-1111-1111-1111-111111111111`">",
+        "`t`t`t`t<Properties>",
+        "`t`t`t`t`t<Name>BadForm</Name>",
+        "`t`t`t`t`t<FormType>Ordinary</FormType>",
+        "`t`t`t`t</Properties>",
+        "`t`t`t</Form>")
+
+    $run = Invoke-Tool $MetaValidate @('-ObjectPath', $target) $Work
+    $combined = "$($run.StdOut)$($run.StdErr)"
+    Assert-True ($run.ExitCode -ne 0) "the validator accepted an inline form descriptor: $combined"
+    Assert-True ($combined -match '6a\.') "no 6a diagnostic: $combined"
+}
+
+Register-Case 'meta-validate: a form registered without its descriptor file is rejected (6b)' {
+    param($Work)
+    Copy-Fixture 'config-dump' $Work "`n"
+    $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+    Add-ChildObjectsEntry $target @("`t`t`t<Form>GhostForm</Form>")
+
+    $run = Invoke-Tool $MetaValidate @('-ObjectPath', $target) $Work
+    $combined = "$($run.StdOut)$($run.StdErr)"
+    Assert-True ($run.ExitCode -ne 0) "the validator accepted a dangling form reference: $combined"
+    Assert-True ($combined -match '6b\.') "no 6b diagnostic: $combined"
+}
+
+# ---------------------------------------------------------------- D. form-add / form-compile
+
+Register-Case 'form-add: the managed scaffold it writes is accepted by meta-validate' {
+    param($Work)
+    # The remediation add-form points at. Three layers are checked, because the
+    # defect was invisible at each single one: registration shape, files on disk,
+    # and the validator's own verdict.
+    Copy-Fixture 'config-dump' $Work "`n"
+    $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+
+    $run = Invoke-Tool $FormAdd @('-ObjectPath', $target, '-FormName', 'SmokeForm', '-Purpose', 'Object', '-SetDefault') $Work
+    Assert-Equal 0 $run.ExitCode "form-add exit code (stderr: $($run.StdErr))"
+
+    $entries = @(Get-ChildObjectEntries $target | Where-Object { $_.Tag -eq 'Form' })
+    Assert-Equal 1 $entries.Count 'the form is not registered exactly once'
+    Assert-Equal 'SmokeForm' $entries[0].Name 'the registration is not a scalar <Form>Name</Form> reference'
+
+    $formsDir = Join-Path $Work 'Catalogs\TestCatalog\Forms'
+    Assert-True (Test-Path -LiteralPath (Join-Path $formsDir 'SmokeForm.xml')) 'no Forms/SmokeForm.xml descriptor'
+    Assert-True (Test-Path -LiteralPath (Join-Path $formsDir 'SmokeForm\Ext\Form.xml')) 'no Ext/Form.xml'
+    Assert-True (Test-Path -LiteralPath (Join-Path $formsDir 'SmokeForm\Ext\Form\Module.bsl')) 'no Ext/Form/Module.bsl'
+    $facts = Get-FileFacts $target
+    Assert-True ($facts.Text -match '<DefaultObjectForm>Catalog\.TestCatalog\.Form\.SmokeForm</DefaultObjectForm>') '-SetDefault did not set DefaultObjectForm'
+
+    $check = Invoke-Tool $MetaValidate @('-ObjectPath', $target) $Work
+    Assert-Equal 0 $check.ExitCode "meta-validate rejected the form-add scaffold: $($check.StdOut)$($check.StdErr)"
+}
+
+Register-Case 'form-compile: a standalone handlers map produces the event, conflicts are refused' {
+    param($Work)
+    # Defect B: `handlers` without `on` compiled successfully and emitted no event
+    # at all, and OnEditEnd auto-names fell through to a literal fallback because
+    # the suffix map spells the key OnEndEdit. This file is pure ASCII, so the
+    # Cyrillic auto-name is asserted negatively - it must not be the literal
+    # English event name, which is exactly what the fallback produced. The full
+    # Cyrillic comparison lives in tools/tests/python-ports-regression.py.
+    $standalone = Invoke-FormCompileCase $Work 'standalone' '{"handlers":{"OnActivateRow":"TActivate"}}'
+    Assert-Equal 0 $standalone.Run.ExitCode "standalone handlers exit code (stderr: $($standalone.Run.StdErr))"
+    Assert-Equal 1 $standalone.Events.Count "standalone handlers emitted no event: $($standalone.Events.Count)"
+    Assert-Equal 'OnActivateRow' $standalone.Events[0].Name 'wrong event name'
+    Assert-Equal 'TActivate' $standalone.Events[0].Handler 'wrong handler name'
+
+    $editEnd = Invoke-FormCompileCase $Work 'editend' '{"events":{"OnEditEnd":null}}'
+    Assert-Equal 0 $editEnd.Run.ExitCode "OnEditEnd exit code (stderr: $($editEnd.Run.StdErr))"
+    Assert-Equal 1 $editEnd.Events.Count 'OnEditEnd emitted no event'
+    Assert-Equal 'OnEditEnd' $editEnd.Events[0].Name 'wrong event name'
+    Assert-True ($editEnd.Events[0].Handler -notmatch 'OnEditEnd') "the auto-name is still the literal fallback: $($editEnd.Events[0].Handler)"
+    Assert-True ($editEnd.Events[0].Handler.Length -gt 0) 'the auto-name is empty'
+
+    foreach ($pair in @(
+        @{ Tag = 'conflict'; Keys = '{"events":{"OnActivateRow":"A"},"on":["OnActivateRow"]}' },
+        @{ Tag = 'unknown';  Keys = '{"events":{"OnEndEdit":null}}' },
+        @{ Tag = 'orphan';   Keys = '{"on":["OnActivateRow"],"handlers":{"OnEditEnd":"X"}}' })) {
+        $case = Invoke-FormCompileCase $Work $pair.Tag $pair.Keys
+        Assert-True ($case.Run.ExitCode -ne 0) "$($pair.Tag): expected a non-zero exit, got 0"
+        Assert-True (-not (Test-Path -LiteralPath $case.OutPath)) "$($pair.Tag): refused but still wrote Form.xml"
+    }
+}
+
+Register-Case 'form-validate: version, owner type, folder type, handlers and conversion context' {
+    param($Work)
+    # form-validate v1.10 checks 1, 12, 12b, 13 and 14 on a form-add scaffold. BSL
+    # is written in English keywords so this file stays pure ASCII.
+    $FormValidate = Join-Path $ToolsDir '1c-form-validate\scripts\form-validate.ps1'
+    Copy-Fixture 'config-dump' $Work "`n"
+    $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+    $bom = New-Object System.Text.UTF8Encoding($true)
+    $formsDir = Join-Path $Work 'Catalogs\TestCatalog\Forms'
+    foreach ($name in @('Main', 'Other')) {
+        $run = Invoke-Tool $FormAdd @('-ObjectPath', $target, '-FormName', $name, '-Purpose', 'Object') $Work
+        Assert-Equal 0 $run.ExitCode "form-add $name (stderr: $($run.StdErr))"
+    }
+    $formXml = Join-Path $formsDir 'Main\Ext\Form.xml'
+    $modulePath = Join-Path $formsDir 'Main\Ext\Form\Module.bsl'
+    $pristineForm = (Get-FileFacts $formXml).Text
+    $validate = {
+        param([string]$FormText, [string]$ModuleText)
+        [System.IO.File]::WriteAllText($formXml, $FormText, $bom)
+        [System.IO.File]::WriteAllText($modulePath, $ModuleText, $bom)
+        $run = Invoke-Tool $FormValidate @('-FormPath', $formXml) $Work
+        return [pscustomobject]@{ ExitCode = $run.ExitCode; Text = "$($run.StdOut)$($run.StdErr)" }
+    }
+    $withEvent = $pristineForm -replace '<ChildItems/>', "<Events>`n`t`t<Event name=`"OnOpen`">OnOpenHandler</Event>`n`t</Events>`n`t<ChildItems/>"
+    $clientHandler = "&AtClient`nProcedure OnOpenHandler(Cancel)`nEndProcedure`n"
+
+    $ok = & $validate $withEvent $clientHandler
+    Assert-Equal 0 $ok.ExitCode "a matching handler was rejected: $($ok.Text)"
+    Assert-True ($ok.Text -notmatch '\[WARN\]') "a matching handler was warned about: $($ok.Text)"
+
+    $missing = & $validate $withEvent "&AtClient`nProcedure Unrelated()`nEndProcedure`n"
+    Assert-Equal 0 $missing.ExitCode "a missing handler must stay a warning: $($missing.Text)"
+    Assert-True ($missing.Text -match '\[WARN\]\s+13\..*not found') "no warning for a missing handler: $($missing.Text)"
+
+    $duplicate = & $validate $withEvent ($clientHandler + "`n" + $clientHandler)
+    Assert-True ($duplicate.ExitCode -ne 0) "a duplicate handler was accepted: $($duplicate.Text)"
+    Assert-True ($duplicate.Text -match '\[ERROR\] 13\..*declared 2 times') "no error for a duplicate handler: $($duplicate.Text)"
+
+    $conversion = & $validate $withEvent ($clientHandler + "`n&AtClient`nProcedure Convert()`n`tValue = FormAttributeToValue(`"Object`");`nEndProcedure`n")
+    Assert-True ($conversion.ExitCode -ne 0) "a client-side FormAttributeToValue was accepted: $($conversion.Text)"
+    Assert-True ($conversion.Text -match '\[ERROR\] 14\.') "no error for a client-side conversion: $($conversion.Text)"
+    $serverConversion = & $validate $withEvent ($clientHandler + "`n&AtServer`nProcedure Convert()`n`tValue = FormAttributeToValue(`"Object`");`nEndProcedure`n")
+    Assert-Equal 0 $serverConversion.ExitCode "a server-side FormAttributeToValue was rejected: $($serverConversion.Text)"
+
+    $version = & $validate ($pristineForm -replace 'version="2\.17"', 'version="2.20"') ''
+    Assert-True ($version.ExitCode -ne 0) "a Form.xml version different from Configuration.xml was accepted: $($version.Text)"
+    Assert-True ($version.Text -match 'differs from Configuration\.xml') "no version diagnostic: $($version.Text)"
+
+    $owner = & $validate ($pristineForm -replace 'cfg:CatalogObject\.TestCatalog', 'cfg:CatalogObject.OtherCatalog') ''
+    Assert-True ($owner.ExitCode -ne 0) "the default object form with a foreign main attribute was accepted: $($owner.Text)"
+    Assert-True ($owner.Text -match '\[ERROR\] 12b\.') "no 12b diagnostic: $($owner.Text)"
+
+    $folder = & $validate ($pristineForm -replace '</Attributes>', "`t<Attribute name=`"Extra`" id=`"2`">`n`t`t`t<Type>`n`t`t`t`t<v8:Type>cfg:Catalogs.TestCatalog</v8:Type>`n`t`t`t</Type>`n`t`t</Attribute>`n`t</Attributes>") ''
+    Assert-True ($folder.ExitCode -ne 0) "cfg:Catalogs.TestCatalog was accepted: $($folder.Text)"
+    Assert-True ($folder.Text -match 'export folder name') "no export-folder diagnostic: $($folder.Text)"
+
+    # The second form is not a default form: a foreign main attribute is legitimate there.
+    $otherXml = Join-Path $formsDir 'Other\Ext\Form.xml'
+    [System.IO.File]::WriteAllText($otherXml, ((Get-FileFacts $otherXml).Text -replace 'cfg:CatalogObject\.TestCatalog', 'cfg:CatalogObject.OtherCatalog'), $bom)
+    $nonDefault = Invoke-Tool $FormValidate @('-FormPath', $otherXml) $Work
+    Assert-Equal 0 $nonDefault.ExitCode "a non-default form with another main attribute was rejected: $($nonDefault.StdOut)"
 }
 
 # ---------------------------------------------------------------- B. meta-compile
@@ -513,6 +828,689 @@ Register-Case 'support guard: meta-compile still refuses to write into a locked 
     Assert-True ($run.ExitCode -ne 0) 'guard let a compile into a locked dump through'
     Assert-True ($run.StdErr -match 'support-guard') "stderr does not name the guard: $($run.StdErr)"
     Assert-Equal $before.Text (Get-FileFacts $configPath).Text 'refused compile still edited Configuration.xml'
+}
+
+
+# ---------------------------------------------------------------- E. remove-form / add-form / descriptor safety
+
+Register-Case 'meta-edit: every accepted spelling of add-form is refused before any mutation' {
+    param($Work)
+    # The gate matched the literal key 'add' while the dispatcher under it goes
+    # through Resolve-OperationKey, so a definition written with the Cyrillic alias
+    # walked past it and wrote the inline FormType=Ordinary descriptor the gate
+    # exists to prevent. This file is pure ASCII, so the alias is built from code
+    # points - it is not exotic input, it is what meta-edit documents.
+    $dobavit = -join @(0x0434, 0x043E, 0x0431, 0x0430, 0x0432, 0x0438, 0x0442, 0x044C | ForEach-Object { [char]$_ })
+    $formy   = -join @(0x0444, 0x043E, 0x0440, 0x043C, 0x044B | ForEach-Object { [char]$_ })
+    $spellings = @(
+        @{ Op = 'add';    Child = 'forms' },
+        @{ Op = 'Add';    Child = 'forms' },
+        @{ Op = 'ADD';    Child = 'Forms' },
+        @{ Op = $dobavit; Child = 'forms' },
+        @{ Op = $dobavit; Child = $formy }
+    )
+    $index = 0
+    foreach ($spelling in $spellings) {
+        $index++
+        $dump = Join-Path $Work "alias$index"
+        Copy-Fixture 'config-dump' $dump "`n"
+        $target = Join-Path $dump 'Catalogs\TestCatalog.xml'
+        $definition = Join-Path $dump 'definition.json'
+        $json = '{"' + $spelling.Op + '":{"' + $spelling.Child + '":["ReviewForm"]}}'
+        [System.IO.File]::WriteAllText($definition, $json, (New-Object System.Text.UTF8Encoding($false)))
+        $before = Get-TreeSnapshot $dump
+
+        $run = Invoke-Tool $MetaEdit @('-ObjectPath', $target, '-DefinitionFile', $definition) $dump
+        Assert-Equal 2 $run.ExitCode "spelling #$index was not refused (stdout: $($run.StdOut) stderr: $($run.StdErr))"
+        Assert-TreeIdentical $before (Get-TreeSnapshot $dump) "refused spelling #$index"
+        Assert-True ($run.StdErr -match 'form-add') "spelling #$index : the refusal does not point at form-add"
+    }
+
+    # A mixed definition is refused as a whole: the unrelated half must not be
+    # applied on the way to discovering the add-form half.
+    $dump = Join-Path $Work 'alias-mixed'
+    Copy-Fixture 'config-dump' $dump "`n"
+    $target = Join-Path $dump 'Catalogs\TestCatalog.xml'
+    $definition = Join-Path $dump 'definition.json'
+    $json = '{"modify":{"properties":{"Comment":"regression"}},"' + $dobavit + '":{"forms":["ReviewForm"]}}'
+    [System.IO.File]::WriteAllText($definition, $json, (New-Object System.Text.UTF8Encoding($false)))
+    $before = Get-TreeSnapshot $dump
+
+    $run = Invoke-Tool $MetaEdit @('-ObjectPath', $target, '-DefinitionFile', $definition) $dump
+    Assert-Equal 2 $run.ExitCode "a mixed definition was not refused (stdout: $($run.StdOut))"
+    Assert-TreeIdentical $before (Get-TreeSnapshot $dump) 'mixed definition applied its other half'
+}
+
+Register-Case 'form-add: an ampersand in -Synonym produces a parseable descriptor' {
+    param($Work)
+    # An ordinary user-facing synonym, not an attack. It was interpolated into the
+    # descriptor here-string verbatim, so form-add exited 0 having written a file no
+    # XML parser accepts - and meta-validate passed the object, because it only
+    # checked that the descriptor path existed.
+    Copy-Fixture 'config-dump' $Work "`n"
+    $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+    $synonym = 'A & B'
+
+    $run = Invoke-Tool $FormAdd @('-ObjectPath', $target, '-FormName', 'ReviewForm', '-Synonym', $synonym) $Work
+    Assert-Equal 0 $run.ExitCode "form-add refused an ordinary synonym (stderr: $($run.StdErr))"
+
+    $descriptor = Join-Path $Work 'Catalogs\TestCatalog\Forms\ReviewForm.xml'
+    $doc = New-Object System.Xml.XmlDocument
+    try { $doc.Load($descriptor) } catch { Fail "the descriptor does not parse as XML: $($_.Exception.Message)" }
+    $nameNode = $doc.SelectSingleNode("//*[local-name()='Form']/*[local-name()='Properties']/*[local-name()='Name']")
+    Assert-True ($null -ne $nameNode) 'the descriptor has no Form/Properties/Name'
+    Assert-Equal 'ReviewForm' $nameNode.InnerText 'descriptor Name'
+    $contentNode = $doc.SelectSingleNode("//*[local-name()='Synonym']//*[local-name()='content']")
+    Assert-True ($null -ne $contentNode) 'the descriptor has no Synonym content'
+    Assert-Equal $synonym $contentNode.InnerText 'the synonym did not survive escaping intact'
+
+    $check = Invoke-Tool $MetaValidate @('-ObjectPath', $target) $Work
+    Assert-Equal 0 $check.ExitCode "meta-validate rejected a correctly escaped scaffold: $($check.StdOut)$($check.StdErr)"
+}
+
+Register-Case 'meta-validate: a malformed or mismatched form descriptor is rejected' {
+    param($Work)
+    # Three layers, because a validator that rejected everything would satisfy the
+    # negative half on its own: an untouched scaffold still passes, an unparseable
+    # descriptor is 6c, and one that parses but describes another form is 6d.
+    Copy-Fixture 'config-dump' $Work "`n"
+    $target = Join-Path $Work 'Catalogs\TestCatalog.xml'
+    $run = Invoke-Tool $FormAdd @('-ObjectPath', $target, '-FormName', 'ReviewForm') $Work
+    Assert-Equal 0 $run.ExitCode "form-add exit code (stderr: $($run.StdErr))"
+
+    $ok = Invoke-Tool $MetaValidate @('-ObjectPath', $target) $Work
+    Assert-Equal 0 $ok.ExitCode "a valid scaffold was rejected: $($ok.StdOut)$($ok.StdErr)"
+
+    $descriptor = Join-Path $Work 'Catalogs\TestCatalog\Forms\ReviewForm.xml'
+    $original = (Get-FileFacts $descriptor).Text
+    $bom = New-Object System.Text.UTF8Encoding($true)
+
+    $malformed = $original -replace '<Name>ReviewForm</Name>', "<Name>ReviewForm</Name>`n`t`t`t<Raw>A & B</Raw>"
+    [System.IO.File]::WriteAllText($descriptor, $malformed, $bom)
+    $broken = Invoke-Tool $MetaValidate @('-ObjectPath', $target) $Work
+    $combined = "$($broken.StdOut)$($broken.StdErr)"
+    Assert-True ($broken.ExitCode -ne 0) "an unparseable descriptor was accepted: $combined"
+    Assert-True ($combined -match '6c\.') "no 6c diagnostic: $combined"
+
+    $mismatched = $original -replace '<Name>ReviewForm</Name>', '<Name>OtherForm</Name>'
+    [System.IO.File]::WriteAllText($descriptor, $mismatched, $bom)
+    $wrong = Invoke-Tool $MetaValidate @('-ObjectPath', $target) $Work
+    $combined = "$($wrong.StdOut)$($wrong.StdErr)"
+    Assert-True ($wrong.ExitCode -ne 0) "a descriptor for another form was accepted: $combined"
+    Assert-True ($combined -match '6d\.') "no 6d diagnostic: $combined"
+}
+
+Register-Case 'remove-form: a failed publish whose restore also fails keeps the quarantine' {
+    param($Work)
+    # A real, native fault - no injection hook in a script that deletes files. The
+    # root XML is held open with FileShare.Read: the backup copy still reads it, both
+    # parking renames still succeed, and only the publish and the restore the
+    # rollback then attempts hit a sharing violation.
+    #
+    # Discarding the quarantine used to be the oldest undo entry, so it ran *after*
+    # that failed restore: the recovery directory the error message named had already
+    # been deleted by the time the operator read about it.
+    $src = Join-Path $Work 'src'
+    Copy-Fixture 'epf-with-form' $src "`n"
+    $rootXml    = Join-Path $src 'Obrabotka.xml'
+    $quarantine = Join-Path $src '.remove-form-quarantine'
+    $originalRoot = (Get-FileHash -LiteralPath $rootXml -Algorithm SHA256).Hash
+
+    $lock = [System.IO.File]::Open($rootXml, [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+    try {
+        $run = Invoke-Tool $RemoveForm @('-ObjectName', 'Obrabotka', '-FormName', 'MainForm',
+            '-SrcDir', $src, '-Force') $src
+    } finally {
+        $lock.Close()
+        $lock.Dispose()
+    }
+
+    Assert-True ($run.ExitCode -ne 0) "a failed publish reported success (stdout: $($run.StdOut))"
+    Assert-True (Test-Path -LiteralPath $quarantine) "the quarantine was deleted although the root restore had failed: $($run.StdErr)"
+
+    $backup = Join-Path $quarantine 'root-backup.xml'
+    Assert-True (Test-Path -LiteralPath $backup) 'the kept quarantine has no root backup in it'
+    Assert-Equal $originalRoot (Get-FileHash -LiteralPath $backup -Algorithm SHA256).Hash 'the kept backup is not the original root bytes'
+    Assert-True ($run.StdErr -match [regex]::Escape($backup)) "the recovery path does not name the kept backup: $($run.StdErr)"
+    Assert-True ($run.StdErr -match [regex]::Escape($rootXml)) "the recovery path does not say where the backup belongs: $($run.StdErr)"
+
+    # The two parked payloads were put back, so the form itself is intact.
+    Assert-True (Test-Path -LiteralPath (Join-Path $src 'Obrabotka\Forms\MainForm.xml')) 'the descriptor was not put back'
+    Assert-True (Test-Path -LiteralPath (Join-Path $src 'Obrabotka\Forms\MainForm\Ext\Form.xml')) 'the form directory was not put back'
+    Assert-Equal $originalRoot (Get-FileHash -LiteralPath $rootXml -Algorithm SHA256).Hash 'the root XML changed although the publish failed'
+}
+
+Register-Case 'remove-form: an object directory reached through a junction is refused' {
+    param($Work)
+    # Containment has to start at -SrcDir. Checking Forms\ against the object
+    # directory says nothing when the object directory is itself a reparse point:
+    # both sides resolve into the same foreign tree, so a -Force run deleted a
+    # stranger's files and exited 0. mklink /J needs no privilege, so this is a real
+    # Windows reparse point, and the victim lives in this case's own temp dir.
+    $src = Join-Path $Work 'src'
+    Copy-Fixture 'epf-with-form' $src "`n"
+    $outside = Join-Path $Work 'outside-object'
+    Move-Item -LiteralPath (Join-Path $src 'Obrabotka') -Destination $outside
+    $link = Join-Path $src 'Obrabotka'
+    $mk = & cmd.exe /c mklink /J "$link" "$outside" 2>&1
+    Assert-True (Test-Path -LiteralPath $link) "could not create a junction for the case: $mk"
+
+    $before = Get-TreeSnapshot $outside
+    $run = Invoke-Tool $RemoveForm @('-ObjectName', 'Obrabotka', '-FormName', 'MainForm',
+        '-SrcDir', $src, '-Force') $src
+    Assert-Equal 2 $run.ExitCode "a junctioned object directory was not refused (stdout: $($run.StdOut) stderr: $($run.StdErr))"
+    Assert-TreeIdentical $before (Get-TreeSnapshot $outside) 'files outside SrcDir behind a junction'
+}
+
+# ------------------------------------------------- Invoke-1CEdit: preview wrapper
+#
+# The wrapper adds what the vendored tools do not have: a logical address, a
+# diff of what a run changed, and a preview that runs the tool for real and then
+# puts the tree back. The preview is only worth having if the restore is exact
+# and if it refuses to run when a rollback would destroy uncommitted work, so
+# those two are what these cases pin.
+
+$InvokeEdit = Join-Path $ToolsDir '_common\Invoke-1CEdit.ps1'
+
+function Get-DumpFacts([string]$Root) {
+    # Path -> SHA256 for every file under the dump. Compared whole, so a write
+    # the wrapper failed to notice shows up as a leftover difference.
+    $map = @{}
+    foreach ($f in (Get-ChildItem -LiteralPath $Root -Recurse -File)) {
+        $map[$f.FullName.Substring($Root.Length)] = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
+    }
+    return $map
+}
+
+function Assert-DumpIdentical($Before, $After, [string]$What) {
+    $added = @($After.Keys | Where-Object { -not $Before.ContainsKey($_) })
+    $gone = @($Before.Keys | Where-Object { -not $After.ContainsKey($_) })
+    $changed = @($Before.Keys | Where-Object { $After.ContainsKey($_) -and $Before[$_] -ne $After[$_] })
+    if ($added.Count -or $gone.Count -or $changed.Count) {
+        Fail ("$What : added=[{0}] removed=[{1}] changed=[{2}]" -f ($added -join ','), ($gone -join ','), ($changed -join ','))
+    }
+}
+
+function Initialize-GitDump([string]$Dump) {
+    & git -C $Dump init --quiet 2>&1 | Out-Null
+    & git -C $Dump config user.email 'regr@test.local' 2>&1 | Out-Null
+    & git -C $Dump config user.name 'regr' 2>&1 | Out-Null
+    & git -C $Dump config core.autocrlf false 2>&1 | Out-Null
+    & git -C $Dump add -A 2>&1 | Out-Null
+    & git -C $Dump commit --quiet -m base 2>&1 | Out-Null
+}
+
+Register-Case 'Invoke-1CEdit: a logical address reaches the same object as the physical path' {
+    param($work)
+    $dump = Join-Path $work 'dump'
+    Copy-Fixture 'config-dump' $dump
+    $before = Get-DumpFacts $dump
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'meta-info', '-Object', 'Catalog.TestCatalog',
+        '-Root', $dump) $dump
+    Assert-Equal 0 $run.ExitCode "logical address was not resolved (stderr: $($run.StdErr))"
+    Assert-True ($run.StdOut -match 'TestCatalog') 'the addressed object was not reported'
+    Assert-DumpIdentical $before (Get-DumpFacts $dump) 'a read-only tool wrote to the dump'
+}
+
+Register-Case 'Invoke-1CEdit: an unknown kind is refused instead of resolving to nothing' {
+    param($work)
+    $dump = Join-Path $work 'dump'
+    Copy-Fixture 'config-dump' $dump
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'meta-info', '-Object', 'Katalog.TestCatalog',
+        '-Root', $dump) $dump
+    Assert-True ($run.ExitCode -ne 0) 'an unknown metadata kind was accepted'
+    Assert-True (($run.StdErr + $run.StdOut) -match 'Unknown metadata kind') 'the refusal did not name the cause'
+}
+
+Register-Case 'Invoke-1CEdit: -Preview restores the tree byte-for-byte (copy backend)' {
+    param($work)
+    $dump = Join-Path $work 'dump'
+    Copy-Fixture 'config-dump' $dump
+    $before = Get-DumpFacts $dump
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'meta-edit', '-Object', 'Catalog.TestCatalog',
+        '-Root', $dump, '-Preview', '-Operation', 'add-attribute',
+        '-Value', 'PreviewProbe: String', '-NoValidate') $dump
+
+    Assert-True ($run.StdOut -match 'PreviewProbe') 'the diff did not show the attribute the run added'
+    Assert-True ($run.StdOut -match 'rollback') 'the run did not report a rollback'
+    Assert-DumpIdentical $before (Get-DumpFacts $dump) 'the preview left changes behind'
+}
+
+Register-Case 'Invoke-1CEdit: the same edit without -Preview is really applied' {
+    param($work)
+    $dump = Join-Path $work 'dump'
+    Copy-Fixture 'config-dump' $dump
+    $target = Join-Path $dump 'Catalogs\TestCatalog.xml'
+    $before = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'meta-edit', '-Object', 'Catalog.TestCatalog',
+        '-Root', $dump, '-Operation', 'add-attribute',
+        '-Value', 'AppliedProbe: String', '-NoValidate') $dump
+    Assert-Equal 0 $run.ExitCode "apply failed (stdout: $($run.StdOut) stderr: $($run.StdErr))"
+
+    $after = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+    Assert-True ($before -ne $after) 'the apply path changed nothing'
+    $facts = Get-FileFacts $target
+    Assert-True ($facts.Text -match 'AppliedProbe') 'the attribute is missing from the applied file'
+    Assert-True $facts.Bom 'the applied file lost its BOM'
+}
+
+Register-Case 'Invoke-1CEdit: -Preview under git leaves the working tree clean' {
+    param($work)
+    $dump = Join-Path $work 'dump'
+    Copy-Fixture 'config-dump' $dump
+    Initialize-GitDump $dump
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'meta-edit', '-Object', 'Catalog.TestCatalog',
+        '-Root', $dump, '-Preview', '-Operation', 'add-attribute',
+        '-Value', 'GitProbe: String', '-NoValidate') $dump
+    Assert-True ($run.StdOut -match 'GitProbe') 'the git-backed diff did not show the change'
+
+    $status = @(& git -C $dump status --porcelain --untracked-files=all)
+    Assert-Equal 0 $status.Count "the git rollback left the tree dirty: $($status -join '; ')"
+}
+
+Register-Case 'Invoke-1CEdit: -Preview refuses a dirty tree instead of reverting someone else work' {
+    param($work)
+    $dump = Join-Path $work 'dump'
+    Copy-Fixture 'config-dump' $dump
+    Initialize-GitDump $dump
+
+    $module = Join-Path $dump 'Catalogs\TestCatalog\Ext\ObjectModule.bsl'
+    Add-Content -LiteralPath $module -Value '// uncommitted work'
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'meta-edit', '-Object', 'Catalog.TestCatalog',
+        '-Root', $dump, '-Preview', '-Operation', 'add-attribute',
+        '-Value', 'ShouldNotRun: String', '-NoValidate') $dump
+
+    Assert-Equal 2 $run.ExitCode "a dirty tree did not stop the preview (stdout: $($run.StdOut))"
+    $text = Get-Content -LiteralPath $module -Raw
+    Assert-True ($text -match 'uncommitted work') 'the refusal still destroyed the uncommitted change'
+    Assert-True ((Get-FileFacts (Join-Path $dump 'Catalogs\TestCatalog.xml')).Text -notmatch 'ShouldNotRun') `
+        'the tool ran even though the preview was refused'
+}
+
+Register-Case 'Invoke-1CEdit: a tool with its own -DryRun is previewed by that flag, not by rollback' {
+    param($work)
+    $src = Join-Path $work 'src'
+    Copy-Fixture 'epf-with-form' $src
+    $before = Get-DumpFacts $src
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'remove-form', '-Scope', $src, '-Preview',
+        '-ObjectName', 'Obrabotka', '-FormName', 'MainForm', '-SrcDir', $src) $src
+
+    Assert-True ($run.StdOut -match "own -DryRun") 'the native dry-run path was not taken'
+    Assert-DumpIdentical $before (Get-DumpFacts $src) 'the native dry-run wrote to the tree'
+}
+
+function Test-InsideGitRepo([string]$Dir) {
+    # git's own answer, so the case below knows it really runs outside a repo.
+    $ErrorActionPreference = 'Continue'
+    & git -C $Dir rev-parse --is-inside-work-tree 2>$null | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+Register-Case 'Invoke-1CEdit: a clean preview outside git exits 0, a tool failure keeps its own code' {
+    # Ticket 09c04c3d: outside a repository Test-GitTracked leaves git's 128 in
+    # $LASTEXITCODE; role-info succeeds without an explicit exit, so the wrapper
+    # used to return that stale 128 for a run that printed its result.
+    param($work)
+    $ext = Join-Path $work 'Roles\ProbeRole\Ext'
+    New-Item -ItemType Directory -Path $ext -Force | Out-Null
+    Assert-True (-not (Test-InsideGitRepo $ext)) "precondition: $ext must not be inside a git repository"
+    $rights = Join-Path $ext 'Rights.xml'
+    [IO.File]::WriteAllText($rights, (
+        '<?xml version="1.0" encoding="UTF-8"?>' + "`n" +
+        '<Rights xmlns="http://v8.1c.ru/8.2/roles" version="2.17">' + "`n" +
+        "`t<object><name>Catalog.TestCatalog</name><right><name>Read</name><value>true</value></right></object>`n" +
+        '</Rights>' + "`n"), (New-Object Text.UTF8Encoding($true)))
+
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'role-info', '-Preview', '-NoDiff',
+        '-Scope', $rights, '-Path', $rights) $work
+    Assert-True ($run.StdOut -match 'copy backend') 'the preview did not take the copy backend'
+    Assert-True ($run.StdOut -match 'TestCatalog: Read') "the role rights were not printed (stderr: $($run.StdErr))"
+    Assert-Equal 0 $run.ExitCode 'a successful preview outside git'
+
+    $missing = Join-Path $ext 'Missing.xml'
+    $run = Invoke-Tool $InvokeEdit @('-Tool', 'role-info', '-Preview', '-NoDiff',
+        '-Scope', $missing, '-Path', $missing) $work
+    Assert-True ($run.StdOut -match 'File not found') "the failure probe did not reach the tool (stdout: $($run.StdOut))"
+    Assert-Equal 1 $run.ExitCode 'the tool own failure through the preview wrapper'
+}
+
+Register-Case 'support: meta-edit refuses add-template before any mutation' {
+    param($work)
+    Copy-Fixture 'config-dump' $work
+    $target = Join-Path $work 'Catalogs\TestCatalog.xml'
+    $definition = Join-Path $work 'template.json'
+    [IO.File]::WriteAllText($definition, '{"modify":{"properties":{"Comment":"must not apply"}},"Add":{"Templates":["Print"]}}')
+    $before = Get-TreeSnapshot $work
+    foreach ($caseArgs in @(@('-Operation', 'add-template', '-Value', 'Print'), @('-DefinitionFile', $definition))) {
+        $run = Invoke-Tool $MetaEdit (@('-ObjectPath', $target) + $caseArgs) $work
+        Assert-Equal 2 $run.ExitCode "add-template refusal (stdout: $($run.StdOut))"
+        Assert-True ($run.StdErr -match 'add-template.ps1' -and $run.StdErr -match 'TemplateType') 'missing actionable template command'
+        Assert-TreeIdentical $before (Get-TreeSnapshot $work) 'refused add-template'
+    }
+}
+
+Register-Case 'support: add-template accepts object XML paths and keeps name lookup' {
+    param($work)
+    Copy-Fixture 'config-dump' $work
+    $target = Join-Path $work 'Catalogs\TestCatalog.xml'
+    $addTemplate = Join-Path $ToolsDir '1c-template-manage\scripts\add-template.ps1'
+    foreach ($scenario in @(
+        @{ Path = $target; Name = 'Absolute' },
+        @{ Path = 'Catalogs\TestCatalog.xml'; Name = 'Relative' },
+        @{ Path = 'TestCatalog'; Name = 'ByName' }
+    )) {
+        $run = Invoke-Tool $addTemplate @('-ObjectName', $scenario.Path, '-TemplateName', $scenario.Name, '-TemplateType', 'Text', '-SrcDir', $work) $work
+        Assert-Equal 0 $run.ExitCode "template creation (stderr: $($run.StdErr))"
+        [xml]$xml = [IO.File]::ReadAllText($target)
+        $registration = $xml.SelectNodes("//*[local-name()='Catalog']/*[local-name()='ChildObjects']/*[local-name()='Template'][text()='$($scenario.Name)']")
+        Assert-Equal 1 $registration.Count 'scalar template registration'
+        $templateDir = Join-Path $work 'Catalogs\TestCatalog\Templates'
+        [xml]$descriptor = [IO.File]::ReadAllText((Join-Path $templateDir "$($scenario.Name).xml"))
+        Assert-Equal 'TextDocument' $descriptor.SelectSingleNode("//*[local-name()='TemplateType']").InnerText 'template type'
+        Assert-True (Test-Path -LiteralPath (Join-Path $templateDir "$($scenario.Name)\Ext\Template.txt")) 'missing template content'
+    }
+    Copy-Fixture 'epf-with-form' (Join-Path $work 'epf')
+    $run = Invoke-Tool $addTemplate @('-ProcessorName', 'Obrabotka', '-TemplateName', 'Legacy', '-TemplateType', 'Text', '-SrcDir', (Join-Path $work 'epf')) $work
+    Assert-Equal 0 $run.ExitCode "legacy EPF alias (stderr: $($run.StdErr))"
+}
+
+Register-Case 'support: form-edit command keeps compact tags, EOL and literal XML text' {
+    param($work)
+    $formEdit = Join-Path $ToolsDir '1c-form-edit\scripts\form-edit.ps1'
+    $definition = Join-Path $work 'command.json'
+    [IO.File]::WriteAllText($definition, '{"commands":[{"name":"X","action":"X"}]}')
+    foreach ($eol in @("`n", "`r`n")) {
+        $target = Join-Path $work 'Form.xml'
+        $before = '<?xml version="1.0" encoding="UTF-8"?>' + $eol +
+            '<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" version="2.17">' + $eol +
+            "`t<AutoCommandBar name=`"FormCommandBar`" id=`"-1`"/>" + $eol +
+            "`t<!-- literal <Comment /> -->" + $eol +
+            "`t<?probe literal <PI /> ?>" + $eol +
+            "`t<Title><![CDATA[literal <Text />]]></Title>" + $eol +
+            "`t<Commands>" + $eol + "`t`t<Command name=`"Existing`" id=`"1`"><Action>Existing</Action></Command>" + $eol +
+            "`t</Commands>" + $eol + '</Form>' + $eol
+        [IO.File]::WriteAllText($target, $before, (New-Object Text.UTF8Encoding($true)))
+        $run = Invoke-Tool $formEdit @('-FormPath', $target, '-JsonPath', $definition) $work
+        Assert-Equal 0 $run.ExitCode "form edit (stderr: $($run.StdErr))"
+        $after = Get-FileFacts $target
+        Assert-True $after.Bom 'UTF-8 BOM lost'
+        [xml]$xml = $after.Text
+        Assert-Equal 1 $xml.SelectNodes("//*[local-name()='Commands']/*[local-name()='Command'][@name='X']").Count 'added command'
+        $withoutAdded = [regex]::Replace($after.Text, '(?s)[\r\n]+\t\t<Command name="X".*?</Command>', '')
+        Assert-Equal $before $withoutAdded 'unrelated form text changed'
+    }
+}
+
+function Assert-CompactXml([string]$Path) {
+    $facts = Get-FileFacts $Path
+    [xml]$parsed = $facts.Text
+    $tags = [regex]::Replace($facts.Text, '(?s)<!\[CDATA\[.*?\]\]>|<!--.*?-->|<\?.*?\?>', '')
+    Assert-True ($tags -notmatch ' />') "serializer expanded empty tags in $Path"
+    Assert-Equal 0 $facts.Crlf "LF input acquired CRLF in $Path"
+    Assert-True $facts.Bom "UTF-8 BOM lost in $Path"
+}
+
+Register-Case 'support xml: form-add preserves compact tags in parent' {
+    param($work)
+    Copy-Fixture 'epf-with-form' $work
+    $target = Join-Path $work 'Obrabotka.xml'
+    $run = Invoke-Tool $FormAdd @('-ObjectPath', $target, '-FormName', 'Added', '-Purpose', 'Object') $work
+    Assert-Equal 0 $run.ExitCode "form-add: $($run.StdErr)"
+    Assert-CompactXml $target
+}
+
+Register-Case 'support xml: remove-form preserves compact tags in parent' {
+    param($work)
+    Copy-Fixture 'epf-with-form' $work
+    $run = Invoke-Tool $RemoveForm @('-ObjectName', 'Obrabotka', '-FormName', 'AuxForm', '-SrcDir', $work, '-Force') $work
+    Assert-Equal 0 $run.ExitCode "remove-form: $($run.StdErr)"
+    Assert-CompactXml (Join-Path $work 'Obrabotka.xml')
+}
+
+Register-Case 'support xml: form-compile registration preserves compact tags in parent' {
+    param($work)
+    Copy-Fixture 'epf-with-form' $work
+    $definition = Join-Path $work 'form.json'
+    [IO.File]::WriteAllText($definition, '{"title":"Test","elements":[]}')
+    $target = Join-Path $work 'Obrabotka\Forms\Added\Ext\Form.xml'
+    $run = Invoke-Tool $FormCompile @('-JsonPath', $definition, '-OutputPath', $target) $work
+    Assert-Equal 0 $run.ExitCode "form-compile: $($run.StdErr)"
+    Assert-CompactXml (Join-Path $work 'Obrabotka.xml')
+}
+
+Register-Case 'support xml: cf-edit preserves compact tags' {
+    param($work)
+    Copy-Fixture 'config-dump' $work
+    $target = Join-Path $work 'Configuration.xml'
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-cf-manage\scripts\cf-edit.ps1') @('-ConfigPath', $target, '-Operation', 'modify-property', '-Value', 'Comment=Probe', '-NoValidate') $work
+    Assert-Equal 0 $run.ExitCode "cf-edit: $($run.StdErr)"
+    Assert-CompactXml $target
+}
+
+Register-Case 'support xml: subsystem registration and edit preserve compact tags' {
+    param($work)
+    Copy-Fixture 'config-dump' $work
+    $definition = Join-Path $work 'subsystem.json'
+    [IO.File]::WriteAllText($definition, '{"name":"Probe"}')
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-subsystem-manage\scripts\subsystem-compile.ps1') @('-DefinitionFile', $definition, '-OutputDir', $work, '-NoValidate') $work
+    Assert-Equal 0 $run.ExitCode "subsystem-compile: $($run.StdErr)"
+    Assert-CompactXml (Join-Path $work 'Configuration.xml')
+    $target = Join-Path $work 'Subsystems\Probe.xml'
+    $text = (Get-FileFacts $target).Text -replace "`r`n", "`n"
+    [IO.File]::WriteAllText($target, $text, (New-Object Text.UTF8Encoding($true)))
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-subsystem-manage\scripts\subsystem-edit.ps1') @('-SubsystemPath', $target, '-Operation', 'add-content', '-Value', 'Catalog.TestCatalog', '-NoValidate') $work
+    Assert-Equal 0 $run.ExitCode "subsystem-edit: $($run.StdErr)"
+    Assert-CompactXml $target
+}
+
+Register-Case 'support xml: interface-edit preserves compact tags' {
+    param($work)
+    $target = Join-Path $work 'CommandInterface.xml'
+    $text = "<?xml version=`"1.0`" encoding=`"UTF-8`"?>`n<CommandInterface xmlns=`"http://v8.1c.ru/8.3/xcf/extrnprops`" version=`"2.17`">`n`t<CommandsVisibility/>`n`t<CommandsOrder/>`n</CommandInterface>`n"
+    [IO.File]::WriteAllText($target, $text, (New-Object Text.UTF8Encoding($true)))
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-interface-manage\scripts\interface-edit.ps1') @('-CIPath', $target, '-Operation', 'hide', '-Value', 'Catalog.TestCatalog.StandardCommand.OpenList', '-NoValidate') $work
+    Assert-Equal 0 $run.ExitCode "interface-edit: $($run.StdErr)"
+    Assert-CompactXml $target
+}
+
+Register-Case 'support xml: add-template preserves compact tags in parent' {
+    param($work)
+    Copy-Fixture 'epf-with-form' $work
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-template-manage\scripts\add-template.ps1') @('-ObjectName', 'Obrabotka', '-TemplateName', 'Probe', '-TemplateType', 'Text', '-SrcDir', $work) $work
+    Assert-Equal 0 $run.ExitCode "add-template: $($run.StdErr)"
+    Assert-CompactXml (Join-Path $work 'Obrabotka.xml')
+}
+
+Register-Case 'support xml: add-help preserves compact tags in form descriptor' {
+    param($work)
+    Copy-Fixture 'epf-with-form' $work
+    $target = Join-Path $work 'Obrabotka\Forms\MainForm.xml'
+    $text = (Get-FileFacts $target).Text -replace '\s*<IncludeHelpInContents>.*?</IncludeHelpInContents>', ''
+    [IO.File]::WriteAllText($target, $text, (New-Object Text.UTF8Encoding($true)))
+    New-Item -ItemType Directory -Path (Join-Path $work 'Obrabotka\Ext') -Force | Out-Null
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-help-manage\scripts\add-help.ps1') @('-ObjectName', 'Obrabotka', '-SrcDir', $work) $work
+    Assert-Equal 0 $run.ExitCode "add-help: $($run.StdErr)"
+    Assert-True ((Get-FileFacts $target).Text -match '<IncludeHelpInContents>false</IncludeHelpInContents>') 'help flag was not added'
+    Assert-CompactXml $target
+}
+
+Register-Case 'support xml: cfe-borrow preserves compact tags in extension' {
+    param($work)
+    $base = Join-Path $work 'base'
+    Copy-Fixture 'config-dump' $base
+    $extension = Join-Path $work 'extension'
+    New-Item -ItemType Directory -Path $extension -Force | Out-Null
+    $target = Join-Path $extension 'Configuration.xml'
+    $text = "<?xml version=`"1.0`" encoding=`"UTF-8`"?>`n<MetaDataObject xmlns=`"http://v8.1c.ru/8.3/MDClasses`" version=`"2.17`">`n`t<Configuration uuid=`"11111111-1111-1111-1111-111111111111`">`n`t`t<Properties><Name>Probe</Name><NamePrefix/><Comment/></Properties>`n`t`t<ChildObjects/>`n`t</Configuration>`n</MetaDataObject>`n"
+    # The borrowed-tool version probe reads 2000 characters from nontrivial dumps.
+    $text = $text.Replace('</MetaDataObject>', ('<!--' + ('x' * 2100) + '-->' + "`n</MetaDataObject>"))
+    [IO.File]::WriteAllText($target, $text, (New-Object Text.UTF8Encoding($true)))
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-cfe-manage\scripts\cfe-borrow.ps1') @('-ExtensionPath', $extension, '-ConfigPath', $base, '-Object', 'Catalog.TestCatalog') $work
+    Assert-Equal 0 $run.ExitCode "cfe-borrow: $($run.StdErr)"
+    Assert-CompactXml $target
+}
+
+Register-Case 'support xml: skd-edit keeps compact tags without changing literal XML text' {
+    param($work)
+    $target = Join-Path $work 'Template.xml'
+    $text = "<?xml version=`"1.0`" encoding=`"UTF-8`"?>`n<DataCompositionSchema xmlns=`"http://v8.1c.ru/8.1/data-composition-system/schema`">`n`t<dataSource><name><![CDATA[literal <Text />]]></name><dataSourceType>Local</dataSourceType></dataSource>`n`t<parameter><name>Probe</name><valueType/></parameter>`n`t<!-- literal <Comment /> -->`n`t<?probe literal <PI /> ?>`n</DataCompositionSchema>`n"
+    [IO.File]::WriteAllText($target, $text, (New-Object Text.UTF8Encoding($true)))
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-skd-edit\scripts\skd-edit.ps1') @('-TemplatePath', $target, '-Operation', 'remove-parameter', '-Value', 'Probe') $work
+    Assert-Equal 0 $run.ExitCode "skd-edit: $($run.StdErr)"
+    Assert-CompactXml $target
+    $after = (Get-FileFacts $target).Text
+    foreach ($literal in @('<![CDATA[literal <Text />]]>', '<!-- literal <Comment /> -->', '<?probe literal <PI /> ?>')) {
+        Assert-True $after.Contains($literal) "XML literal changed: $literal"
+    }
+}
+
+# ---------------------------------------------------------------- Complete dump integrity (read-only)
+
+function Write-DumpTestXml([string]$Path, [string]$Body) {
+    New-Item -ItemType Directory -Path (Split-Path $Path -Parent) -Force | Out-Null
+    [IO.File]::WriteAllText($Path, $Body, (New-Object Text.UTF8Encoding($true)))
+}
+
+function New-DumpTestFixture([string]$Work, [switch]$Extension) {
+    $dir = Join-Path $Work 'dump'
+    $extensionProperty = if ($Extension) { '<ObjectBelonging>Adopted</ObjectBelonging>' } else { '' }
+    $header = '<MetaDataObject xmlns="http://v8.1c.ru/8.3/MDClasses" version="2.17">'
+    Write-DumpTestXml (Join-Path $dir 'Configuration.xml') ($header + '<Configuration><Properties><Name>Probe</Name>' + $extensionProperty + '<DefaultLanguage>Language.Test</DefaultLanguage><Comment>Catalog.NotAReference</Comment></Properties><ChildObjects><Language>Test</Language><Subsystem>Main</Subsystem><Catalog>TestCatalog</Catalog></ChildObjects></Configuration></MetaDataObject>')
+    Write-DumpTestXml (Join-Path $dir 'Languages/Test.xml') ($header + '<Language><Properties><Name>Test</Name></Properties></Language></MetaDataObject>')
+    Write-DumpTestXml (Join-Path $dir 'Subsystems/Main.xml') ($header + '<Subsystem><Properties><Name>Main</Name><Content><Item>Catalog.TestCatalog</Item><Item>Subsystem.Main.Subsystem.Child</Item></Content></Properties><ChildObjects><Subsystem>Child</Subsystem></ChildObjects></Subsystem></MetaDataObject>')
+    Write-DumpTestXml (Join-Path $dir 'Subsystems/Main/Subsystems/Child.xml') ($header + '<Subsystem><Properties><Name>Child</Name><Content/></Properties><ChildObjects/></Subsystem></MetaDataObject>')
+    $catalog = Join-Path $dir 'Catalogs/TestCatalog.xml'
+    New-Item -ItemType Directory -Path (Split-Path $catalog -Parent) -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $FixturesDir 'config-dump/Catalogs/TestCatalog.xml') -Destination $catalog
+    Write-DumpTestXml (Join-Path $dir 'ConfigDumpInfo.xml') '<ConfigDumpInfo xmlns="http://v8.1c.ru/8.3/xcf/dumpinfo" version="2.17" format="Hierarchical"><ConfigVersions><Metadata name="Configuration.Probe.ManagedApplicationModule"/><Metadata name="Catalog.TestCatalog"><Metadata name="Catalog.TestCatalog.Attribute.Baza"/></Metadata><Metadata name="Subsystem.Main.Subsystem.Child"/></ConfigVersions></ConfigDumpInfo>'
+    # These are intentionally not root metadata descriptors and must not be traversed.
+    Write-DumpTestXml (Join-Path $dir 'Catalogs/TestCatalog/Forms/Form/Ext/Form.xml') '<ignored/>'
+    Write-DumpTestXml (Join-Path $dir 'Ext/ParentConfigurations/Supplier/Configuration.xml') '<ignored/>'
+    return $dir
+}
+
+function Invoke-DumpTest([string]$Dir, [string]$Work, [string[]]$Extra = @()) {
+    $tool = Join-Path $ToolsDir '1c-cf-manage/scripts/dump-validate.ps1'
+    $run = Invoke-Tool $tool (@('-ConfigPath', $Dir, '-Format', 'Json') + $Extra) $Work
+    Assert-True ([string]::IsNullOrWhiteSpace($run.StdErr)) "dump validator stderr: $($run.StdErr)"
+    $json = $run.StdOut | ConvertFrom-Json
+    Assert-Equal 1 $json.schema_version 'dump result schema'
+    return [pscustomobject]@{ Run=$run; Json=$json }
+}
+
+function Assert-DumpFinding($Result, [string]$Kind, [string]$Object = '') {
+    Assert-Equal 1 $Result.Run.ExitCode 'invalid dump exit code'
+    $hits = @($Result.Json.findings | Where-Object { $_.kind -eq $Kind -and (-not $Object -or $_.object -eq $Object) })
+    Assert-True ($hits.Count -gt 0) "missing finding $Kind ($Object): $($Result.Run.StdOut)"
+}
+
+Register-Case 'dump-validate: healthy CF and CFE, nested subsystems and internal dump-info records' {
+    param($Work)
+    foreach ($extension in @($false, $true)) {
+        $base = Join-Path $Work "$extension"
+        $dir = New-DumpTestFixture $base -Extension:$extension
+        $before = @(Get-ChildItem -LiteralPath $dir -Recurse -File | Sort-Object FullName | Get-FileHash | Select-Object -ExpandProperty Hash)
+        $result = Invoke-DumpTest $dir $Work
+        Assert-Equal 0 $result.Run.ExitCode $result.Run.StdOut
+        Assert-Equal 'valid' $result.Json.status 'healthy dump verdict'
+        Assert-Equal 5 $result.Json.objects_checked 'root and nested object count'
+        Assert-Equal 0 @($result.Json.findings).Count 'healthy findings'
+        $after = @(Get-ChildItem -LiteralPath $dir -Recurse -File | Sort-Object FullName | Get-FileHash | Select-Object -ExpandProperty Hash)
+        Assert-Equal ($before -join ',') ($after -join ',') 'validation mutated a file'
+    }
+}
+
+Register-Case 'dump-validate: missing root and nested objects, orphan and unknown types' {
+    param($Work)
+    $dir = New-DumpTestFixture $Work
+    Remove-Item -LiteralPath (Join-Path $dir 'Catalogs/TestCatalog.xml'), (Join-Path $dir 'Subsystems/Main/Subsystems/Child.xml')
+    $configuration = Join-Path $dir 'Configuration.xml'
+    $text = [IO.File]::ReadAllText($configuration).Replace('<Catalog>TestCatalog</Catalog>', '<Catalog>TestCatalog</Catalog><Catalog>TestCatalog</Catalog><Unknown>Bad</Unknown>')
+    Write-DumpTestXml $configuration $text
+    $orphan = [IO.File]::ReadAllText((Join-Path $dir 'Languages/Test.xml')).Replace('<Name>Test</Name>', '<Name>Orphan</Name>')
+    Write-DumpTestXml (Join-Path $dir 'Languages/Orphan.xml') $orphan
+    $result = Invoke-DumpTest $dir $Work
+    Assert-DumpFinding $result 'missing-file' 'Catalog.TestCatalog'
+    Assert-DumpFinding $result 'missing-file' 'Subsystem.Main.Subsystem.Child'
+    Assert-DumpFinding $result 'orphan-file' 'Language.Orphan'
+    Assert-DumpFinding $result 'duplicate-entry' 'Catalog.TestCatalog'
+    Assert-DumpFinding $result 'unknown-type' 'Unknown.Bad'
+    Assert-DumpFinding $result 'dangling-reference' 'Catalog.TestCatalog'
+    Assert-DumpFinding $result 'dump-info-extra' 'Catalog.TestCatalog'
+}
+
+Register-Case 'dump-validate: object versions, malformed XML and mismatched descriptor names' {
+    param($Work)
+    $dir = New-DumpTestFixture $Work
+    $language = Join-Path $dir 'Languages/Test.xml'
+    Write-DumpTestXml $language ([IO.File]::ReadAllText($language).Replace('2.17', '2.20').Replace('<Name>Test</Name>', '<Name>Wrong</Name>'))
+    Write-DumpTestXml (Join-Path $dir 'Catalogs/TestCatalog.xml') '<broken'
+    $child = Join-Path $dir 'Subsystems/Main/Subsystems/Child.xml'
+    Write-DumpTestXml $child ([IO.File]::ReadAllText($child).Replace(' version="2.17"', ''))
+    $result = Invoke-DumpTest $dir $Work
+    Assert-DumpFinding $result 'version-mismatch' 'Language.Test'
+    Assert-DumpFinding $result 'name-mismatch' 'Language.Test'
+    Assert-DumpFinding $result 'xml-unreadable' 'Catalog.TestCatalog'
+    Assert-DumpFinding $result 'version-unreadable' 'Subsystem.Main.Subsystem.Child'
+    Assert-Equal 0 @($result.Json.findings | Where-Object kind -eq 'dangling-reference').Count 'unreadable existing file is not missing'
+}
+
+Register-Case 'dump-validate: ConfigDumpInfo version and missing objects without duplicate child reports' {
+    param($Work)
+    $dir = New-DumpTestFixture $Work
+    $info = Join-Path $dir 'ConfigDumpInfo.xml'
+    Write-DumpTestXml $info ([IO.File]::ReadAllText($info).Replace('2.17', '2.20').Replace('Catalog.TestCatalog', 'Catalog.Deleted'))
+    $result = Invoke-DumpTest $dir $Work
+    Assert-DumpFinding $result 'dump-info-version'
+    Assert-DumpFinding $result 'dump-info-extra' 'Catalog.Deleted'
+    Assert-Equal 1 @($result.Json.findings | Where-Object kind -eq 'dump-info-extra').Count 'duplicate missing-owner reports'
+}
+
+Register-Case 'dump-validate: optional dump-info and root file input, text and JSON output' {
+    param($Work)
+    $dir = New-DumpTestFixture $Work
+    Remove-Item -LiteralPath (Join-Path $dir 'ConfigDumpInfo.xml')
+    $out = Join-Path $Work 'result.json'
+    $result = Invoke-DumpTest (Join-Path $dir 'Configuration.xml') $Work @('-OutFile', $out)
+    Assert-Equal 0 $result.Run.ExitCode $result.Run.StdOut
+    Assert-Equal 'valid' ((Get-Content -LiteralPath $out -Raw -Encoding UTF8 | ConvertFrom-Json).status) 'saved JSON'
+    $run = Invoke-Tool (Join-Path $ToolsDir '1c-cf-manage/scripts/dump-validate.ps1') @('-ConfigPath', $dir) $Work
+    Assert-Equal 0 $run.ExitCode $run.StdErr
+    Assert-True ($run.StdOut -match 'valid') 'text verdict missing'
+}
+
+Register-Case 'dump-validate: refuses source overwrite and reports missing configuration' {
+    param($Work)
+    $dir = New-DumpTestFixture $Work
+    $configuration = Join-Path $dir 'Configuration.xml'
+    $before = (Get-FileHash -LiteralPath $configuration).Hash
+    $result = Invoke-DumpTest $dir $Work @('-OutFile', $configuration)
+    Assert-DumpFinding $result 'scan-error'
+    Assert-Equal $before (Get-FileHash -LiteralPath $configuration).Hash 'source overwritten by report'
+    Remove-Item -LiteralPath $configuration
+    Assert-DumpFinding (Invoke-DumpTest $dir $Work) 'configuration-missing'
+}
+
+Register-Case 'dump-validate: missing composition, invalid metadata root and unsupported dump layout' {
+    param($Work)
+    $dir = New-DumpTestFixture $Work
+    $configuration = Join-Path $dir 'Configuration.xml'
+    Write-DumpTestXml $configuration ([regex]::Replace([IO.File]::ReadAllText($configuration), '<ChildObjects>.*?</ChildObjects>', ''))
+    Write-DumpTestXml (Join-Path $dir 'Languages/Test.xml') '<not-metadata/>'
+    $info = Join-Path $dir 'ConfigDumpInfo.xml'
+    Write-DumpTestXml $info ([IO.File]::ReadAllText($info).Replace('Hierarchical', 'Plain'))
+    $result = Invoke-DumpTest $dir $Work
+    Assert-DumpFinding $result 'composition-missing'
+    Assert-DumpFinding $result 'metadata-root-invalid' 'Language.Test'
+    Assert-DumpFinding $result 'dump-format-unsupported'
 }
 
 # ---------------------------------------------------------------- run

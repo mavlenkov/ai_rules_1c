@@ -1,40 +1,38 @@
 # external-review Specification
 
 ## Purpose
-TBD - created by archiving change multi-client-routing. Update Purpose after archive.
+Define explicitly requested external review, permitted model routing and the required review context.
+
 ## Requirements
 ### Requirement: Автоматический внешний критик в quality gate
+The ruleset SHALL run an extra external critic only when explicitly requested. The selected upstream validator policy SHALL remain authoritative and SHALL NOT be replaced by the critic.
 
-Набор правил SHALL предписывать автоматический прогон внешнего критика на этапе verification gate для **нетривиального** кода (граница full-cycle vs quick-fix из Triage). Quick-fix и docs-fix критика НЕ требуют. Внешний критик — слой ② поверх обязательных hard-валидаторов (`syntaxcheck` → `check_1c_code` → `review_1c_code`), которые остаются обязательными.
+**Definition of Done:** DoD-3: Review external-review.md and verification-delivery.md. Expected: the extra critic requires an explicit request and retains the selected validators.
 
-#### Scenario: Нетривиальное изменение запускает внешнего критика
+#### Scenario: Routine change does not start an extra critic
+- **WHEN** an agent completes a change without an explicit external review request
+- **THEN** the applicable upstream gates run without starting the extra critic
 
-- **WHEN** агент завершает нетривиальное изменение кода и доходит до verification gate
-- **THEN** автоматически выполняется проход внешнего критика без запроса к пользователю
-
-#### Scenario: Quick-fix не запускает внешнего критика
-
-- **WHEN** изменение классифицировано как quick-fix
-- **THEN** проход внешнего критика пропускается
-
-#### Scenario: Обязательные валидаторы не заменяются критиком
-
-- **WHEN** выполняется проход внешнего критика
-- **THEN** hard-валидаторы `syntaxcheck` / `check_1c_code` / `review_1c_code` всё равно выполняются как обязательный слой
+#### Scenario: Explicit review request
+- **WHEN** the user explicitly requests an external review
+- **THEN** the focused critic workflow runs after the selected validators
 
 ### Requirement: Предпочтение Codex с graceful fallback
+The explicitly requested external review SHALL prefer an available Codex invocation. A reviewer subagent fallback SHALL respect the explicitly selected reviewer model and host availability; missing routes SHALL be reported without silently selecting another model.
 
-Внешним критиком SHALL предпочтительно выступать Codex; при его недоступности правило SHALL деградировать на субагента `1c-code-reviewer` на модели текущего клиента (из per-client разрешения). Недоступность Codex НЕ должна блокировать завершение задачи. Способ детекции доступности Codex SHALL описываться per-client (Claude Code — codex-плагин/`codex` CLI; OpenCode — `codex exec` через shell).
+**Definition of Done:** DoD-3: Review the external review routing policy. Expected: fallback requires a selected model and available host route; unavailable review is reported without a silent alternative.
 
-#### Scenario: Codex доступен
+#### Scenario: Codex available
+- **WHEN** an explicit external review request has an available Codex route
+- **THEN** Codex performs the review
 
-- **WHEN** способ вызова Codex для текущего клиента доступен
-- **THEN** ревью выполняет Codex
+#### Scenario: Codex unavailable with a selected fallback model
+- **WHEN** Codex is unavailable and a reviewer model and subagent route are explicitly selected
+- **THEN** the reviewer subagent performs the review on that model
 
-#### Scenario: Codex недоступен — fallback на субагента
-
-- **WHEN** Codex недоступен (бинарь не найден, ошибка запуска или таймаут)
-- **THEN** ревью выполняет субагент `1c-code-reviewer` на модели текущего клиента, и завершение задачи не блокируется
+#### Scenario: No review route available
+- **WHEN** no permitted external review route is available
+- **THEN** the requested review is reported as unavailable and is not claimed complete
 
 ### Requirement: Передача контекста правил внешнему критику
 

@@ -83,6 +83,7 @@ Batch: `"Catalog.Товары ;; Document.Заказ ;; Enum.ВидыОплат"
   }
 ]
 ```
+
 Через `-Value` (CLI): передай объект как JSON-строку — `... -Operation set-panels -Value '{"top":["open"]}'`.
 
 ## set-home-page
@@ -146,3 +147,4 @@ Batch: `"Catalog.Товары ;; Document.Заказ ;; Enum.ВидыОплат"
   { "operation": "add-defaultRole", "value": "ПолныеПрава" }
 ]
 ```
+

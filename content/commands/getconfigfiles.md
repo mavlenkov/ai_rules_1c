@@ -1,140 +1,19 @@
 ---
-description: Выгрузка объектов конфигурации/расширения из ИБ в файлы (Linux + 1CFilesConverter)
+description: Extract configuration objects from infobase to files for editing
 ---
 
 # /getconfigfiles — extract configuration objects from an infobase
 
-Fork command (`mavlenkov/ai_rules_1c`, Linux + 1CFilesConverter). Reads all parameters from **`.dev.env`** (the single source of truth — see `.dev.env.example`).
+**Linux/converter branch (fork):** load `content/rules/linux-converter.md` when running on Linux or when `CONVERTER_PATH` is configured. It supplies platform paths and converter routing; all source-selection, safety, verification and reporting requirements below remain authoritative.
 
-## Settings (`.dev.env`)
 
-All paths and identifiers come from `.dev.env`. Only `INFOBASE_PATH` and `PLATFORM_PATH` are blocking — if either is empty, ask the user and write the value to `.dev.env`. `IB_USER` / `IB_PASSWORD` / `LOG_PATH` have documented defaults (see the table below) — apply them silently, do not ask up front. If the project still has a legacy `infobasesettings.md`, migrate its values into `.dev.env` and delete the legacy file after a successful migration.
+The full procedure — parameters, `repoobjects.txt`, the `ibcmd` / Designer tool selection, the PowerShell templates, and the log check — is owned by the rule **`getconfigfiles.md`**. Read it from the canonical rules directory (source: `content/rules/getconfigfiles.md`) and follow it exactly; do not improvise flags that are not in the rule.
 
-- The `ibcmd` path requires both `{PLATFORM_PATH}/bin/ibcmd` (Linux) or `{PLATFORM_PATH}\bin\ibcmd.exe` (Windows) and a filled `IBCMD_CONFIG`; clustered server infobases always use Designer.
-- **EDT projects** (`.dev.env` `USE_EDT=true`): this command exports a Designer XML dump. If the working tree is an EDT (`src/**/*.mdo`) workspace, export to a separate directory and never mix the two trees — canon `content/rules/edt-workflow.md`.
+Quick facts (details and templates — in the rule):
 
-| Key | Purpose |
-|---|---|
-| `PLATFORM_PATH` | Platform install dir; `V8_VERSION` = `basename(PLATFORM_PATH)`, executable `{PLATFORM_PATH}/1cv8` (Linux) or `{PLATFORM_PATH}\bin\1cv8.exe` (Windows) |
-| `INFOBASE_KIND` / `INFOBASE_PATH` | Build `<ib_connection>`: `file` → `/F<path>`, `server` → `/S<path>` (no space after flag, no quotes) |
-| `IB_USER` / `IB_PASSWORD` | Credentials; empty = no authentication / no password (`/N` / `/P` omitted). An empty password is a fully valid configuration for dev / test infobases — **do not ask up front**. Re-ask only if the platform itself returns an authentication error. |
-| `EXTENSION_NAME` | Extension name; empty = main configuration |
-| `EXPORT_PATH` | Target export directory; empty = current repository root |
-| `LOG_PATH` | Designer log file; empty resolves to `$TMPDIR/1cv8.log` (Linux) / `$env:TEMP\1cv8.log` (Windows). **Do not ask up front.** |
-| `IBCMD_CONFIG` | Path to standalone server `config.yml` for `ibcmd`, optional |
-| `CONVERTER_PATH` | 1CFilesConverter path (fork Section 5); set = Mode 1, empty = Mode 2 |
-| `CONVERT_TOOL` | `designer` / `ibcmd` → `V8_CONVERT_TOOL` |
-
-## Mode selection
-
-- `CONVERTER_PATH` set **and** path contains `scripts/conf2xml.sh` → use **Mode 1: 1CFilesConverter** (recommended for full export).
-- Otherwise, or when **selective** export is needed → use **Mode 2: Designer fallback**.
-
-**Note:** 1CFilesConverter does not support selective export (`-listFile`). For selective dumps, always use Mode 2.
-
----
-
-# Mode 1: 1CFilesConverter (full export)
-
-Use for complete configuration export when `CONVERTER_PATH` is configured.
-
-## Prerequisites
-
-1) `CONVERTER_PATH` set; verify `{CONVERTER_PATH}/scripts/conf2xml.sh` exists.
-2) Derive `V8_VERSION` = `basename(PLATFORM_PATH)`.
-3) Read `CONVERT_TOOL`, `IB_USER`, `IB_PASSWORD`, `EXTENSION_NAME` from `.dev.env`.
-
-## Parameter mapping (`.dev.env` → converter env vars)
-
-- `INFOBASE_KIND` + `INFOBASE_PATH` → `<ib_connection>` (`/F...` or `/S...`)
-- `basename(PLATFORM_PATH)` → `V8_VERSION`
-- `CONVERT_TOOL` → `V8_CONVERT_TOOL`
-- `IBCMD_TOOL` → `IBCMD_TOOL` (if set)
-- `IB_USER` → `V8_IB_USER`
-- `IB_PASSWORD` → `V8_IB_PWD` (empty string if not set)
-- `EXTENSION_NAME` → `V8_EXT_NAME` (when exporting an extension)
-- `EXPORT_PATH` → target directory (empty = current repository root)
-- For `CONVERT_TOOL=ibcmd` + server infobase: `DB_SRV_DBMS` → `V8_DB_SRV_DBMS`, `DB_SRV_ADDR` → `V8_DB_SRV_ADDR`, `DB_SRV_USR` → `V8_DB_SRV_USR`, `DB_SRV_PWD` → `V8_DB_SRV_PWD`; for MSSQL on Linux also `REMOTE_HOST` → `V8_REMOTE_HOST`, `REMOTE_IBCMD` → `V8_REMOTE_IBCMD`, `REMOTE_TEMP` → `V8_REMOTE_TEMP`. Omit when the corresponding `.dev.env` key is empty. See `deploy-and-test.md` → "Tool selection (ibcmd)" for when remote ibcmd is required.
-
-## Commands
-
-**Export configuration:**
-
-```bash
-cd <export_path>
-V8_VERSION=<version> \
-V8_CONVERT_TOOL=<tool> \
-V8_IB_USER=<user> \
-V8_IB_PWD=<pwd> \
-  <converter_path>/scripts/conf2xml.sh <ib_connection> <export_path>
-```
-
-Example:
-```bash
-V8_VERSION=8.3.27.1859 \
-V8_CONVERT_TOOL=designer \
-V8_IB_USER=Administrator \
-V8_IB_PWD="" \
-  ~/Проекты/1CFilesConverter/scripts/conf2xml.sh /F/tmp/test_ib .
-```
-
-**Export extension:**
-
-```bash
-V8_VERSION=<version> \
-V8_EXT_NAME=<extension_name> \
-V8_IB_USER=<user> \
-V8_IB_PWD=<pwd> \
-  <converter_path>/scripts/ext2xml.sh <ib_connection> <export_path>
-```
-
-Read the converter log to confirm success.
-
----
-
-# Mode 2: Designer fallback (selective or full export)
-
-Use for selective export or when 1CFilesConverter is unavailable.
-
-## Environment detection
-**IMPORTANT** Before running commands, detect the environment automatically:
-
-1) **OS**: run `uname -s` (or check for Windows by the presence of `%PROGRAMFILES%`).
-2) **Platform path**: take it from `.dev.env` `PLATFORM_PATH`; if empty, find the latest installed 1C:Enterprise version.
-
-| OS | Platform executable | Default log path |
-|----|---------------------|------------------|
-| Linux | `{PLATFORM_PATH}/1cv8` (or `/opt/1cv8/x86_64/<version>/1cv8`) | `LOG_PATH` (e.g. `/tmp/1c/update.log`) |
-| Windows | `{PLATFORM_PATH}\bin\1cv8.exe` (or `C:\Program Files\1cv8\<version>\bin\1cv8.exe`) | `LOG_PATH` (e.g. `%TEMP%\1c\update.log`) |
-
-Store the result as `<V8_PATH>` and `<LOG_PATH>`.
-
-## To get files from the infobase to modify its code or metadata, use the following commands:
-
-Replace `<IB_CONNECTION>` with the connection string built from `INFOBASE_KIND` + `INFOBASE_PATH` (`/F...` or `/S...` — no space after the flag, no quotes).
-If `IB_USER` / `IB_PASSWORD` are set, add `/N 'UserName' /P 'Password'` after `/DisableStartupMessages`. Omit `/P` if the password is empty — otherwise Designer consumes the next parameter as the password value.
-
-**Step 1 — Dump config to files:**
-
-File infobase:
-```
-<V8_PATH> DESIGNER /F/path/to/InfoBase /DisableStartupMessages /DumpConfigToFiles <export_path> -listFile repoobjects.txt /Out <LOG_PATH>
-```
-
-Server infobase:
-```
-<V8_PATH> DESIGNER /Sservername:port\basename /DisableStartupMessages /N UserName /DumpConfigToFiles <export_path> -listFile repoobjects.txt /Out <LOG_PATH>
-```
-
-For an extension dump add `-Extension <ExtensionName>` (`EXTENSION_NAME` from `.dev.env`):
-
-```
-<V8_PATH> DESIGNER <IB_CONNECTION> /DisableStartupMessages /N 'UserName' /P 'Password' /DumpConfigToFiles <export_path> -listFile repoobjects.txt -Extension <EXTENSION_NAME> /Out <LOG_PATH>
-```
-
-Export objects fully, strictly into `<export_path>` (`EXPORT_PATH` or the repository root) — do not create a new subdirectory.
-
-Beforehand, put the objects to export into `repoobjects.txt`.
-
-# Tool usage
-Use **search_metadata** to obtain the lists of metadata objects required for loading into the repository.
+- All parameters come from `.dev.env`. Parameters, classes and defaults — `content/rules/dev-standards-env.md §1`; Defaulted keys are never asked for. Only `INFOBASE_PATH` and `PLATFORM_PATH` are blocking — if either is empty, ask the user once and write the value to `.dev.env`. Also read: `IB_USER` / `IB_PASSWORD`, `LOG_PATH`, `IBCMD_CONFIG`.
+- Build `repoobjects.txt` from verified metadata names in the selected export tool's notation, one per line. Remove empty entries and duplicates; an empty selection must not trigger a full dump. Include separate development objects only when needed.
+- The `ibcmd` path requires both `{PLATFORM_PATH}\bin\ibcmd.exe` and a filled `IBCMD_CONFIG`; clustered server infobases always use Designer.
+- Inspect `{LOG_PATH}` for errors before starting any edits.
+- **EDT projects** (`.dev.env` `USE_EDT=true`): the export is a Designer XML dump. If the working tree is an EDT (`src/**/*.mdo`) workspace, export to a separate directory and never mix the two trees — `content/rules/edt-workflow.md`.
+- `/loadfrom1cbase partial` delegates its selected-object refresh here and retains the dirty-directory guard. After editing, `/update1cbase partial` loads a separate list of **file paths**, runs checks, then updates the database. Never reuse `repoobjects.txt` as the load list; follow the rule's synchronization contract.
