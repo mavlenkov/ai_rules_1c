@@ -20,7 +20,19 @@ def check(condition, message):
         raise AssertionError(message)
 
 
+def check_live_ib_skill(path):
+    text = path.read_text(encoding="utf-8-sig")
+    declaration = next((line.partition(":")[2] for line in text.splitlines()
+                        if line.startswith("allowed-tools:")), "")
+    allowed_tools = {name.strip() for name in declaration.split(",")}
+    check("mcp__1c-data-mcp__vcvalidatequery" in allowed_tools,
+          str(path) + ": vcvalidatequery missing from allowed-tools")
+    check("mcp__1c-data-mcp__validatequery" not in allowed_tools,
+          str(path) + ": obsolete validatequery in allowed-tools")
+
+
 def main():
+    check_live_ib_skill(REPO / "content/skills/1c-live-ib/SKILL.md")
     pwsh = shutil.which("pwsh")
     check(pwsh, "PowerShell 7 is required")
     with tempfile.TemporaryDirectory(prefix="fork-install-") as work:
@@ -56,6 +68,10 @@ def main():
         koda_settings = '{"user-setting":"keep"}'
         write(target / ".kodacli/settings.json", koda_settings)
         tools = "cursor,claude-code,opencode,codex,kimi,kilocode,qwen,koda"
+        # OpenCode and Claude Code share the same installed skills directory.
+        live_ib_skills = [target / directory / "skills/1c-live-ib/SKILL.md"
+                          for directory in (".cursor", ".claude", ".codex", ".kimi-code",
+                                            ".kilo", ".qwen", ".koda")]
         command = ["bash", str(REPO / "scripts/install.sh"), str(target), "--tools", tools,
                    "--host", "127.0.0.1", "--publish-url", "http://127.0.0.1:1/TestBase/ru/"]
         def run(args):
@@ -64,6 +80,8 @@ def main():
             check(result.returncode == 0, result.stdout)
             return result.stdout
         run(command)
+        for path in live_ib_skills:
+            check_live_ib_skill(path)
         check((target / ".codex/config.toml").read_text() == codex, "Codex settings changed")
         for path, (key, server_id) in configs.items():
             config = json.loads((target / path).read_text())
@@ -89,6 +107,8 @@ def main():
         config["mcpServers"][managed_id] = connection
         config_path.write_text(json.dumps(config))
         run(command)  # wrapper chooses update; user edits are preserved
+        for path in live_ib_skills:
+            check_live_ib_skill(path)
         run([pwsh, "-NoLogo", "-NoProfile", "-File", str(REPO / "install.ps1"), "update",
              "-ProjectRoot", str(target), "-Source", str(REPO), "-NonInteractive",
              "-ForcePaths", ".cursor/mcp.json"])
@@ -113,7 +133,7 @@ def main():
         result = subprocess.run([shutil.which("bash"), str(REPO / "scripts/install.sh"), str(empty)],
                                 env=missing_env, capture_output=True)
         check(result.returncode != 0 and not list(empty.iterdir()), "Missing runtime wrote target")
-        print("PASS: eight adapters; CLI arguments; model routing; permissions; OpenSpec; MCP preservation; invalid config; missing runtime")
+        print("PASS: eight adapters; CLI arguments; model routing; permissions; OpenSpec; MCP preservation; Live IB allowed-tools; invalid config; missing runtime")
 
 
 if __name__ == "__main__":
