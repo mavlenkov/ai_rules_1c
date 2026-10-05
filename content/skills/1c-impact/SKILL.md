@@ -41,6 +41,10 @@ Object/call tools use `object_name`, `routine_name`, `register_name`, `method_na
 
 When the graph covers the relevant base/extension layers: `list_graph_projects`, match the current roots, keep the base `project_id`, and never register extensions as projects. Repeat discovery only when workspace/server context changes or the mapping becomes invalid. Effective implementation in that index — `resolve_effective_entity(project_id, object_name, entity_kind="MetadataObject", entity_name?)`; what one indexed extension changed — `compare_base_and_extension(project_id, object_name, extension_name)`. Keep the base and extension comparison inside that same project. Neither a plain hit nor an indexed effective view alone proves what runs in a named infobase.
 
+**Identity guard.** Before accepting a returned candidate as the requested object or its indexed effective implementation, match its metadata category and exact object name, and verify its base/extension layer provenance against the requested scope. Documented singular/plural spellings of the same category are equivalent; a same-named object from another category is not a match. A layer-restricted answer must belong to that layer; a cross-layer effective view must attribute each variant to a verified covered layer.
+
+A category/name/layer mismatch or missing/ambiguous identity evidence leaves the candidate unresolved: neither a found object/effective implementation nor proof of absence. Report the discrepancy and use the intended contour's mapped code index or current sources under the existing tool policy. Never silently change the requested identity, retry sibling resolvers to mask the mismatch, patch the server, restart or reindex as lookup recovery.
+
 For separate indexes or missing graph layers, use each contour's mapped code tools or own files. Account for base, primary, secondary and relevant infrastructure contours before project-wide impact/absence claims; disclose missing coverage. Routing and runtime-evidence boundaries — `content/rules/multi-contour-search.md`.
 
 ## Rules
