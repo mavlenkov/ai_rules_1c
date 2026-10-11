@@ -119,6 +119,7 @@ Load `content/rules/<name>.md` on its trigger only; routers pull companions and 
 - code, review, debug, refactor, performance, metadata work → `tooling-playbooks`
 - `USE_EDT=true` → `edt-workflow`; several source contours → `multi-contour-search`
 - applying a configuration/extension, missing MCP validators → `designer-batch-checks`
+- source-dependent MCP deployment or reindex acceptance → `mcp-index-acceptance`
 - UI tests → `ui-testing-tools` → QA MCP: skill `1c-qa-testing` + `qa-testclient`; web: `web-client-driving`
 - extract from ИБ → `getconfigfiles`; integrations → `integrations-add`
 - metadata hand-edit within a skill exception → `metadata-xml-workarounds`

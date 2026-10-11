@@ -6,7 +6,7 @@ category: tooling
 
 # MCP deployment — host, addresses and ports
 
-Applies to the 1C MCP bundle and memory services. Local deployment is the ordinary path; a shared network server is an optional path, not a prerequisite. Reuse existing choices before asking. This rule governs deployment plumbing; the selected distribution/provider still owns images, container ports, environment variables and data formats.
+Applies to the 1C MCP bundle and memory services. Local deployment is the ordinary path; a shared network server is an optional path, not a prerequisite. Reuse existing choices before asking. This rule governs deployment plumbing; the selected distribution/provider still owns images, container ports, environment variables and data formats. Before claiming index readiness after deployment or reindexing, load `content/rules/mcp-index-acceptance.md` for independent completeness acceptance.
 
 ## Choose the target once
 
