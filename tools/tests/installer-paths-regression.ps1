@@ -6,6 +6,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $Installer = Join-Path $RepoRoot 'install.ps1'
+$PowerShellHost = (Get-Process -Id $PID).Path
 $Work = Join-Path ([IO.Path]::GetTempPath()) ('installer-paths-' + [guid]::NewGuid().ToString('N'))
 $SourceRoot = Join-Path $Work 'source repository with long name'
 $Utf8 = New-Object Text.UTF8Encoding $false
@@ -21,7 +22,7 @@ function Read-Json([string]$Path) { Get-Content -LiteralPath $Path -Raw | Conver
 function Pass([string]$Name) { $script:Passed++; Write-Host "OK  $Name" }
 function Invoke-Installer([string]$Project, [string[]]$Arguments, [string]$SourcePath = $SourceRoot) {
     $log = Join-Path $Work ('run-' + [guid]::NewGuid().ToString('N') + '.log')
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Installer @Arguments `
+    & $PowerShellHost -NoProfile -File $Installer @Arguments `
         -ProjectRoot $Project -Source $SourcePath -NonInteractive -McpMode managed *> $log
     Assert-True ($LASTEXITCODE -eq 0) "Installer failed: $(Get-Content -LiteralPath $log -Raw)"
     return (Get-Content -LiteralPath $log -Raw)
@@ -247,7 +248,7 @@ try {
     Invoke-Init -Root $ProjectFixture -SourceRootRequested $SourceFixture -RequestedTools @('cursor')
 '@
         $exportLog = Join-Path $Work 'accepted-export.log'
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -InstallerFile $Installer `
+        & $PowerShellHost -NoProfile -File $wrapper -InstallerFile $Installer `
             -ProjectFixture $exportProject -SourceFixture $SourceRoot *> $exportLog
         Assert-True ($LASTEXITCODE -eq 0) "Accepted export failed: $(Get-Content -LiteralPath $exportLog -Raw)"
         Assert-True (([IO.File]::ReadAllText((Join-Path $exportProject 'openspec/project.md'))).Contains('DumpedConfig')) 'Successful initial dump did not refresh project.md'
