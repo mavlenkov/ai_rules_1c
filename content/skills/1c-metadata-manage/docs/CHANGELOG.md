@@ -58,6 +58,21 @@ The PowerShell scripts under `tools/1c-cf-manage/scripts/` were refreshed from [
 
 ## cfe-manage.md
 
+### Local fix `2026-10-18` — borrowing follows Configurator 2.20
+
+`cfe-borrow` v1.9 → **v1.10**, `cfe-validate` v1.4 → **v1.5** (support ticket 4e6f4e67):
+
+- A borrowed form's `Forms/<Form>.xml` gets the `InternalInfo` `PropertyState` (`Form` / `Extended`) instead of an empty `<InternalInfo/>`.
+- `CommandSet` no longer ends the form-property copy: it, its `ExcludedCommand` list and every property after it up to `AutoCommandBar` reach the form and `BaseForm`.
+- One attribute (`Type.Name.Attribute.A`) or one tabular-section column (`Type.Name.TabularSection.T.Attribute.A`) can be borrowed: source uuid, source `<Type>`, type objects as shells, no cascade. `-BorrowMainAttribute Only` adds the form attribute `Объект` without the cascade and strips the data paths in both parts.
+- A new extension `ChildObjects` entry is appended to the end of its type group instead of being sorted by name. `cf-edit` / `meta-compile` keep the by-name order (APK:1108) for the main configuration.
+- No empty `Ext/Form/Module.bsl` for a borrowed form; an existing module is kept.
+- A borrowed `Document` gets an empty `<RegisterRecords/>`.
+- `cfe-validate` check 12 reports an unborrowed `CommonPicture` or a `StyleItem` outside the platform style list as an error (the form will not load with `Configuration.xml`); check 11 no longer warns about a borrowed form without `Module.bsl`. `cfe-borrow` borrows a referenced style item when the source file exists, and strips a `style:` reference that is neither borrowed nor a platform style item.
+- `Detect-FormatVersion` takes the string length after reading. A short UTF-8 `Configuration.xml` with Cyrillic no longer throws on `Substring` (file length is bytes).
+
+Pinned by `tools/tests/cfe-borrow-regression.ps1`.
+
 ### Local fix `2026-10-01` — `BaseForm` keeps multi-line texts
 
 `cfe-borrow` shifted every line of the borrowed `AutoCommandBar` / `ChildItems` one tab deeper for `BaseForm`, including the continuation line of a multi-line `v8:content`, so the copy of the base form no longer matched the configuration (support ticket bc42b89c). Only line breaks between two tags are indentation now; the texts keep their bytes.
@@ -139,6 +154,10 @@ The PowerShell script `tools/1c-epf-validate/scripts/epf-validate.ps1` was refre
 - The same script handles `erf-validate` — upstream `erf-validate` is a thin pass-through to `epf-validate.ps1`, the script auto-detects `ExternalReport` vs `ExternalDataProcessor` from the root XML element. No separate `erf-validate.ps1` is shipped.
 
 ## form-manage.md
+
+### Local fix `2026-10-14` — input-field events and pass-through keys
+
+`form-compile` refused the input-field events `Tuning` (Регулирование), `Opening` and `StartListChoice`, which vendor forms use (ZUP dump: 333, 195 and 2 input fields; support ticket 0225a24c, ERP 2.5 `Документ.НачислениеЗарплаты.ФормаДокумента`). They are allowed for `input` in the PowerShell and Python compilers and in `form-edit`, with the handler suffixes `Регулирование` / `НачалоВыбораИзСписка`. The pass-through scalars of `genericScalars` (`markNegatives`, `threeState`, `choiceListHeight` and 30 more) were written to `Form.xml` yet reported as «unknown key … ignored»; they now count as known keys. `form-compile-dsl.md` lists the `input` and `picField` events separately, as the compiler checks them.
 
 ### Local fix `2026-10-01` — button and command order, command `Representation`
 
@@ -292,6 +311,10 @@ The PowerShell script `tools/1c-mxl-validate/scripts/mxl-validate.ps1` was refre
 The compile/decompile/info scripts (`mxl-compile`, `mxl-decompile`, `mxl-info`) were not refreshed — no significant upstream changes for them in this period.
 
 ## role-manage.md
+
+### Local fix `2026-10-14` — `role-validate` parameters, rights-only edits
+
+The validate section described `-MetadataPath`, which `role-validate.ps1` does not have (the call failed with a PowerShell parameter error; support ticket d3372592): the metadata file is located from the `Rights.xml` path. The section now lists the real parameters (`-RightsPath` / `-Path`, `-OutFile`, `-Detailed`, `-MaxErrors`). The manual fallback for rights-only edits of an existing role contradicted `SKILL.md → Hard rule`; it is now one of its documented exceptions, because no tool edits a role in place.
 
 ### Upstream sync `2026-07-30`
 
