@@ -22,6 +22,10 @@ No script files were brought into `tools/` — the operations are pure module-te
 
 ## cf-manage.md
 
+### Local fix `2026-10-19` — `add-childObject` follows `NEW_OBJECT_POSITION`
+
+`cf-edit` v1.11 → **v1.12** (support ticket 4e6f4e67, item 4): `add-childObject` always inserted a new entry by name inside its kind group (culture-aware `-gt`), whatever `NEW_OBJECT_POSITION` said. It now resolves the setting as `meta-compile` does — `end` (default) after the last object of the kind, as Configurator; `byName` with the 1C-tree comparator; order-sensitive kinds never sorted. Pinned by `tools/tests/metadata-tools-regression.ps1`.
+
 ### Local fix `2026-10-01` — sibling validators are found
 
 The auto-validation of `cf-edit`, `interface-edit`, `subsystem-compile` and `subsystem-edit` looked for the validator at upstream's `..\..\<validator>\scripts\` path, which does not exist in this layout, so it was skipped silently; `xdto-edit` looked for `xdto-decompile` / `xdto-compile` / `xdto-validate` the same way and refused every structural operation. All five now take the sibling script from their own `scripts` directory.
@@ -57,6 +61,10 @@ The PowerShell scripts under `tools/1c-cf-manage/scripts/` were refreshed from [
 - Platform 8.5 support — new compatibility-mode and interface-mode values plus the new XML header format. (Same upgrade in `cfe-validate`, `epf-validate`, `skd-validate`.)
 
 ## cfe-manage.md
+
+### Local fix `2026-10-19` — an element `CommandSet` keeps its `ExcludedCommand` list
+
+`cfe-borrow` v1.10 → **v1.11** (support ticket 2b392369, an addition to 4e6f4e67): `Borrow-Form` removed every `ExcludedCommand` inside `ChildItems`, so an element whose base form excludes standard commands (a tabular-section table without `Add` / `Copy`) got an empty `<CommandSet></CommandSet>` in the form and in `BaseForm`. Configurator keeps the element's `CommandSet` with its `ExcludedCommand` list in both parts and drops an empty one on load, so the check dump after a partial load differed from the source directory. The element `CommandSet` is now copied as is. Pinned by `tools/tests/cfe-borrow-regression.ps1`.
 
 ### Local fix `2026-10-18` — borrowing follows Configurator 2.20
 
@@ -112,6 +120,10 @@ Full description in section 4 above.
 An extension is the **default answer** when a typical object on vendor support needs a change: support state stays untouched and vendor updates keep flowing. The mutating tools of this skill now enforce that — they refuse to edit a locked object directly and point here. See [support-manage.md](support-manage.md).
 
 ## db-manage.md
+
+### Local fix `2026-10-20` — `-Dynamic` takes `auto` / `disable`
+
+`db-update` v1.13 → **v1.14** (support ticket 7557c7cf): through `powershell.exe -File` a lone `-Dynamic "-"` never reaches the script — Windows PowerShell 5.1 exits with a non-zero code and no output, so the agent saw a silent failure instead of `/UpdateDBCfg -Dynamic-`. `-Dynamic` now also accepts `auto` and `disable` (the ibcmd spellings), mapped to `+` / `-`; `+` / `-` keep working in-process, and `-Dynamic:-` works through `-File` as well. Checked on a throwaway 8.3.27.2130 file base: `-File … -Dynamic disable` → `-Dynamic-`, `auto` → `-Dynamic+`, both exit 0.
 
 ### Recent Additions (upstream sync `2026-07-30`)
 
