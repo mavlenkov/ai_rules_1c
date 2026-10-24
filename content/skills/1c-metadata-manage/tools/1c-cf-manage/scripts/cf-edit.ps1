@@ -1093,7 +1093,8 @@ if (-not $NoValidate) {
 	if (Test-Path $validateScript) {
 		Write-Host ""
 		Write-Host "--- Running cf-validate ---"
-		& powershell.exe -NoProfile -File $validateScript -ConfigPath $resolvedPath
+		$psExe = if ($PSVersionTable.PSEdition -eq 'Core' -and -not $IsWindows) { Join-Path $PSHOME 'pwsh' } else { 'powershell.exe' }
+		& $psExe -NoProfile -File $validateScript -ConfigPath $resolvedPath
 	}
 }
 
