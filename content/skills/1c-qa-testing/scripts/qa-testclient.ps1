@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Start, capture and stop a 1C test client (/TestClient) for QA MCP in native mode.
 

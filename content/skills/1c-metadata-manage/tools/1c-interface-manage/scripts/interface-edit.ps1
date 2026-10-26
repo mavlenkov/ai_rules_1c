@@ -716,7 +716,8 @@ if (-not $NoValidate) {
 	if (Test-Path $validateScript) {
 		Write-Host ""
 		Write-Host "--- Running interface-validate ---"
-		& powershell.exe -NoProfile -File $validateScript -CIPath $resolvedPath
+		$psExe = if ($PSVersionTable.PSEdition -eq 'Core' -and -not $IsWindows) { Join-Path $PSHOME 'pwsh' } else { 'powershell.exe' }
+		& $psExe -NoProfile -File $validateScript -CIPath $resolvedPath
 	}
 }
 
