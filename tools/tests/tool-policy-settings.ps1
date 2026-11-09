@@ -39,7 +39,7 @@ try {
         $original = '# keep ' + [char]0x0410 + $newline +
             'TOOL_COGNEE = off' + $newline + 'TOOL_SYNTAX=required' + $newline +
             'TOOL_OPENVIKING=' + $newline + 'TOOL_DATA=typo' + $newline +
-            'TOOL_CUSTOM=off' + $newline + 'PREFIX=unchanged'
+            'TOOL_WINDOWS_MCP=off' + $newline + 'TOOL_CUSTOM=off' + $newline + 'PREFIX=unchanged'
         Write-TextFile -Path $target -Content $original
         $manifest = [ordered]@{ files = [ordered]@{ '.dev.env' = [ordered]@{ installedHash = 'old' } } }
         Ensure-ToolPolicySettings -Root $fixtureRoot -SourceRoot $repoRoot -Manifest $manifest
@@ -51,6 +51,7 @@ try {
             Assert-True (([regex]::Matches($result, ('(?m)^' + $key + '\s*='))).Count -eq 1) "Duplicate key: $key"
         }
         Assert-True ($values['TOOL_COGNEE'] -eq 'off') 'off was overwritten'
+        Assert-True ($values['TOOL_AGENT_DESKTOP'] -eq 'off') 'Desktop migration lost the previous policy'
         Assert-True ($values['TOOL_SYNTAX'] -eq 'required') 'required was overwritten'
         Assert-True ($values['TOOL_OPENVIKING'] -eq '') 'Empty value was overwritten'
         Assert-True ($values['TOOL_DATA'] -eq 'typo') 'Invalid value was silently repaired'
@@ -61,15 +62,48 @@ try {
         Assert-True ($hash -eq (Get-FileSha256 $target)) 'Migration is not idempotent'
     }
 
+    # Cross every legacy value with an explicit new choice (or missing key).
+    # Empty/invalid values must remain distinguishable from permission to run.
+    $desktopCases = 0
+    foreach ($newline in @("`n", "`r`n")) {
+        foreach ($legacy in @($null, 'off', 'required', 'auto', '', 'typo')) {
+            foreach ($explicit in @($null, 'off', 'required', 'auto', '', 'typo')) {
+                $original = '# Preserve unrelated bytes' + $newline + 'PREFIX=unchanged' + $newline
+                if ($null -ne $legacy) { $original += 'TOOL_WINDOWS_MCP=' + $legacy + $newline }
+                if ($null -ne $explicit) { $original += 'TOOL_AGENT_DESKTOP=' + $explicit + $newline }
+                Write-TextFile -Path $target -Content $original
+                $manifest = [ordered]@{ files = [ordered]@{} }
+                Ensure-ToolPolicySettings -Root $fixtureRoot -SourceRoot $repoRoot -Manifest $manifest
+                $result = Read-TextFile $target
+                $values = Read-DevEnvKeys $target
+                $expected = if ($null -ne $explicit) { $explicit } elseif ($null -ne $legacy) { $legacy } else { 'auto' }
+                Assert-True ($result.StartsWith($original)) 'Desktop matrix changed existing bytes'
+                Assert-True ($values['TOOL_AGENT_DESKTOP'] -ceq $expected) 'Desktop matrix lost policy precedence/value'
+                Assert-True (([regex]::Matches($result, '(?m)^TOOL_AGENT_DESKTOP=')).Count -eq 1) 'Duplicate desktop policy'
+                if ($null -ne $legacy) {
+                    Assert-True ($values['TOOL_WINDOWS_MCP'] -ceq $legacy) 'Legacy policy was removed or changed'
+                }
+                if ($newline -eq "`r`n") { Assert-True ($result -notmatch '(?<!\r)\n') 'Desktop matrix mixed line endings' }
+                $hash = Get-FileSha256 $target
+                Ensure-ToolPolicySettings -Root $fixtureRoot -SourceRoot $repoRoot -Manifest $manifest
+                Assert-True ($hash -eq (Get-FileSha256 $target)) 'Desktop matrix is not idempotent'
+                $desktopCases++
+            }
+        }
+    }
+
     $emptyRoot = Join-Path $fixtureRoot 'empty'
     New-Item -ItemType Directory -Path $emptyRoot | Out-Null
     Ensure-ToolPolicySettings -Root $emptyRoot -SourceRoot $repoRoot -Manifest ([ordered]@{ files = [ordered]@{} })
     Assert-True (-not (Test-Path (Join-Path $emptyRoot '.dev.env'))) 'Migration created a missing user file'
     $target = Join-Path $fixtureRoot '.dev.env'
+    Write-TextFile -Path $target -Content "TOOL_WINDOWS_MCP=off`nTOOL_AGENT_DESKTOP=required"
+    Ensure-ToolPolicySettings -Root $fixtureRoot -SourceRoot $repoRoot -Manifest ([ordered]@{ files = [ordered]@{} })
+    Assert-True ((Read-DevEnvKeys $target)['TOOL_AGENT_DESKTOP'] -eq 'required') 'Explicit desktop policy was overwritten'
     Write-TextFile -Path $target -Content ''
     Ensure-ToolPolicySettings -Root $fixtureRoot -SourceRoot $repoRoot -Manifest ([ordered]@{ files = [ordered]@{} })
     Assert-True ((Read-DevEnvKeys $target).Count -eq $policyKeys.Count) 'Empty file migration failed'
-    Write-Host "OK: $($policyKeys.Count) policies; preservation, LF/CRLF, idempotency, manifest, missing/empty file."
+    Write-Host "OK: $($policyKeys.Count) policies; $desktopCases desktop precedence cases; preservation, LF/CRLF, idempotency, manifest, missing/empty file."
 }
 finally {
     $resolved = [IO.Path]::GetFullPath($fixtureRoot)

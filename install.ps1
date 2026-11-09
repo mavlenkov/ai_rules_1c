@@ -4660,12 +4660,18 @@ function Ensure-ToolPolicySettings {
     $newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
     if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += $newline }
     $text += $newline + '# Tool policy: auto (default), off, required; availability is checked separately.' + $newline
-    foreach ($key in $missing) { $text += $key + '=auto' + $newline }
+    foreach ($key in $missing) {
+        $value = 'auto'
+        if ($key -eq 'TOOL_AGENT_DESKTOP' -and $values.Contains('TOOL_WINDOWS_MCP')) {
+            $value = $values['TOOL_WINDOWS_MCP']
+        }
+        $text += $key + '=' + $value + $newline
+    }
     Write-TextFile -Path $target -Content $text
     if ($Manifest.files.Contains($script:DevEnvFileName)) {
         $Manifest.files[$script:DevEnvFileName]['installedHash'] = Get-FileSha256 $target
     }
-    Write-Info ('  .dev.env: added tool policy keys with auto defaults (' + ($missing -join ', ') + ')')
+    Write-Info ('  .dev.env: added missing tool policy keys (' + ($missing -join ', ') + ')')
 }
 
 function Ensure-EdtUsageSetting {
@@ -5574,6 +5580,40 @@ function Invoke-Update {
             foreach ($d in $undecided) { $manifest.files[$d]['userModified'] = $true }
         }
         $script:KeptThisRun = @($dirty | Where-Object { $manifest.files[$_] -and $manifest.files[$_].userModified })
+    }
+
+    # Retire the replaced desktop command before pruning its ownership record.
+    # Only the exact active adapter target with a matching receipt is ours to
+    # delete. Unknown/edited bytes and symlinks remain user-owned, even -Force.
+    if ((Test-Path -LiteralPath (Join-Path $sourceRoot 'content/commands/install-agent-desktop.md') -PathType Leaf) -and
+        -not (Test-Path -LiteralPath (Join-Path $sourceRoot 'content/commands/install-windows-mcp.md'))) {
+        foreach ($tool in $activeTools) {
+            $adapter = $adapters[$tool]
+            if (-not $adapter.commands -or -not $adapter.commands.copyTo) { continue }
+            $rel = Resolve-CopyToPath $adapter.commands.copyTo 'install-windows-mcp'
+            if (-not $manifest.files.Contains($rel)) { continue }
+            $entry = $manifest.files[$rel]
+            if ($entry.source -ne 'content/commands/install-windows-mcp.md') { continue }
+            $abs = [IO.Path]::GetFullPath((Resolve-ManifestPath -Root $Root -Rel $rel))
+            if (-not (Test-Path -LiteralPath $abs -PathType Leaf)) { continue }
+            $linked = $false
+            $part = Get-Item -LiteralPath $abs -Force
+            while ($null -ne $part) {
+                if ($part.Attributes -band [IO.FileAttributes]::ReparsePoint) { $linked = $true; break }
+                $parent = Split-Path -Parent $part.FullName
+                if (-not $parent -or $parent -eq $part.FullName) { break }
+                $part = Get-Item -LiteralPath $parent -Force
+            }
+            if ($entry.userModified -or -not $entry.installedHash -or $linked -or
+                (Get-FileSha256 $abs) -ne $entry.installedHash) {
+                $entry['userModified'] = $true
+                Write-Warn "  Retired desktop command kept (user-owned): $rel"
+                continue
+            }
+            Remove-Item -LiteralPath $abs -Force -ErrorAction Stop
+            [void]$manifest.files.Remove($rel)
+            Write-Info "  Retired desktop command removed: $rel"
+        }
     }
 
     # Rescan
