@@ -2,8 +2,8 @@ name: validate-rules
 
 # Structural validation of the ruleset: frontmatter against the adapter schemas,
 # cross-reference and Markdown-link resolution, section anchors, MCP-only router
-# targets, the 16 KiB always-on byte budget of AGENTS.md and the load-set budgets
-# (per rule, full-cycle set, subagent start set). The bodies of the
+# targets, the always-on byte budget of AGENTS.md and the load-set budgets
+# (per rule, full-cycle set, quick-fix set, subagent start set). The bodies of the
 # routed standards live in the 1C-docs-mcp repository, so the router/body heading
 # sync runs only locally (tools/validate-rules.ps1 -StandardsDir <path>); in CI it
 # is skipped with a notice. See tools/validate-rules.ps1.
@@ -74,6 +74,14 @@ jobs:
         shell: powershell
         run: .\tools\tests\tool-policy-settings.ps1
 
+      - name: Code owner setting
+        shell: powershell
+        run: .\tools\tests\code-owner-setting.ps1
+
+      - name: DSH recommendation
+        shell: powershell
+        run: .\tools\tests\dsh-recommendation.ps1
+
       - name: Optional initial source dump
         shell: powershell
         run: .\tools\tests\initial-source-dump.ps1
@@ -141,6 +149,10 @@ jobs:
         shell: powershell
         run: .\tools\tests\installer-paths-regression.ps1
 
+      - name: Installer update keeps user edits and settings
+        shell: powershell
+        run: .\tools\tests\installer-update-safety.ps1
+
       - name: Preserve OpenCode configs (PowerShell 5.1)
         shell: powershell
         run: .\tools\tests\opencode-config-preservation.ps1
@@ -165,6 +177,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Replay optional native search against rendered graders
+        shell: powershell
+        run: node tools/tests/search-order-regression.mjs "$env:RUNNER_TEMP\gate-evals"
 
       - name: Support-guard hook (Node hook vs PowerShell guard)
         shell: powershell

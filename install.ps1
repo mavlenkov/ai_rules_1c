@@ -54,9 +54,12 @@
     (exact match or `*` wildcard, e.g. `.claude/rules-1c/tooling-playbooks.md`
     or `.claude/skills/*`). Implies -Force for the matching paths only; all
     other drifted files keep the user's edits. Multiple paths are passed
-    COMMA-separated (PowerShell array syntax):
-    `-ForcePaths .claude/skills/*,.claude/rules-1c/forms.md` — a space-separated
-    list would bind only the first path.
+    COMMA-separated: `-ForcePaths .claude/skills/*,.claude/rules-1c/forms.md`.
+    The list works as an array (`&` / `-Command`) and as one string
+    (`powershell -File install.ps1 ... -ForcePaths "a,b"`); a space-separated
+    list would bind only the first path. A leading `./` and an absolute path
+    inside the project are accepted. A pattern that matches no managed path is
+    reported at the end of the run.
 
 .PARAMETER McpMode
     How to handle the MCP phase. `auto` (default) — detect an external MCP
@@ -131,6 +134,11 @@ $script:LlmRulesFileName = 'LLM-RULES.md'
 $script:DevEnvFileName = '.dev.env'
 $script:DevEnvExampleName = '.dev.env.example'
 $script:UseEdtKey = 'USE_EDT'
+# CODE_OWNER: who owns the project code (user | agent). Asked at most once per
+# run - see Resolve-CodeOwnerAnswer.
+$script:CodeOwnerKey = 'CODE_OWNER'
+$script:CodeOwnerAnswer = $null
+$script:CodeOwnerAsked = $false
 $script:SupportKeys = @('SUPPORT_KEY', 'SUPPORT_EMAIL', 'SUPPORT_API_URL')
 $script:SupportedTools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'zcode', 'mimocode', 'koda', 'pi', 'other')
 # OpenCode configs belong to the user, including files tracked by older
@@ -735,6 +743,24 @@ function Invoke-FrontmatterOps {
                 if ($grantedHostTools -contains $hostTool) { continue }
                 if ($denied -contains $hostTool) { continue }
                 $denied += $hostTool
+            }
+            # Read-only agents (the source list grants none of
+            # `readOnly.whenNoneOf`) also lose `readOnly.deny`: host tool names
+            # the abstract map cannot express, such as the state-changing MCP
+            # tools that `MCP` would otherwise hand over with the read ones.
+            $readOnly = $toolsToDenylist.readOnly
+            if ($readOnly -and $readOnly.whenNoneOf -and $readOnly.deny) {
+                $grantsChange = $false
+                foreach ($srcTool in @($readOnly.whenNoneOf)) {
+                    if ($granted -contains $srcTool) { $grantsChange = $true; break }
+                }
+                if (-not $grantsChange) {
+                    foreach ($hostTool in @($readOnly.deny)) {
+                        if ([string]::IsNullOrWhiteSpace([string]$hostTool)) { continue }
+                        if ($denied -contains $hostTool) { continue }
+                        $denied += $hostTool
+                    }
+                }
             }
             # Comma-separated string: the form all three hosts document.
             if ($denied.Count -gt 0) { $src[$targetKey] = ($denied -join ', ') }
@@ -1627,13 +1653,11 @@ function Invoke-OpenSpecScaffold {
 # Code with two project folders (`.kilo` + `.kilocode`). Remap the Kilo Code
 # artefacts onto the same `.kilo/` root — commands into `.kilo/commands/`
 # (Kilo's current location for what upstream calls "workflows") and skills into
-# `.kilo/skills/`. Since OpenSpec 1.13 two more tools diverge from their
-# adapter: Codex skills come as the vendor-neutral `.agents/skills/` (the Codex
-# adapter installs skills into `.codex/skills/`), and OpenCode commands come as
-# `.opencode/commands/` (the OpenCode adapter uses `.opencode/command/`). Both
-# are remapped so every tool keeps a single skills / commands folder and the
-# install destinations of earlier bundles stay unchanged. All other paths pass
-# through unchanged.
+# `.kilo/skills/`. Since OpenSpec 1.13 OpenCode commands come as
+# `.opencode/commands/` (the OpenCode adapter uses `.opencode/command/`) and
+# are remapped the same way, so the tool keeps a single commands folder. Codex
+# skills come as `.agents/skills/`, which is the Codex adapter's own skills
+# folder, and pass through like all other paths.
 function Get-OpenSpecBundleDestRel {
     param(
         [string]$Tool,
@@ -1641,9 +1665,6 @@ function Get-OpenSpecBundleDestRel {
     )
     if ($Tool -eq 'kimi' -and $Rel -like '.kimi/*') {
         return '.kimi-code/' + $Rel.Substring('.kimi/'.Length)
-    }
-    if ($Tool -eq 'codex' -and $Rel -like '.agents/skills/*') {
-        return '.codex/skills/' + $Rel.Substring('.agents/skills/'.Length)
     }
     if ($Tool -eq 'opencode' -and $Rel -like '.opencode/commands/*') {
         return '.opencode/command/' + $Rel.Substring('.opencode/commands/'.Length)
@@ -1660,6 +1681,98 @@ function Get-OpenSpecBundleDestRel {
         }
     }
     return $Rel
+}
+
+# Kimi Code, Pi and Command Code also read `.agents/skills/`, the one project
+# skills folder Codex scans (moonshotai.github.io/kimi-code/en/customization/
+# skills, earendil-works/pi packages/coding-agent/docs/skills.md,
+# commandcode.ai/docs/skills; checked 2026-11-20). Installed beside Codex, their
+# own skills folder would show every skill twice, and Codex's command skills
+# would repeat their commands. So the rule above holds here too — every tool
+# keeps a single skills / commands folder: with Codex active these tools take
+# Codex's `skills` and `commands` sections, each file is placed once in
+# `.agents/skills/` and owned by every tool that reads it.
+$script:AgentsSkillsReaders = @('kimi', 'pi', 'command-code')
+
+function Get-SharedSkillsAdapters {
+    param(
+        [string[]]$Tools,
+        [hashtable]$Adapters
+    )
+    $result = @{}
+    foreach ($key in $Adapters.Keys) { $result[$key] = $Adapters[$key] }
+    $codex = $Adapters['codex']
+    if ($Tools -notcontains 'codex' -or -not $codex) { return $result }
+    foreach ($tool in $script:AgentsSkillsReaders) {
+        if ($Tools -notcontains $tool -or -not $Adapters[$tool]) { continue }
+        $copy = [ordered]@{}
+        foreach ($k in $Adapters[$tool].Keys) { $copy[$k] = $Adapters[$tool][$k] }
+        $copy['skills'] = $codex['skills']
+        $copy['commands'] = $codex['commands']
+        $result[$tool] = $copy
+    }
+    return $result
+}
+
+# Our copies a change of that layout leaves behind: in a reader's own skills
+# and commands folders once it shares `.agents/skills/`, or in `.agents/skills/`
+# once Codex is gone. Unchanged copies are deleted; an edited one stays on disk,
+# untracked, with a warning. Nothing untracked is touched.
+function Remove-UnsharedSkillCopies {
+    param(
+        [string]$Root,
+        [System.Collections.IDictionary]$Manifest,
+        [string[]]$Tools,
+        [hashtable]$NativeAdapters
+    )
+    $prefixes = @()
+    if ($Tools -contains 'codex') {
+        foreach ($tool in $script:AgentsSkillsReaders) {
+            $adapter = $NativeAdapters[$tool]
+            if ($Tools -notcontains $tool -or -not $adapter) { continue }
+            $own = [ordered]@{}
+            foreach ($section in @('skills', 'commands')) { if ($adapter.Contains($section)) { $own[$section] = $adapter[$section] } }
+            $prefixes += @(Get-AdapterTargetDirs $own)
+        }
+    }
+    else { $prefixes = @('.agents/skills') }
+    if ($prefixes.Count -eq 0) { return }
+    $removed = 0
+    $kept = @()
+    foreach ($k in @(@($Manifest.files.Keys) + @($script:PreviousFiles.Keys) | Select-Object -Unique)) {
+        $rel = ([string]$k).Replace('\', '/')
+        if (@($prefixes | Where-Object { $rel.StartsWith($_ + '/') }).Count -eq 0) { continue }
+        $abs = Join-Path $Root $rel
+        $exists = Test-Path -LiteralPath $abs
+        if ($Manifest.files.Contains($k)) {
+            $entry = $Manifest.files[$k]
+            $clean = -not $entry.userModified -and $exists -and ((Get-FileSha256 $abs) -eq $entry.installedHash)
+            if ($exists -and -not $clean) { $kept += $rel }
+            [void]$Manifest.files.Remove($k)
+        }
+        else { $clean = $exists }  # update dropped it as unchanged and nothing placed it again
+        if ($clean) {
+            Remove-Item -LiteralPath $abs -Force -ErrorAction SilentlyContinue
+            $removed++
+        }
+    }
+    foreach ($p in $prefixes) {
+        $dir = Join-Path $Root $p
+        if ($removed -eq 0 -or -not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($d in @(Get-ChildItem -LiteralPath $dir -Recurse -Directory -ErrorAction SilentlyContinue |
+                Sort-Object { $_.FullName.Length } -Descending) + @(Get-Item -LiteralPath $dir)) {
+            if (-not (Get-ChildItem -LiteralPath $d.FullName -Force -ErrorAction SilentlyContinue)) {
+                Remove-Item -LiteralPath $d.FullName -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    if ($removed -gt 0) {
+        Write-Info "  skills folder layout changed: removed $removed copy(ies) from $($prefixes -join ', ')"
+    }
+    if ($kept.Count -gt 0) {
+        Write-Warn "  Kept $($kept.Count) edited copy(ies) the shared skills folder replaces; they are no longer tracked:"
+        $kept | ForEach-Object { Write-Warn "    $_" }
+    }
 }
 
 # Remove OpenSpec artefacts left in the legacy `.kilocode/` tree by an earlier
@@ -1708,6 +1821,58 @@ function Remove-LegacyKilocodeOpenSpec {
     return $removed
 }
 
+# Earlier Codex installs wrote commands as custom prompts into the user-level
+# `~/.codex/prompts/` and skills into a project `.codex/skills/`. Codex
+# deprecated custom prompts and never scanned a project `.codex/skills/`; both
+# now live in `.agents/skills/`. Our copies are deleted and untracked; a copy
+# the user edited is untracked and kept on disk, with a warning, so the edit is
+# not lost. The user's prompts directory itself is never removed.
+function Remove-LegacyCodexArtifacts {
+    param(
+        [string]$Root,
+        [System.Collections.IDictionary]$Manifest
+    )
+    if (-not $Manifest -or -not $Manifest.files) { return }
+    $legacy = @($Manifest.files.Keys | Where-Object {
+        $k = [string]$_
+        $k -like '.codex/skills/*' -or (
+            [System.IO.Path]::IsPathRooted($k) -and
+            $k.Replace('\', '/') -match '/\.codex/prompts/[^/]+\.md$' -and
+            ([string]$Manifest.files[$k].source) -like 'content/commands/*')
+    })
+    if ($legacy.Count -eq 0) { return }
+    $removed = 0
+    $kept = @()
+    foreach ($k in $legacy) {
+        $entry = $Manifest.files[$k]
+        $abs = Resolve-ManifestPath -Root $Root -Rel $k
+        if (Test-Path -LiteralPath $abs) {
+            $clean = $entry -and -not $entry.userModified -and $entry.installedHash -and
+                ((Get-FileSha256 $abs) -eq $entry.installedHash)
+            if ($clean) {
+                Remove-Item -LiteralPath $abs -Force -ErrorAction SilentlyContinue
+                $removed++
+            }
+            else { $kept += $k }
+        }
+        [void]$Manifest.files.Remove($k)
+    }
+    $skillsDir = Join-Path $Root '.codex/skills'
+    if (Test-Path -LiteralPath $skillsDir) {
+        foreach ($d in @(Get-ChildItem -LiteralPath $skillsDir -Recurse -Directory -ErrorAction SilentlyContinue |
+                Sort-Object { $_.FullName.Length } -Descending) + @(Get-Item -LiteralPath $skillsDir)) {
+            if (-not (Get-ChildItem -LiteralPath $d.FullName -Force -ErrorAction SilentlyContinue)) {
+                Remove-Item -LiteralPath $d.FullName -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    Write-Info "Migrated: removed $removed Codex prompt / .codex/skills file(s) of an earlier install (commands and skills now live in .agents/skills/)"
+    if ($kept.Count -gt 0) {
+        Write-Warn "  Kept $($kept.Count) of them because they were edited; Codex no longer reads them, and they are no longer tracked:"
+        $kept | ForEach-Object { Write-Warn "    $_" }
+    }
+}
+
 # Place OpenSpec artefacts (slash commands / workflows + SKILLs) bundled under
 # `content/openspec-bundle/<tool>/...`. Each file under a tool's bundle is
 # copied to its real install destination (see Get-OpenSpecBundleDestRel), so the
@@ -1741,6 +1906,8 @@ function Invoke-OpenSpecArtifacts {
     $totalKept = 0
     $skippedTools = @()
     foreach ($tool in $ActiveTools) {
+        # When Codex is present, Kimi reads its OpenSpec skills from .agents/skills/.
+        if ($tool -eq 'kimi' -and 'codex' -in (@($ActiveTools) + @($Manifest.tools))) { continue }
         $toolBundle = Join-Path $bundleRoot $tool
         if (-not (Test-Path $toolBundle)) {
             $skippedTools += $tool
@@ -1748,12 +1915,13 @@ function Invoke-OpenSpecArtifacts {
         }
         $toolCopied = 0
         $toolKept = 0
-        Get-ChildItem -Recurse -File -Force -Path $toolBundle -ErrorAction SilentlyContinue | ForEach-Object {
+        # -Force: the bundle lives under dot directories, hidden on Linux / macOS.
+        Get-ChildItem -Recurse -Force -File -LiteralPath $toolBundle -ErrorAction SilentlyContinue | ForEach-Object {
             $rel = Get-InstallerRelativePath -BasePath $toolBundle -ChildPath $_.FullName
             $destRel = Get-OpenSpecBundleDestRel -Tool $tool -Rel $rel
             if ($Manifest.files.Contains($destRel)) {
                 $existing = $Manifest.files[$destRel]
-                if ($existing -and $existing.userModified) {
+                if ($existing -and $existing.userModified -and -not (Test-ForcePath $destRel)) {
                     $toolKept++
                     return
                 }
@@ -2196,9 +2364,73 @@ function Resolve-CopyToPath {
     return $p
 }
 
+# The skill name a command gets under `commands.mode: skill` (Codex). A command
+# named like a source skill (`caveman`) cannot share that skill's directory,
+# so it is installed as `<name>-command`; every other command keeps its name.
+function Get-CommandSkillName {
+    param(
+        [string]$SourceRoot,
+        [string]$Name
+    )
+    if ($SourceRoot -and (Test-Path -LiteralPath (Join-Path $SourceRoot "content/skills/$Name/SKILL.md"))) {
+        return "$Name-command"
+    }
+    return $Name
+}
+
+# `SKILL.md` text for a command placed as an agent skill. A skill carries only
+# `name` and `description`; the argument hint and the explicit-only marker of
+# a `userOnly` command go into the text, so a host without `agents/openai.yaml`
+# still sees them, and `$ARGUMENTS` is explained instead of expanded.
+function Format-CommandSkill {
+    param(
+        [string]$Name,
+        [string]$CommandName,
+        [System.Collections.IDictionary]$SourceFm,
+        [string]$Body
+    )
+    $fm = [ordered]@{ name = $Name }
+    if ($SourceFm -and $SourceFm.Contains('description')) { $fm['description'] = [string]$SourceFm['description'] }
+    $notes = @("The ``/$CommandName`` command as the skill ``$Name`` (in Codex: ``$" + $Name + "``). Another ``/<command>`` named below is the skill of that name.")
+    $hint = if ($SourceFm -and $SourceFm.Contains('argumentHint')) { [string]$SourceFm['argumentHint'] } else { '' }
+    if ($hint) { $notes += "Arguments: ``$hint`` — the text the user writes after invoking this skill." }
+    if ($Body -match '\$ARGUMENTS') { $notes += '`$ARGUMENTS` below means those arguments (empty when none were given).' }
+    if ($SourceFm -and $SourceFm.Contains('userOnly') -and [string]$SourceFm['userOnly'] -eq 'True') {
+        $notes += 'Run only when the user invokes this skill explicitly; never start it on your own.'
+    }
+    $text = (Format-Frontmatter $fm) + "`n`n" + (($notes | ForEach-Object { "> $_" }) -join "`n>`n") + "`n"
+    return $text + $Body
+}
+
+# A skill directory under a shared, cross-tool root (`.agents/skills/`) that
+# holds files none of which this installer placed belongs to the user or to
+# another tool: it is kept, not overwritten (AGENT-INSTALL.md → Confirm before
+# destructive actions). -Force / -ForcePaths on the directory takes it over.
+function Test-ForeignSkillDir {
+    param(
+        [string]$Root,
+        [string]$TargetDir,
+        [System.Collections.IDictionary]$Manifest
+    )
+    $rel = ($TargetDir -replace '[\\/]+$', '').Replace('\', '/')
+    if (-not $rel.StartsWith('.agents/skills/')) { return $false }
+    $abs = Join-Path $Root $rel
+    if (-not (Test-Path -LiteralPath $abs)) { return $false }
+    if (Test-ForcePath "$rel/SKILL.md") { return $false }
+    $files = @(Get-ChildItem -LiteralPath $abs -Recurse -File -ErrorAction SilentlyContinue)
+    if ($files.Count -eq 0) { return $false }
+    foreach ($f in $files) {
+        $key = "$rel/" + (Get-InstallerRelativePath -BasePath (Resolve-InstallerExistingPath $abs) -ChildPath $f.FullName)
+        if ($Manifest.files.Contains($key) -or $script:PreviousFiles.Contains($key)) { return $false }
+    }
+    Write-Warn "  $rel exists and was not installed by 1c-rules — kept as is (-ForcePaths '$rel/*' replaces it)"
+    return $true
+}
+
 # Resolve a manifest key (relative or already-absolute) to an absolute filesystem
-# path. Manifest keys for adapters whose `copyTo` starts with `~/` (currently
-# codex `commands`) are stored as absolute paths by `Invoke-PlaceArtifactFile`;
+# path. Manifest keys for adapters whose `copyTo` starts with `~/` (no current
+# adapter; Codex `commands` before they became skills, see
+# Remove-LegacyCodexArtifacts) are stored as absolute paths by `Invoke-PlaceArtifactFile`;
 # every other key is project-relative. Iteration over `$manifest.files.Keys`
 # must go through this helper instead of `Join-Path $Root $rel`, otherwise
 # absolute keys turn into garbage like `C:\Project\C:\Users\...` and Test-Path
@@ -2218,6 +2450,57 @@ function Resolve-ManifestPath {
 # the force to paths matching one of the patterns (exact match or `*`/`?`
 # wildcard via -like). Used uniformly by the artefact, MCP, entry, and skill
 # placement paths so the overwrite contract is identical everywhere.
+function ConvertTo-ForcePathPattern {
+    # One -ForcePaths item in the form manifest keys use: forward slashes,
+    # project-relative, no leading `./`. A path outside the project is returned
+    # as given (user-scope keys are absolute).
+    param(
+        [string]$Pattern,
+        [string]$Root
+    )
+    $p = ([string]$Pattern).Trim().Trim('"', "'").Replace('\', '/')
+    if (-not $p) { return '' }
+    $base = ([string]$Root).Replace('\', '/').TrimEnd('/') + '/'
+    if ($base -ne '/' -and $p.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)) { $p = $p.Substring($base.Length) }
+    while ($p.StartsWith('./')) { $p = $p.Substring(2) }
+    return $p
+}
+
+function Resolve-ForcePathList {
+    # `powershell -File` does not split `a,b` into an array, so every element is
+    # split here. An explicit list that comes out empty is an error: treating it
+    # as "no list" would turn `-Force -ForcePaths ","` into "force everything".
+    param(
+        [string[]]$Paths,
+        [string]$Root
+    )
+    $result = @()
+    foreach ($item in @($Paths)) {
+        foreach ($part in ([string]$item).Split(',')) {
+            $p = ConvertTo-ForcePathPattern -Pattern $part -Root $Root
+            if ($p -and $result -notcontains $p) { $result += $p }
+        }
+    }
+    if ($result.Count -eq 0) { throw '-ForcePaths is given but names no path.' }
+    return , $result
+}
+
+function Get-UnmatchedForcePaths {
+    # Patterns of -ForcePaths that match none of the given project-relative
+    # paths: a typo or a wrong separator must not look like a done overwrite.
+    param([string[]]$KnownPaths)
+    $unmatched = @()
+    foreach ($pat in @($script:ForcePaths)) {
+        if (-not $pat) { continue }
+        $hit = $false
+        foreach ($known in @($KnownPaths)) {
+            if (([string]$known).Replace('\', '/') -like $pat) { $hit = $true; break }
+        }
+        if (-not $hit) { $unmatched += $pat }
+    }
+    return , $unmatched
+}
+
 function Test-ForcePath {
     param([string]$Rel)
     # -ForcePaths implies -Force for the listed paths (per the documented
@@ -2228,8 +2511,8 @@ function Test-ForcePath {
     $norm = ([string]$Rel).Replace('\', '/')
     foreach ($pat in $script:ForcePaths) {
         if (-not $pat) { continue }
-        $p = ([string]$pat).Replace('\', '/')
-        if ($norm -like $p) { return $true }
+        # Patterns are already in manifest form (Resolve-ForcePathList).
+        if ($norm -like $pat) { return $true }
     }
     return $false
 }
@@ -2264,10 +2547,8 @@ function Invoke-PlaceArtifactFile {
         [System.Collections.IDictionary]$Manifest,
         [string]$ContentSource,
         [string]$OwnerTool,
-        [System.Collections.IDictionary]$Layouts,
-        [System.Collections.IDictionary]$RelativeLayouts
+        [System.Collections.IDictionary]$Layouts
     )
-    if ($null -eq $RelativeLayouts) { $RelativeLayouts = $Layouts }
     # Respect user modifications: if manifest marks this path as userModified,
     # keep the user's edits and leave the manifest entry unchanged — unless the
     # user asked to force this path (-Force / -ForcePaths), in which case fall
@@ -2286,7 +2567,6 @@ function Invoke-PlaceArtifactFile {
         $absTarget = Join-Path $Root $TargetRel
     }
     if ($Mode -eq 'rebuild-toml') {
-        $SourceBody = Convert-ContentRelativeLinks -Text $SourceBody -SourcePath $SourcePath -TargetPath $absTarget -Root $Root -Layouts $RelativeLayouts
         $SourceBody = Convert-AgentsMdPaths -Text $SourceBody -Layouts $Layouts
         $rendered = Invoke-CodexAgentTemplate -Template $Template -Fm $SourceFm -Body $SourceBody
         Write-TextFile -Path $absTarget -Content $rendered
@@ -2297,11 +2577,22 @@ function Invoke-PlaceArtifactFile {
             New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
         }
         if ([IO.Path]::GetExtension($SourcePath) -ieq '.md') {
-            $rendered = Convert-ContentRelativeLinks -Text (Read-TextFile $SourcePath) -SourcePath $SourcePath -TargetPath $absTarget -Root $Root -Layouts $RelativeLayouts
-            $rendered = Convert-AgentsMdPaths -Text $rendered -Layouts $Layouts
+            $rendered = Convert-AgentsMdPaths -Text (Read-TextFile $SourcePath) -Layouts $Layouts
             Write-TextFile -Path $absTarget -Content $rendered
         }
         else { Copy-Item -LiteralPath $SourcePath -Destination $absTarget -Force }
+    }
+    elseif ($Mode -eq 'skill') {
+        # A command placed as an agent skill: `<skills>/<skill>/SKILL.md`, the
+        # skill named after its directory.
+        $skillName = Split-Path -Leaf (Split-Path -Parent $absTarget)
+        $full = Format-CommandSkill -Name $skillName -CommandName ([IO.Path]::GetFileNameWithoutExtension($SourcePath)) `
+            -SourceFm $SourceFm -Body $SourceBody
+        Write-TextFile -Path $absTarget -Content (Convert-AgentsMdPaths -Text $full -Layouts $Layouts)
+    }
+    elseif ($Mode -eq 'generated') {
+        # Text the installer composed itself (a skill's `agents/openai.yaml`).
+        Write-TextFile -Path $absTarget -Content $SourceBody
     }
     else {
         $newFm = Invoke-FrontmatterOps -Source $SourceFm -Ops $FrontmatterOps
@@ -2312,7 +2603,6 @@ function Invoke-PlaceArtifactFile {
         else {
             $full = $SourceBody
         }
-        $full = Convert-ContentRelativeLinks -Text $full -SourcePath $SourcePath -TargetPath $absTarget -Root $Root -Layouts $RelativeLayouts
         $full = Convert-AgentsMdPaths -Text $full -Layouts $Layouts
         Write-TextFile -Path $absTarget -Content $full
     }
@@ -2343,13 +2633,12 @@ function Invoke-PlaceSkill {
         [System.Collections.IDictionary]$Manifest,
         [string]$ContentSource,
         [string]$OwnerTool,
-        [System.Collections.IDictionary]$Layouts,
-        [System.Collections.IDictionary]$RelativeLayouts
+        [System.Collections.IDictionary]$Layouts
     )
-    if ($null -eq $RelativeLayouts) { $RelativeLayouts = $Layouts }
     $absTarget = Join-Path $Root $TargetDir
     $srcFull = Resolve-InstallerExistingPath $SourceDir
     $targetRelBase = ($TargetDir -replace '[\\/]+$', '').Replace('\', '/')
+    if (Test-ForeignSkillDir -Root $Root -TargetDir $TargetDir -Manifest $Manifest) { return }
     if (-not (Test-Path $absTarget)) {
         New-Item -ItemType Directory -Force -Path $absTarget | Out-Null
     }
@@ -2377,8 +2666,7 @@ function Invoke-PlaceSkill {
             New-Item -ItemType Directory -Force -Path $destDir | Out-Null
         }
         if ($sf.Extension -ieq '.md') {
-            $rendered = Convert-ContentRelativeLinks -Text (Read-TextFile $sf.FullName) -SourcePath $sf.FullName -TargetPath $destFull -Root $Root -Layouts $RelativeLayouts
-            $rendered = Convert-AgentsMdPaths -Text $rendered -Layouts $Layouts
+            $rendered = Convert-AgentsMdPaths -Text (Read-TextFile $sf.FullName) -Layouts $Layouts
             Write-TextFile -Path $destFull -Content $rendered
         }
         else { Copy-Item -LiteralPath $sf.FullName -Destination $destFull -Force }
@@ -2586,7 +2874,7 @@ function Read-AgentModelChoice {
     Write-Info '    [3] Claude Fable 5 / Mythos 5   (fable5)'
     Write-Info '    [4] GPT-5.6                     (gpt56)'
     Write-Info '    [5] GPT-6 Astra                 (gpt6)'
-    Write-Info '    [6] другая модель / не задавать (базовый свод правил, профиль не применяется)'
+    Write-Info '    [6] другая модель / не задавать (агент сам применит профиль своей модели, если он есть)'
     Write-Info '    [7] ввести название модели самому (в любом написании)'
     $choice = Read-Required '  Выбор модели головного агента' '6'
     switch ($choice) {
@@ -2596,10 +2884,10 @@ function Read-AgentModelChoice {
         '4' { return 'gpt56' }
         '5' { return 'gpt6' }
         '7' {
-            $raw = Read-Required '  Название модели (Enter — без профиля)' ''
+            $raw = Read-Required '  Название модели (Enter — не задавать)' ''
             $slug = Resolve-AgentModelSlug -Raw $raw
             if (-not $slug -and $raw) {
-                Write-Warn "  модель '$raw' не распознана — профиль не применяется, действует базовый свод правил (сменить позже: /rulesmodel)"
+                Write-Warn "  модель '$raw' не распознана — значение не записано, агент сам применит профиль своей модели, если он есть (сменить позже: /rulesmodel)"
             }
             return $slug
         }
@@ -2715,14 +3003,23 @@ function Invoke-PlacePhase {
         $loadedAdapters = Load-Adapters -SourceRoot $SourceRoot -Tools $missingAdapters
         foreach ($key in $loadedAdapters.Keys) { $canonicalAdapters[$key] = $loadedAdapters[$key] }
     }
-    $layouts = Resolve-CanonicalArtifactLayouts -ActiveTools $canonicalTools -Adapters $canonicalAdapters
-    foreach ($tool in $ActiveTools) {
-        $adapter = $Adapters[$tool]
-        $relativeLayouts = Resolve-CanonicalArtifactLayouts -ActiveTools @($tool) -Adapters $canonicalAdapters
+    $nativeAdapters = $canonicalAdapters
+    $canonicalAdapters = Get-SharedSkillsAdapters -Tools $canonicalTools -Adapters $nativeAdapters
+    $layouts = Resolve-CanonicalArtifactLayouts -ActiveTools $canonicalTools -Adapters $canonicalAdapters -SourceRoot $SourceRoot
+    # `add -Tool codex` beside an installed reader of `.agents/skills/`: the
+    # reader is placed again for its now shared skills and commands only, so it
+    # becomes an owner of the copies it reads.
+    $sharedOnly = @()
+    if ($ActiveTools -contains 'codex') {
+        $sharedOnly = @($script:AgentsSkillsReaders | Where-Object { $canonicalTools -contains $_ -and $ActiveTools -notcontains $_ })
+    }
+    foreach ($tool in @(@($ActiveTools) + $sharedOnly)) {
+        $adapter = $canonicalAdapters[$tool]
+        $ownSections = $sharedOnly -notcontains $tool
         Write-Info "  [$tool] placing files"
 
         # rules
-        if ($adapter.rules -and $adapter.rules.copyTo) {
+        if ($ownSections -and $adapter.rules -and $adapter.rules.copyTo) {
             $copyTpl = $adapter.rules.copyTo
             $fmOps = $adapter.rules.frontmatter
             $mode = if ($adapter.rules.mode) { $adapter.rules.mode } else { 'transform' }
@@ -2733,12 +3030,12 @@ function Invoke-PlacePhase {
                 Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                     -TargetRel $target -SourceFm $parts.Frontmatter -SourceBody $parts.Body `
                     -FrontmatterOps $fmOps -Mode $mode `
-                    -Manifest $Manifest -ContentSource ("content/rules/" + $f.Name) -OwnerTool $tool -Layouts $layouts -RelativeLayouts $relativeLayouts
+                    -Manifest $Manifest -ContentSource ("content/rules/" + $f.Name) -OwnerTool $tool -Layouts $layouts
             }
         }
 
         # agents
-        if ($adapter.agents -and $adapter.agents.copyTo) {
+        if ($ownSections -and $adapter.agents -and $adapter.agents.copyTo) {
             $copyTpl = $adapter.agents.copyTo
             $fmOps = $adapter.agents.frontmatter
             $mode = if ($adapter.agents.mode) { $adapter.agents.mode } else { 'transform' }
@@ -2751,7 +3048,7 @@ function Invoke-PlacePhase {
                 Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                     -TargetRel $target -SourceFm $agentFm -SourceBody $parts.Body `
                     -FrontmatterOps $fmOps -Mode $mode -Template $template `
-                    -Manifest $Manifest -ContentSource ("content/agents/" + $f.Name) -OwnerTool $tool -Layouts $layouts -RelativeLayouts $relativeLayouts
+                    -Manifest $Manifest -ContentSource ("content/agents/" + $f.Name) -OwnerTool $tool -Layouts $layouts
             }
         }
 
@@ -2763,20 +3060,38 @@ function Invoke-PlacePhase {
             foreach ($f in Get-ChildItem -File (Join-Path $SourceRoot 'content/commands') -Filter *.md) {
                 $parts = Split-FrontmatterAndBody (Read-TextFile $f.FullName)
                 $name = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
+                if ($mode -eq 'skill') {
+                    $skillName = Get-CommandSkillName -SourceRoot $SourceRoot -Name $name
+                    $targetRaw = Resolve-CopyToPath $copyTpl $skillName
+                    $skillDir = Split-Path -Parent $targetRaw
+                    if (Test-ForeignSkillDir -Root $Root -TargetDir $skillDir -Manifest $Manifest) { continue }
+                    Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
+                        -TargetRel $targetRaw -SourceFm $parts.Frontmatter -SourceBody $parts.Body `
+                        -FrontmatterOps $fmOps -Mode $mode `
+                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts
+                    if ($parts.Frontmatter -and [string]$parts.Frontmatter['userOnly'] -eq 'True') {
+                        # Codex: no implicit invocation of a service command.
+                        Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
+                            -TargetRel ($skillDir.Replace('\', '/') + '/agents/openai.yaml') `
+                            -SourceBody "policy:`n  allow_implicit_invocation: false`n" -Mode 'generated' `
+                            -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts
+                    }
+                    continue
+                }
                 $targetRaw = Resolve-CopyToPath $copyTpl $name
                 # If target starts with ~/ (absolute home path), we need to write outside root
                 if ($copyTpl.StartsWith('~/')) {
                     Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                         -TargetRel $targetRaw -SourceFm $parts.Frontmatter -SourceBody $parts.Body `
                         -FrontmatterOps $fmOps -Mode $mode `
-                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts -RelativeLayouts $relativeLayouts
+                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts
                     Write-Warn "  command written to user scope: $targetRaw (shared across projects)"
                 }
                 else {
                     Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                         -TargetRel $targetRaw -SourceFm $parts.Frontmatter -SourceBody $parts.Body `
                         -FrontmatterOps $fmOps -Mode $mode `
-                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts -RelativeLayouts $relativeLayouts
+                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts
                 }
             }
         }
@@ -2789,10 +3104,8 @@ function Invoke-PlacePhase {
                 if (-not (Test-Path $skillMd)) { continue }
                 $name = $sd.Name
                 $targetDir = Resolve-CopyToPath $dirTpl $name
-                $skillRelativeLayouts = Resolve-DocumentRelativeLayouts -Section 'skills' -TargetRel $targetDir `
-                    -WriterTool $tool -ActiveTools $canonicalTools -Adapters $canonicalAdapters
                 Invoke-PlaceSkill -Root $Root -SourceDir $sd.FullName -TargetDir $targetDir `
-                    -Manifest $Manifest -ContentSource ("content/skills/" + $name) -OwnerTool $tool -Layouts $layouts -RelativeLayouts $skillRelativeLayouts
+                    -Manifest $Manifest -ContentSource ("content/skills/" + $name) -OwnerTool $tool -Layouts $layouts
             }
         }
 
@@ -2802,7 +3115,7 @@ function Invoke-PlacePhase {
         # installed by us and is byte-identical to what we recorded (lets a
         # changed stub template refresh cleanly); otherwise keep the user's
         # file. -Force / -ForcePaths overrides and rewrites the shipped stub.
-        if ($adapter.entry) {
+        if ($ownSections -and $adapter.entry) {
             $etarget = $adapter.entry.target
             $etpl = $adapter.entry.template
             if ($etarget) {
@@ -2848,6 +3161,8 @@ function Invoke-PlacePhase {
     # On-demand rules go to each active tool's rules directory only. The shared
     # `.ai-rules/rules/` mirror is no longer created — `AGENTS.md` references
     # the canonical tool's directory, resolved by `Resolve-CanonicalRulesDir`.
+
+    Remove-UnsharedSkillCopies -Root $Root -Manifest $Manifest -Tools $canonicalTools -NativeAdapters $nativeAdapters
 }
 
 # Priority order for choosing the "canonical" rules directory referenced by
@@ -2881,38 +3196,13 @@ function Resolve-CanonicalRulesLayout {
 #
 # Used by the place phase and Update-AgentsMd so every installed Markdown
 # document and agent body can resolve source references from the project root.
-function Resolve-DocumentRelativeLayouts {
-    # A shared directory follows its active physical owner, not the last writer.
-    # OpenCode-alone .claude/skills falls back to OpenCode's declared sections.
-    param(
-        [string]$Section,
-        [string]$TargetRel,
-        [string]$WriterTool,
-        [string[]]$ActiveTools,
-        [hashtable]$Adapters
-    )
-    $target = $TargetRel.Replace('\', '/').TrimEnd('/')
-    $owner = $WriterTool
-    foreach ($candidate in $script:RulesDirPriority) {
-        if ($ActiveTools -notcontains $candidate) { continue }
-        $adapter = $Adapters[$candidate]
-        if (-not $adapter -or -not $adapter.Contains($Section) -or -not $adapter[$Section].copyTo -or
-            -not $adapter.Contains('rules') -or -not $adapter.rules.copyTo) { continue }
-        $namespace = ([string]$adapter.rules.copyTo).Replace('\', '/').Split('/')[0]
-        $directory = (([string]$adapter[$Section].copyTo).Replace('\', '/') -replace '\{name\}.*$', '').TrimEnd('/')
-        if ($namespace -and $directory -and $target.StartsWith($namespace + '/', [StringComparison]::Ordinal) -and
-            ($target -eq $directory -or $target.StartsWith($directory + '/', [StringComparison]::Ordinal))) {
-            $owner = $candidate
-            break
-        }
-    }
-    return (Resolve-CanonicalArtifactLayouts -ActiveTools @($owner) -Adapters $Adapters)
-}
-
 function Resolve-CanonicalArtifactLayouts {
     param(
         [string[]]$ActiveTools,
-        [hashtable]$Adapters
+        [hashtable]$Adapters,
+        # Lets a `commands.mode: skill` layout know which commands are
+        # installed under another name (Get-CommandSkillName).
+        [string]$SourceRoot
     )
     $layouts = [ordered]@{}
     foreach ($section in @('rules', 'agents', 'commands', 'skills')) {
@@ -2928,6 +3218,15 @@ function Resolve-CanonicalArtifactLayouts {
             $ext = ''
             if ($copyTo -match '\{name\}\.([A-Za-z0-9]+)$') { $ext = $Matches[1] }
             $layouts[$section] = [ordered]@{ Dir = $dir; Ext = $ext; Tool = $tool; Template = $copyTo.Replace('\', '/') }
+            if ($section -eq 'commands' -and [string]$adapter[$section].mode -eq 'skill' -and $SourceRoot) {
+                $rename = @{}
+                foreach ($f in Get-ChildItem -File (Join-Path $SourceRoot 'content/commands') -Filter *.md -ErrorAction SilentlyContinue) {
+                    $name = [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
+                    $skillName = Get-CommandSkillName -SourceRoot $SourceRoot -Name $name
+                    if ($skillName -ne $name) { $rename[$name] = $skillName }
+                }
+                $layouts[$section]['Rename'] = $rename
+            }
             break
         }
     }
@@ -2948,87 +3247,6 @@ function Resolve-CanonicalArtifactLayouts {
 # The name regex accepts `<` and `>` so placeholder paths like
 # `content/agents/<name>.md` in prose are also rewritten to the installed
 # directory but keep the literal `<name>` token.
-function Get-LegacyRelativeLinkPath {
-    # .NET Framework (Windows PowerShell 5.1) has no Path.GetRelativePath.
-    # Inputs are absolute filesystem paths; compare segments without URI parsing.
-    param([string]$BaseDirectory, [string]$TargetPath)
-    $base = [IO.Path]::GetFullPath($BaseDirectory)
-    $target = [IO.Path]::GetFullPath($TargetPath)
-    $comparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
-    $baseRoot = [IO.Path]::GetPathRoot($base)
-    $targetRoot = [IO.Path]::GetPathRoot($target)
-    if (-not [string]::Equals($baseRoot, $targetRoot, $comparison)) { return $target }
-    $baseParts = @($base.Substring($baseRoot.Length).Split([IO.Path]::DirectorySeparatorChar) | Where-Object { $_ -ne '' })
-    $targetParts = @($target.Substring($targetRoot.Length).Split([IO.Path]::DirectorySeparatorChar) | Where-Object { $_ -ne '' })
-    $common = 0
-    while ($common -lt $baseParts.Count -and $common -lt $targetParts.Count -and
-        [string]::Equals($baseParts[$common], $targetParts[$common], $comparison)) { $common++ }
-    $parts = @()
-    for ($i = $common; $i -lt $baseParts.Count; $i++) { $parts += '..' }
-    for ($i = $common; $i -lt $targetParts.Count; $i++) { $parts += $targetParts[$i] }
-    if ($parts.Count -eq 0) { return '.' }
-    return ($parts -join '/')
-}
-
-function Get-RelativeLinkPath {
-    param([string]$BaseDirectory, [string]$TargetPath)
-    $base = [IO.Path]::GetFullPath($BaseDirectory)
-    $target = [IO.Path]::GetFullPath($TargetPath)
-    if ([IO.Path].GetMethods().Name -contains 'GetRelativePath') {
-        return [IO.Path]::GetRelativePath($base, $target).Replace('\', '/')
-    }
-    return (Get-LegacyRelativeLinkPath -BaseDirectory $base -TargetPath $target)
-}
-
-function Convert-ContentRelativeLinks {
-    # Resolve a Markdown destination in the source tree first, then map its
-    # section through the existing canonical layouts. Never guess from ../ depth.
-    # Compute relative filesystem paths without constructing or comparing URIs.
-    param(
-        [string]$Text,
-        [string]$SourcePath,
-        [string]$TargetPath,
-        [string]$Root,
-        [System.Collections.IDictionary]$Layouts
-    )
-    if (-not $Text -or -not $Layouts -or $Layouts.Count -eq 0) { return $Text }
-    $sourceFull = [IO.Path]::GetFullPath($SourcePath)
-    $sourceMatch = [regex]::Match($sourceFull.Replace('\', '/'), '^(?<content>.+/content)/(?<section>skills|agents|commands|docs)/')
-    if (-not $sourceMatch.Success) { return $Text }
-    $contentRoot = [IO.Path]::GetFullPath($sourceMatch.Groups['content'].Value)
-    $contentPrefix = $contentRoot.TrimEnd('/', '\') + [IO.Path]::DirectorySeparatorChar
-    $sourceDir = Split-Path -Parent $sourceFull
-    $targetDir = [IO.Path]::GetFullPath((Split-Path -Parent $TargetPath)).TrimEnd('/', '\') + [IO.Path]::DirectorySeparatorChar
-    $comparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
-    $pattern = '(?m)(?<prefix>!?\[[^\]\r\n]*\]\([ \t]*|^[ \t]{0,3}\[[^\]\r\n]+\]:[ \t]*)(?<dest><[^>\r\n]+>|[^\s)\r\n]+)'
-    return [regex]::Replace($Text, $pattern, {
-        param($m)
-        $token = $m.Groups['dest'].Value
-        $angled = $token.StartsWith('<') -and $token.EndsWith('>')
-        $destination = if ($angled) { $token.Substring(1, $token.Length - 2) } else { $token }
-        if ($destination -match '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|[/\\#?])' -or
-            $destination -match 'YYYY-MM|[{}<>*]') { return $m.Value }
-        $parts = [regex]::Match($destination, '^(?<path>[^#?]+)(?<suffix>[#?].*)?$')
-        if (-not $parts.Success) { return $m.Value }
-        $linkPath = [Uri]::UnescapeDataString($parts.Groups['path'].Value).Replace('/', [IO.Path]::DirectorySeparatorChar)
-        try { $resolved = [IO.Path]::GetFullPath((Join-Path $sourceDir $linkPath)) } catch { return $m.Value }
-        if (-not $resolved.StartsWith($contentPrefix, $comparison) -or -not (Test-Path -LiteralPath $resolved)) { return $m.Value }
-        $sourceRel = $resolved.Substring($contentPrefix.Length).Replace('\', '/')
-        $section = ($sourceRel -split '/', 2)[0]
-        if ($section -eq $sourceMatch.Groups['section'].Value -or -not $Layouts.Contains($section)) { return $m.Value }
-        $installed = Convert-AgentsMdPaths -Text ("content/$sourceRel") -Layouts $Layouts
-        if ($installed -eq "content/$sourceRel") { return $m.Value }
-        if ($installed.StartsWith('~/')) { $installed = Join-Path $HOME $installed.Substring(2) }
-        $installedFull = [IO.Path]::GetFullPath((Resolve-ManifestPath -Root $Root -Rel $installed))
-        $relative = Get-RelativeLinkPath -BaseDirectory $targetDir -TargetPath $installedFull
-        if ([IO.Path]::IsPathRooted($relative)) { return $m.Value }
-        $escaped = (($relative.Replace('\', '/') -split '/') | ForEach-Object { [Uri]::EscapeDataString($_) }) -join '/'
-        $newDestination = $escaped + $parts.Groups['suffix'].Value
-        if ($angled) { $newDestination = '<' + $newDestination + '>' }
-        return $m.Groups['prefix'].Value + $newDestination
-    })
-}
-
 function Convert-AgentsMdPaths {
     param(
         [string]$Text,
@@ -3054,12 +3272,14 @@ function Convert-AgentsMdPaths {
         $captureDir = $dir
         $captureExt = $ext
         $captureTemplate = [string]$Layouts[$section].Template
+        $captureRename = $Layouts[$section].Rename
         # Pass 1: file references — both directory and extension are rewritten
         # (the extension swap matters for Cursor's `.mdc` rules and Codex's
         # `.toml` agents).
         $result = [regex]::Replace($result, $entry.Pattern, {
             param($m)
             $name = $m.Groups[1].Value
+            if ($captureRename -and $captureRename.Contains($name)) { $name = $captureRename[$name] }
             if ($captureTemplate) { return $captureTemplate.Replace('{name}', $name) }
             return "$captureDir/$name.$captureExt"
         })
@@ -3121,6 +3341,13 @@ function Get-McpConfigMap {
     return $node
 }
 
+function Test-EditedMcpConfig {
+    param($Entry, [string]$Path)
+    return ($Entry -and $Entry.source -eq 'content/mcp-servers.json' -and
+        (Test-Path -LiteralPath $Path -PathType Leaf) -and
+        ($Entry.userModified -or (Get-FileSha256 $Path) -ne $Entry.installedHash))
+}
+
 function Invoke-McpPhase {
     param(
         [string]$Root,
@@ -3142,7 +3369,9 @@ function Invoke-McpPhase {
         return
     }
     $servers = Read-McpServers -Root $SourceRoot
-    Resolve-McpServerHost -Servers $servers -HostName (Get-McpHost -Root $Root)
+    $serverHost = Get-McpHost -Root $Root
+    $siteDefaults = [bool]($McpHost -or $InfobasePublishUrl -or $serverHost -ne 'localhost')
+    Resolve-McpServerHost -Servers $servers -HostName $serverHost
 
     # Substitute {INFOBASE_PUBLISH_URL} placeholders in server URLs from the
     # project's .dev.env (Place-DevEnv runs earlier in the pipeline so the
@@ -3245,18 +3474,29 @@ function Invoke-McpPhase {
             if ($Manifest.files.Contains($legacy)) { [void]$Manifest.files.Remove($legacy) }
         }
 
-        # Respect user modifications to the MCP config the same way artefact
-        # files are respected: if a previous `update` flagged this target as
-        # userModified (the user trimmed the server list, switched the format,
-        # etc.), DO NOT regenerate it from the full catalog — that would
-        # silently bring back servers the user removed. Honour -Force /
-        # -ForcePaths as the explicit opt-in to regenerate.
-        if ($Manifest.files.Contains($target)) {
-            $mcpExisting = $Manifest.files[$target]
-            if ($mcpExisting -and $mcpExisting.userModified -and -not (Test-ForcePath $target)) {
-                Write-Warn "  [$tool] MCP config: $target помечен как изменённый пользователем — оставляю без изменений (ваш выбор серверов сохранён). Чтобы перегенерировать из полного каталога: update -Force -ForcePaths $target — ваши правки будут заменены."
-                continue
-            }
+        if (Test-EditedMcpConfig -Entry $Manifest.files[$target] -Path $absTarget) {
+            $Manifest.files[$target]['userModified'] = $true
+            Write-Warn "  [$tool] MCP config: $target изменён пользователем — сохраняю подключения."
+            continue
+        }
+
+        # A config that exists and was never ours holds the user's own servers
+        # and, in Codex, every other client setting. JSON is merged per server
+        # below; TOML has no safe key-level merge here and is left untouched
+        # and untracked, so no update or remove ever touches it.
+        $isUserConfig = (Test-Path -LiteralPath $absTarget) -and
+            -not $Manifest.files.Contains($target) -and -not $script:PreviousFiles.Contains($target)
+        $isJsonConfig = ([string]$adapter.mcp.format) -eq 'json'
+        # A legacy whole-file receipt may contain site URLs even when its hash
+        # matches. It does not establish that the current catalog owns those URLs.
+        $legacyMcpReceipt = $Manifest.files.Contains($target) -and -not $Manifest.files[$target].catalogManaged
+        if (($siteDefaults -or $legacyMcpReceipt) -and $tool -eq 'codex' -and (Test-Path -LiteralPath $absTarget)) {
+            [void]$Manifest.files.Remove($target)
+            continue
+        }
+        if ($isUserConfig -and -not $isJsonConfig) {
+            Write-Warn "  [$tool] MCP config: $target создан не установщиком — оставляю без изменений. Подключения 1С добавьте через /setupmcp."
+            continue
         }
 
         # `mcp.merge: true` (set in adapter yaml) — when the target file is
@@ -3268,10 +3508,6 @@ function Invoke-McpPhase {
         # overridable via `mcp.mergeKey`) with our rendered value, keep
         # every other key untouched. New file path → write whole rendered
         # JSON as before.
-        if ($tool -eq 'codex' -and (Test-Path -LiteralPath $absTarget)) {
-            Write-Info "  [$tool] Existing MCP TOML preserved: $target; add new connections through /setupmcp"
-            continue
-        }
         $mergeRequested = $false
         if ($adapter.mcp.PSObject.Properties.Match('merge').Count -gt 0) {
             $mergeRequested = [bool]$adapter.mcp.merge
@@ -3288,17 +3524,40 @@ function Invoke-McpPhase {
         }
 
         $finalContent = $content
-        $mergeServers = $tool -ne 'codex' -and $tool -ne 'koda'
-        $managedServers = @()
-        if ($mergeServers) {
-            $mergeRequested = $true
-            if ($mergeKey -eq 'mcp' -and $tool -in @('cursor', 'claude-code', 'command-code', 'kimi', 'other')) {
-                $mergeKey = 'mcpServers'
+        $mergeServers = [bool]($adapter.mcp -is [System.Collections.IDictionary] -and $adapter.mcp['mergeServers'])
+        # The user's own config (see above), now or at an earlier install, takes
+        # the per-server merge whatever the adapter says: user servers, their
+        # URLs and headers, and all other settings stay.
+        $tracksServers = $Manifest.files.Contains($target) -and $Manifest.files[$target].Contains('managedServers')
+        if (-not $mergeServers -and $isJsonConfig -and ($isUserConfig -or $tracksServers -or $siteDefaults -or $legacyMcpReceipt)) {
+            if (-not $mergeRequested) {
+                $renderedKeys = @(($content | ConvertFrom-Json).PSObject.Properties.Name)
+                $mergeKey = @(@('mcpServers', 'mcp', 'servers') | Where-Object { $renderedKeys -contains $_ })[0]
             }
+            $userProblem = ''
+            if (Test-Path -LiteralPath $absTarget) {
+                try {
+                    $probe = ConvertTo-OrderedHashtable (Get-Content -LiteralPath $absTarget -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop)
+                    if ($probe -isnot [System.Collections.IDictionary]) { throw 'not a JSON object' }
+                    $null = Get-McpConfigMap -Config $probe -Key $mergeKey -Create
+                }
+                catch { $userProblem = $_.Exception.Message }
+            }
+            if ($userProblem) {
+                Write-Warn "  [$tool] MCP config: $target не разбирается как JSON-объект — не перезаписываю ($userProblem). Исправьте файл и повторите update или добавьте подключения через /setupmcp."
+                continue
+            }
+            $mergeServers = $true
+            $mergeRequested = $true
+        }
+        $managedServers = @()
+        if ($mergeRequested -and $mergeServers) {
+            # New adapters merge individual servers. A pre-existing server
+            # with the same id belongs to the user unless our manifest owns
+            # it; keep it on init/add. Invalid JSON must never be overwritten.
             $merged = [ordered]@{}
             if (Test-Path -LiteralPath $absTarget) {
-                # Parsing errors stop installation; never replace unreadable configuration.
-                $merged = ConvertTo-OrderedHashtable (Get-Content -LiteralPath $absTarget -Raw | ConvertFrom-Json -ErrorAction Stop)
+                $merged = ConvertTo-OrderedHashtable (Get-Content -LiteralPath $absTarget -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop)
             }
             $currentServers = Get-McpConfigMap -Config $merged -Key $mergeKey -Create
             $renderedObj = ConvertTo-OrderedHashtable ($content | ConvertFrom-Json)
@@ -3307,23 +3566,66 @@ function Invoke-McpPhase {
             if ($Manifest.files.Contains($target) -and $Manifest.files[$target].Contains('managedServers')) {
                 $previousServers = @($Manifest.files[$target]['managedServers'])
             }
+            if ($siteDefaults) {
+                # Site-specific defaults apply only to missing connections.
+                $previousServers = @()
+            }
+            elseif ($previousServers.Count -gt 0 -and $legacyMcpReceipt) {
+                # The old fork recorded ownership even for custom connections. Only
+                # keep an old claim when the entire entry still matches the catalog.
+                $previousServers = @($previousServers | Where-Object {
+                    $currentServers.Contains($_) -and $newServers.Contains($_) -and
+                    (ConvertTo-Json $currentServers[$_] -Depth 20 -Compress) -ceq
+                    (ConvertTo-Json $newServers[$_] -Depth 20 -Compress)
+                })
+            }
+            foreach ($id in $previousServers) {
+                if (-not $newServers.Contains($id) -and $currentServers.Contains($id)) {
+                    [void]$currentServers.Remove($id)
+                }
+            }
             foreach ($id in $newServers.Keys) {
-                if ($currentServers.Contains($id)) {
-                    # Deployment records own endpoints and authentication even for managed entries.
-                    Write-Info "  [$tool] MCP connection preserved: $id"
-                    if ($id -in $previousServers) { $managedServers += $id }
+                if ($currentServers.Contains($id) -and $id -notin $previousServers) {
+                    Write-Info "  [$tool] MCP server kept (user-owned): $id"
                     continue
                 }
                 $currentServers[$id] = $newServers[$id]
-                $managedServers += $id
-            }
-            foreach ($key in $renderedObj.Keys) {
-                if (-not $merged.Contains($key)) { $merged[$key] = $renderedObj[$key] }
+                if (-not $siteDefaults) { $managedServers += $id }
             }
             $finalContent = ConvertTo-Json $merged -Depth 20
         }
+        elseif ($mergeRequested -and (Test-Path $absTarget)) {
+            try {
+                $existingRaw = Get-Content -Path $absTarget -Raw -ErrorAction Stop
+                $existingObj = $existingRaw | ConvertFrom-Json -ErrorAction Stop
+                $renderedObj = $content | ConvertFrom-Json -ErrorAction Stop
+                $merged = [ordered]@{}
+                # Preserve user keys in their original order, replacing only $mergeKey.
+                foreach ($prop in $existingObj.PSObject.Properties) {
+                    if ($prop.Name -ne $mergeKey) { $merged[$prop.Name] = $prop.Value }
+                }
+                if ($renderedObj.PSObject.Properties.Match($mergeKey).Count -gt 0) {
+                    $merged[$mergeKey] = $renderedObj.$mergeKey
+                }
+                # Append any non-mergeKey keys from rendered that the existing
+                # file lacks (defensive: future-proofs adapters that emit more
+                # than the merge key).
+                foreach ($prop in $renderedObj.PSObject.Properties) {
+                    if ($prop.Name -eq $mergeKey) { continue }
+                    if (-not $merged.Contains($prop.Name)) { $merged[$prop.Name] = $prop.Value }
+                }
+                $finalContent = (ConvertTo-Json $merged -Depth 20)
+            }
+            catch {
+                # A shared config holds user settings beside the MCP key; an
+                # unreadable one is never replaced, not even by -Force.
+                Write-Warn "  [$tool] MCP merge: $target не парсится как JSON — не перезаписываю: в нём могут быть ваши настройки. Исправьте файл и повторите. Ошибка: $($_.Exception.Message)"
+                continue
+            }
+        }
 
         Write-TextFile -Path $absTarget -Content ($finalContent + "`n")
+        if ($siteDefaults -and $tool -eq 'codex') { continue }
         if ($tool -eq 'opencode') {
             # A fresh config is a starter template, not an installer-owned file.
             # Later updates and removal must preserve even a byte-identical copy.
@@ -3334,6 +3636,7 @@ function Invoke-McpPhase {
         if ($Manifest.files.Contains($target)) { $previousMcpEntry = $Manifest.files[$target] }
         $mcpEntry = [ordered]@{
             source        = 'content/mcp-servers.json'
+            catalogManaged = $true
             installedHash = (Get-FileSha256 $absTarget)
         }
         # `merged` marks a SHARED config (opencode.json / .kilo/kilo.json /
@@ -4057,7 +4360,8 @@ function Update-AgentsMd {
     # Resolve the canonical installed location for every artefact section
     # (rules / agents / commands / skills) so the readable source AGENTS.md
     # can be rewritten into a project-local file with no broken links.
-    $layouts = Resolve-CanonicalArtifactLayouts -ActiveTools $ActiveTools -Adapters $Adapters
+    $layouts = Resolve-CanonicalArtifactLayouts -ActiveTools $ActiveTools `
+        -Adapters (Get-SharedSkillsAdapters -Tools $ActiveTools -Adapters $Adapters) -SourceRoot $SourceRoot
 
     if (-not $layouts -or -not $layouts.Contains('rules')) {
         Write-Warn 'No active tool defines a rules directory; AGENTS.md content/<section>/ paths will not be rewritten.'
@@ -4249,11 +4553,13 @@ function Place-RootTemplates {
 #
 # Behaviour:
 #   - If the file already exists in the project root — preserve every user
-#     value. Migrations may append missing USE_EDT and TOOL_* keys.
+#     value. Migrations may append missing USE_EDT, CODE_OWNER and TOOL_*
+#     keys; a missing CODE_OWNER is asked when a person can answer.
 #   - If missing — render from the source `.dev.env.example` template,
 #     auto-fill what we can detect (PLATFORM_VERSION from Configuration.xml,
 #     PLATFORM_PATH from C:\Program Files\1cv8\, PREFIX from extension's
-#     NamePrefix), ask once whether the project uses EDT, and either prompt the
+#     NamePrefix), ask once whether the project uses EDT and who owns the
+#     code (CODE_OWNER), and either prompt the
 #     user for the remaining setup values (interactive mode) or use documented
 #     defaults / leave optional values empty with a warning (non-interactive).
 #
@@ -4268,8 +4574,9 @@ function Place-RootTemplates {
 #   LOG_PATH    (empty = $env:TEMP\1cv8.log),
 #   SUBAGENT_MODEL_CODING / SUBAGENT_MODEL_ANALYSIS / SUBAGENT_MODEL_LIGHT
 #   (empty = AI client default model; see SECTION 7b),
-#   AGENT_MODEL (empty = no model profile, base model-neutral ruleset; the
-#   parent agent's behaviour profile, toggled by the /rulesmodel command),
+#   AGENT_MODEL (empty = the agent applies the profile of the model it knows
+#   it runs; a slug decides only for an agent that cannot tell; off = no
+#   profile; edited by the /rulesmodel command),
 #   ORCHESTRATION (empty = standard; toggled by the /economymode command),
 #   QUICKFIX_MAX_LINES (empty = 40; quick-fix line budget),
 #   DEBUG_FAST_PATH (empty = standard; debugging fast-path mode),
@@ -4342,13 +4649,85 @@ function Read-DevEnvKeys {
     return $result
 }
 
+function Get-SourceScanSkipDirs {
+    # Directories that never hold 1C sources: installed rules and dependencies.
+    return @('.git', '.cursor', '.claude', '.kilo', '.kilocode', '.codex', '.agents',
+        '.opencode', '.kimi-code', '.qwen', '.commandcode', '.cline', '.zcode',
+        '.mimocode', '.pi', '.ai-agent', 'node_modules', '.venv')
+}
+
+function Find-SourceFormats {
+    # Which source formats the working tree holds: EDT projects (`.project` plus
+    # `DT-INF/` or `src/Configuration/Configuration.mdo`) and Designer dumps
+    # (`Configuration.xml`). Looks at the project root and three levels below -
+    # an EDT workspace keeps the projects in subdirectories - and at EXPORT_PATH.
+    # Reads directory listings only; links are not followed.
+    param(
+        [string]$Root,
+        [string]$ExportPath
+    )
+    $skipDirs = Get-SourceScanSkipDirs
+    $edt = @()
+    $designer = @()
+    $level = @($Root)
+    if ($ExportPath) {
+        $exportAbs = if ([IO.Path]::IsPathRooted($ExportPath)) { $ExportPath } else { Join-Path $Root $ExportPath }
+        if (Test-Path -LiteralPath (Join-Path $exportAbs 'Configuration.xml') -PathType Leaf) { $designer += $exportAbs }
+    }
+    for ($depth = 0; $depth -le 3 -and $level.Count -gt 0; $depth++) {
+        $next = @()
+        foreach ($dir in $level) {
+            # .NET checks: a tree may have thousands of directories at this depth.
+            $isEdtProject = [IO.File]::Exists([IO.Path]::Combine($dir, '.project')) -and
+                ([IO.Directory]::Exists([IO.Path]::Combine($dir, 'DT-INF')) -or
+                [IO.File]::Exists([IO.Path]::Combine($dir, 'src', 'Configuration', 'Configuration.mdo')))
+            if ($isEdtProject) {
+                # A root project may sit beside a Designer dump, so only a nested
+                # EDT project ends the descent; the sources of the root one are
+                # skipped below.
+                $edt += $dir
+                if ($depth -gt 0) { continue }
+            }
+            if ([IO.File]::Exists([IO.Path]::Combine($dir, 'Configuration.xml'))) {
+                if ($designer -notcontains $dir) { $designer += $dir }
+                continue
+            }
+            if ($depth -eq 3) { continue }
+            foreach ($sub in @(Get-ChildItem -LiteralPath $dir -Directory -Force -ErrorAction SilentlyContinue)) {
+                if ($skipDirs -contains $sub.Name) { continue }
+                if ($isEdtProject -and $sub.Name -in @('src', 'DT-INF')) { continue }
+                if ($sub.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+                $next += $sub.FullName
+            }
+        }
+        $level = $next
+    }
+    return @{ Edt = @($edt); Designer = @($designer) }
+}
+
+function Resolve-EdtUsageDefault {
+    # Default for USE_EDT taken from the tree: 'true' only when it holds an EDT
+    # project and no Designer dump. Both formats = the user decides which one is
+    # authoritative (edt-workflow.md), so the default stays 'false'.
+    param(
+        [string]$Root,
+        [string]$ExportPath
+    )
+    $formats = Find-SourceFormats -Root $Root -ExportPath ([string]$ExportPath).Trim().Trim('"', "'")
+    $edtPath = ''
+    if ($formats.Edt.Count -gt 0) {
+        $edtPath = $formats.Edt[0].Substring($Root.TrimEnd('\', '/').Length).TrimStart('\', '/').Replace('\', '/')
+        if (-not $edtPath) { $edtPath = '.' }
+    }
+    $value = if ($edtPath -and $formats.Designer.Count -eq 0) { 'true' } else { 'false' }
+    return @{ Value = $value; EdtPath = $edtPath; Hybrid = ([bool]$edtPath -and $formats.Designer.Count -gt 0) }
+}
+
 function Test-InitialDumpSources {
     # Ignore installed rules and dependencies, but include partial dumps and EDT.
     param([string]$Root)
 
-    $skipDirs = @('.git', '.cursor', '.claude', '.kilo', '.kilocode', '.codex', '.agents',
-        '.opencode', '.kimi-code', '.qwen', '.commandcode', '.cline', '.zcode',
-        '.mimocode', '.pi', '.ai-agent', 'node_modules', '.venv')
+    $skipDirs = Get-SourceScanSkipDirs
     $pending = New-Object 'System.Collections.Generic.Queue[string]'
     $pending.Enqueue($Root)
     while ($pending.Count -gt 0) {
@@ -4566,7 +4945,8 @@ function Place-DevEnv {
     if ($detectedPrefix)  { $text = Set-DevEnvValue -Text $text -Key 'PREFIX'           -Value $detectedPrefix }
 
     # Interactive prompts for the human-only fields
-    $edtUsage = 'false'
+    $edtDefault = Resolve-EdtUsageDefault -Root $Root
+    $edtUsage = $edtDefault.Value
     if (-not $NonInteractive) {
         Write-Info ''
         Write-Info '  Заполнение .dev.env (Enter — оставить поле пустым/значением по умолчанию):'
@@ -4581,14 +4961,23 @@ function Place-DevEnv {
         $val = Read-Required 'IB_PASSWORD (пусто — без пароля, /P опускается; не храните прод-пароли)' '';                                       if ($val) { $text = Set-DevEnvValue -Text $text -Key 'IB_PASSWORD'         -Value $val }
         $val = Read-Required 'LOG_PATH (файл лога Designer''а; пусто — $env:TEMP\1cv8.log)' '';                                                if ($val) { $text = Set-DevEnvValue -Text $text -Key 'LOG_PATH'            -Value $val }
         $val = Read-Required 'INFOBASE_PUBLISH_URL (URL веб-публикации для UI-тестов; пусто — UI-тесты пропускаются)' '';                      if ($val) { $text = Set-DevEnvValue -Text $text -Key 'INFOBASE_PUBLISH_URL' -Value $val }
-        $edtAnswer = Read-Choice 'Используется ли в этом проекте 1C:EDT? Это повлияет на рекомендации и EDT-интеграции' @('да', 'нет') 'нет'
+        $edtHint = if ($edtDefault.EdtPath) { " (найден проект EDT: $($edtDefault.EdtPath))" } else { '' }
+        $edtSuggested = if ($edtDefault.Value -eq 'true') { 'да' } else { 'нет' }
+        $edtAnswer = Read-Choice "Используется ли в этом проекте 1C:EDT$($edtHint)? Это повлияет на рекомендации и EDT-интеграции" @('да', 'нет') $edtSuggested
         $edtUsage = if ($edtAnswer -eq 'да') { 'true' } else { 'false' }
     }
     $text = Set-DevEnvValue -Text $text -Key $script:UseEdtKey -Value $edtUsage
 
+    # Code owner (CODE_OWNER): asked with an explanation of both owners when a
+    # person can answer, otherwise the default 'user'. If the template lacks
+    # the key, Ensure-CodeOwnerSetting appends it and reuses this answer.
+    $codeOwner = Resolve-CodeOwnerAnswer
+    $text = Set-DevEnvValue -Text $text -Key $script:CodeOwnerKey -Value $codeOwner
+
     # Persist the parent agent's model profile (AGENT_MODEL). Asked once here,
     # only while the file is being created — an existing .dev.env is never
-    # touched, and an empty value is fully valid (no profile, base ruleset).
+    # touched, and an empty value is fully valid (the agent then selects the
+    # profile by the model it knows it runs).
     $agentModel = Resolve-AgentModel -Root $Root
     if ($agentModel) { $text = Set-DevEnvValue -Text $text -Key $script:AgentModelKey -Value $agentModel }
 
@@ -4617,11 +5006,18 @@ function Place-DevEnv {
     if ($detectedPath)    { Write-Info "    autodetected PLATFORM_PATH    = $detectedPath" }
     if ($detectedPrefix)  { Write-Info "    autodetected PREFIX           = $detectedPrefix" }
     Write-Info "    USE_EDT = $edtUsage"
+    if ($edtDefault.EdtPath -and -not $edtDefault.Hybrid) {
+        Write-Info "      (в дереве найден проект EDT: $($edtDefault.EdtPath))"
+    }
+    if ($edtDefault.Hybrid) {
+        Write-Warn "    Найдены и проект EDT ($($edtDefault.EdtPath)), и выгрузка Конфигуратора: решите, какая из них основная (edt-workflow.md)."
+    }
+    Write-Info "    CODE_OWNER = $codeOwner"
     if ($agentModel) {
         Write-Info ("    AGENT_MODEL = $agentModel (" + [string]$script:AgentModelProfiles[$agentModel] + ") — профиль правил model-$agentModel.md")
     }
     else {
-        Write-Info '    AGENT_MODEL не задан — профиль модели не применяется, действует базовый свод правил (задать: /rulesmodel <модель>)'
+        Write-Info '    AGENT_MODEL не задан — агент сам применит профиль своей модели, если он есть (задать явно: /rulesmodel <модель>, выключить: /rulesmodel off)'
     }
 
     # Final sanity check: report only operation-scoped empty fields. No field
@@ -4677,8 +5073,8 @@ function Ensure-ToolPolicySettings {
 function Ensure-EdtUsageSetting {
     # Migration for projects whose user-owned .dev.env predates USE_EDT.
     # It runs on update / add, where it would be the only interactive question
-    # of an otherwise unattended run — so it never asks. The conservative
-    # default (EDT not used) is written and reported; the question itself
+    # of an otherwise unattended run — so it never asks. The value follows the
+    # tree (Resolve-EdtUsageDefault) and is reported; the question itself
     # belongs to /installtools and /install-edt-mcp, which the user invokes
     # deliberately.
     param(
@@ -4693,7 +5089,9 @@ function Ensure-EdtUsageSetting {
     $current = if ($values.Contains($script:UseEdtKey)) { ([string]$values[$script:UseEdtKey]).Trim().ToLowerInvariant() } else { '' }
     if ($current -in @('true', 'false')) { return }
 
-    $edtUsage = 'false'
+    $exportPath = if ($values.Contains('EXPORT_PATH')) { [string]$values['EXPORT_PATH'] } else { '' }
+    $edtDefault = Resolve-EdtUsageDefault -Root $Root -ExportPath $exportPath
+    $edtUsage = $edtDefault.Value
 
     $text = Read-TextFile $target
     if ($text -match ('(?m)^' + [regex]::Escape($script:UseEdtKey) + '=')) {
@@ -4711,8 +5109,90 @@ function Ensure-EdtUsageSetting {
     if ($Manifest.files.Contains($script:DevEnvFileName)) {
         $Manifest.files[$script:DevEnvFileName]['installedHash'] = Get-FileSha256 $target
     }
-    Write-Info "  .dev.env: added USE_EDT=$edtUsage (по умолчанию 1C:EDT не используется)"
+    if ($edtUsage -eq 'true') {
+        Write-Info "  .dev.env: added USE_EDT=true (найден проект EDT: $($edtDefault.EdtPath); выгрузки Конфигуратора нет)"
+        Write-Info '    Если проект ведётся не в EDT, исправьте значение в .dev.env на false.'
+        return
+    }
+    if ($edtDefault.Hybrid) {
+        Write-Warn "  .dev.env: added USE_EDT=false, но в дереве есть и проект EDT ($($edtDefault.EdtPath)), и выгрузка Конфигуратора."
+        Write-Warn '    Решите, какая из них основная (edt-workflow.md), и при работе в EDT впишите в .dev.env USE_EDT=true.'
+        return
+    }
+    Write-Info "  .dev.env: added USE_EDT=$edtUsage (проект EDT в дереве не найден)"
     Write-Info '    Проект разрабатывается в 1C:EDT? Запустите /installtools или /install-edt-mcp — они спросят и запишут USE_EDT=true (можно просто исправить значение в .dev.env).'
+}
+
+function Test-CodeOwnerPromptAllowed {
+    # The code-owner question needs a person at the console. With
+    # -NonInteractive, or when input is redirected (an agent shell, CI), no
+    # prompt is shown: an update must never block or fail on it.
+    if ($NonInteractive) { return $false }
+    try { return -not [Console]::IsInputRedirected } catch { return $false }
+}
+
+function Read-CodeOwnerChoice {
+    # Explains both owners and returns 'user' or 'agent'. Enter, an unknown
+    # answer or a failing prompt keep the default 'user'.
+    Write-Info ''
+    Write-Info '  Кто владелец кода проекта? От ответа зависит, чьим правилам агент следует при правках.'
+    Write-Info '    [1] Пользователь (по умолчанию). Правила задаёте вы: агент следует архитектуре и соглашениям,'
+    Write-Info '        которые уже есть в коде, меняет только то, что нужно задаче, а о посторонних проблемах сообщает.'
+    Write-Info '    [2] Модель. Правила устройства кода задаёт агент: он ведёт собственный код проекта как владелец,'
+    Write-Info '        по ходу задачи объединяет дублирующийся код и исправляет связанную структуру.'
+    Write-Info '        Правок и расхода токенов заметно больше, итоговый diff нужно просматривать внимательнее.'
+    Write-Info '    В обоих случаях типовой код поставщика, обязательные проверки и подтверждение опасных действий не меняются.'
+    $choice = '1'
+    try { $choice = [string](Read-Required '  Владелец кода (1 — пользователь, 2 — модель)' '1') } catch { $choice = '1' }
+    if ($choice.Trim() -match '^(2|agent|модель)$') { return 'agent' }
+    return 'user'
+}
+
+function Resolve-CodeOwnerAnswer {
+    # Returns the CODE_OWNER value for this run; the question fires at most once.
+    if ($null -ne $script:CodeOwnerAnswer) { return $script:CodeOwnerAnswer }
+    $script:CodeOwnerAsked = [bool](Test-CodeOwnerPromptAllowed)
+    $script:CodeOwnerAnswer = if ($script:CodeOwnerAsked) { Read-CodeOwnerChoice } else { 'user' }
+    return $script:CodeOwnerAnswer
+}
+
+function Ensure-CodeOwnerSetting {
+    # Migration for a .dev.env that predates CODE_OWNER. Unlike USE_EDT, the
+    # key is asked on update / add / init over an existing file as well: the
+    # owner changes how agents edit code, so an explicit answer beats a silent
+    # default. The question appears only where a person can answer
+    # (Test-CodeOwnerPromptAllowed); otherwise 'user' is written and reported.
+    # A present key - empty or invalid included - is the user's and is never
+    # touched.
+    param(
+        [string]$Root,
+        [System.Collections.IDictionary]$Manifest
+    )
+
+    $target = Join-Path $Root $script:DevEnvFileName
+    if (-not (Test-Path -LiteralPath $target -PathType Leaf)) { return }
+    $values = Read-DevEnvKeys -Path $target
+    if ($values.Contains($script:CodeOwnerKey)) { return }
+
+    $codeOwner = Resolve-CodeOwnerAnswer
+    $text = Read-TextFile $target
+    $newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += $newline }
+    $text += $newline +
+        '# Владелец кода: user — агент следует правилам, уже принятым в коде (по умолчанию);' + $newline +
+        '# agent — устройство собственного кода проекта задаёт агент (dev-standards-env-process.md → CODE_OWNER).' + $newline +
+        $script:CodeOwnerKey + '=' + $codeOwner + $newline
+    Write-TextFile -Path $target -Content $text
+    if ($Manifest.files.Contains($script:DevEnvFileName)) {
+        $Manifest.files[$script:DevEnvFileName]['installedHash'] = Get-FileSha256 $target
+    }
+    if ($script:CodeOwnerAsked) {
+        Write-Info "  .dev.env: added CODE_OWNER=$codeOwner"
+    }
+    else {
+        Write-Info '  .dev.env: added CODE_OWNER=user — владелец кода пользователь; вопрос не задан, потому что запуск идёт без интерактивного ввода.'
+        Write-Info '    Чтобы устройство кода задавал агент, впишите в .dev.env CODE_OWNER=agent.'
+    }
 }
 
 function Ensure-SupportSettings {
@@ -5013,6 +5493,7 @@ function Invoke-Init {
         $manifest.lastChannel = $script:LastChannel
         if (-not $manifest.files) { $manifest.files = [ordered]@{} }
         if (-not $manifest.mcpServers) { $manifest.mcpServers = @() }
+        Remove-LegacyCodexArtifacts -Root $Root -Manifest $manifest
     }
     else {
         $manifest = New-Manifest -Source $sourceRoot -Version $version
@@ -5049,6 +5530,7 @@ function Invoke-Init {
     Place-DevEnv -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
     Invoke-LegacyInfobaseSettingsMigration -Root $Root -Manifest $manifest
     Ensure-EdtUsageSetting -Root $Root -Manifest $manifest
+    Ensure-CodeOwnerSetting -Root $Root -Manifest $manifest
     Ensure-SupportSettings -Root $Root -Manifest $manifest
 
     Write-Section 'Phase 7b: OpenSpec project.md (1C autodetect)'
@@ -5112,6 +5594,7 @@ function Invoke-Init {
 
     Write-RestartRecommendation -ActiveTools $activeTools -McpCount $manifest.mcpServers.Count
     Write-McpEffectivenessReminder -Root $Root -ExternalMcp $extMcp
+    if (-not $existing) { Write-DshRecommendation -Root $Root }
     Write-InstallToolsAnnouncement
 
     if (-not $existing -and $verify.Ok) {
@@ -5133,18 +5616,22 @@ function Write-RulesModelAnnouncement {
     param([string]$Root)
 
     $current = ''
+    $disabled = $false
     if ($Root) {
         $envPath = Join-Path $Root $script:DevEnvFileName
         if (Test-Path $envPath) {
             $keys = Read-DevEnvKeys -Path $envPath
             if ($keys.Contains($script:AgentModelKey)) {
-                $current = Resolve-AgentModelSlug -Raw ([string]$keys[$script:AgentModelKey])
+                $rawModel = [string]$keys[$script:AgentModelKey]
+                $disabled = ($rawModel.Trim() -eq 'off')
+                $current = Resolve-AgentModelSlug -Raw $rawModel
             }
         }
     }
     Write-Info ""
-    Write-Info "Адаптация правил под модель: введите /rulesmodel <модель> в чате AI-клиента (название — в любом"
-    Write-Info "написании, команда сама его распознает; /rulesmodel auto — определить текущую модель)."
+    Write-Info "Адаптация правил под модель: агент сам применяет профиль своей модели, если он есть. Задать явно —"
+    Write-Info "/rulesmodel <модель> в чате AI-клиента (название — в любом написании; /rulesmodel auto — определить"
+    Write-Info "текущую модель, /rulesmodel off — выключить профили)."
     Write-Info "Поддерживаемые профили: opus5 (Claude Opus 5), sonnet5 (Claude Sonnet 5), fable5 (Claude Fable 5),"
     Write-Info "gpt56 (GPT-5.6), gpt6 (GPT-6 Astra). Команда пишет AGENT_MODEL в .dev.env — действует на весь проект, включая новые чаты;"
     Write-Info "перерендер и перезапуск клиента не нужны. Профиль настраивает только стиль и инициативу (длина"
@@ -5152,8 +5639,11 @@ function Write-RulesModelAnnouncement {
     if ($current) {
         Write-Info ("Сейчас: AGENT_MODEL=$current (" + [string]$script:AgentModelProfiles[$current] + "). Выключить — /rulesmodel off.")
     }
+    elseif ($disabled) {
+        Write-Info "Сейчас: AGENT_MODEL=off — профили выключены, действует базовый (модель-нейтральный) свод правил. Включить — /rulesmodel reset."
+    }
     else {
-        Write-Info "Сейчас: AGENT_MODEL не задан — действует базовый (модель-нейтральный) свод правил."
+        Write-Info "Сейчас: AGENT_MODEL не задан — агент сам применяет профиль своей модели, если он есть."
     }
 }
 
@@ -5204,6 +5694,54 @@ function Write-McpEffectivenessReminder {
     Write-Info "Нет комплекта — страница покупки по ссылке. Установщик правил ключ MCP не выдаёт."
 }
 
+# DSH (DeepSeek Harness) is the vendor's portable 1C build. /installdsh records
+# the unpacked launcher folder in the user variable DSH_1C_HOME.
+function Get-DshHomeCandidates {
+    return @(
+        @('User', 'Process') |
+            ForEach-Object { [Environment]::GetEnvironmentVariable('DSH_1C_HOME', $_) } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+}
+
+# A recorded folder that still holds a DSH launcher means the build is here.
+function Test-DshSignal {
+    foreach ($dir in @(Get-DshHomeCandidates)) {
+        try {
+            if ((Test-Path -LiteralPath $dir -PathType Container) -and
+                @(Get-ChildItem -LiteralPath $dir -Filter 'DSH*' -File -ErrorAction Stop).Count -gt 0) {
+                return $true
+            }
+        }
+        catch { }
+    }
+    return $false
+}
+
+# /installmcp saves the personal-cabinet login to memory.md only with the user's
+# consent; /installdsh reuses it. Only the entry title is checked, never the value.
+function Test-CabinetLoginStored {
+    param([string]$Root)
+    $path = Join-Path $Root 'memory.md'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
+    return ((Read-TextFile $path) -match '(?m)^#+[^\r\n]*MCP Distribution[^\r\n]*vibecoding1c\.ru credentials')
+}
+
+# Shown once, after the first init. Same wording as AGENT-INSTALL.md → Recommend DSH.
+# The PowerShell channel cannot run the download itself: it names /installdsh.
+function Write-DshRecommendation {
+    param([string]$Root)
+    if (Test-DshSignal) { return }
+    Write-Info ""
+    Write-Info "Правила лучше всего работают в DSH (DeepSeek Harness) — специализированной сборке для 1С: https://vibecoding1c.ru/harnesses"
+    if (Test-CabinetLoginStored -Root $Root) {
+        Write-Info "Вход в личный кабинет уже задан — после перезапуска клиента /installdsh сразу скачает и распакует DSH."
+    }
+    else {
+        Write-Info "Сборка уже куплена — после перезапуска клиента запустите /installdsh: команда войдёт в личный кабинет, скачает DSH и распакует (сборка portable, установка не нужна)."
+    }
+}
+
 # Offer the single tool-installation entry point after a first install and
 # whenever an update introduces one or more new standalone installers. The
 # slash command performs detection and asks before making any tool changes.
@@ -5214,7 +5752,7 @@ function Write-InstallToolsAnnouncement {
     if (@($NewInstallers).Count -gt 0) {
         Write-Info "Добавлены новые установщики инструментов: $(@($NewInstallers) -join ', ')."
     }
-    Write-Info "После перезапуска AI-клиента запустите /installtools — команда сначала предложит установить приобретённый комплект 1С MCP, затем покажет Cognee, OpenViking, EDT-MCP, инструменты UI-автоматизации, rtk и Atlassian MCP (Jira/Confluence)."
+    Write-Info "После перезапуска AI-клиента запустите /installtools — команда сначала предложит установить приобретённый комплект 1С MCP и DSH, затем покажет Cognee, OpenViking, EDT-MCP, инструменты UI-автоматизации, rtk и Atlassian MCP (Jira/Confluence)."
     Write-Info "Каждый пункт устанавливается только после подтверждения; отдельные команды установки также доступны."
 }
 
@@ -5412,6 +5950,98 @@ function Assert-AgentToolVocabulary {
     throw "Agent tool vocabulary gate failed ($($result.Violations.Count) file(s)). See errors above."
 }
 
+function Move-LegacyRules {
+    # Takes the managed files out of a retired rules directory without losing
+    # user edits, in every mode (interactive, -AssumeYes, -NonInteractive):
+    #   clean copy (hash = installedHash)  -> deleted;
+    #   modified copy, -NewDir given       -> moved there together with its
+    #       manifest entry, flagged userModified (the place phase keeps it, the
+    #       report lists it); if an edited or untracked file already sits at the
+    #       new path, neither is overwritten - the legacy copy is saved beside
+    #       it as `<name>.legacy`;
+    #   modified copy, no -NewDir          -> left in place, no longer tracked;
+    #   modified copy + -Force / -ForcePaths on the old or the new path -> deleted.
+    param(
+        [string]$Root,
+        [System.Collections.IDictionary]$Manifest,
+        [string]$LegacyDir,
+        [string]$NewDir
+    )
+    $keys = @($Manifest.files.Keys | Where-Object { ([string]$_).StartsWith("$LegacyDir/", [StringComparison]::OrdinalIgnoreCase) })
+    if ($keys.Count -eq 0) { return }
+    $removed = 0
+    $moved = @()
+    $aside = @()
+    $left = @()
+    foreach ($k in $keys) {
+        $entry = $Manifest.files[$k]
+        $abs = Join-Path $Root $k
+        $newKey = if ($NewDir) { $NewDir + $k.Substring($LegacyDir.Length) } else { '' }
+        if (-not (Test-Path -LiteralPath $abs -PathType Leaf)) {
+            [void]$Manifest.files.Remove($k)
+            $removed++
+            continue
+        }
+        $expected = if ($entry) { [string]$entry.installedHash } else { '' }
+        # Without a recorded hash the file cannot be proven to be ours unchanged.
+        $isClean = [bool]$expected -and ((Get-FileSha256 $abs) -eq $expected)
+        $isForced = (Test-ForcePath $k) -or ($newKey -and (Test-ForcePath $newKey))
+        if ($isClean -or $isForced) {
+            Remove-Item -LiteralPath $abs -Force
+            [void]$Manifest.files.Remove($k)
+            $removed++
+            continue
+        }
+        if (-not $newKey) {
+            [void]$Manifest.files.Remove($k)
+            $left += $k
+            continue
+        }
+        $newAbs = Join-Path $Root $newKey
+        $newParent = Split-Path -Parent $newAbs
+        if (-not (Test-Path -LiteralPath $newParent)) { New-Item -ItemType Directory -Path $newParent -Force | Out-Null }
+        $canMove = $true
+        if (Test-Path -LiteralPath $newAbs) {
+            $newEntry = if ($Manifest.files.Contains($newKey)) { $Manifest.files[$newKey] } else { $null }
+            $newHash = Get-FileSha256 $newAbs
+            # A shipped copy nobody edited, or the same content, gives way.
+            $canMove = ($newHash -eq (Get-FileSha256 $abs)) -or
+                ($newEntry -and -not $newEntry.userModified -and $newEntry.installedHash -eq $newHash)
+        }
+        if ($canMove) {
+            Move-Item -LiteralPath $abs -Destination $newAbs -Force
+            $entry['userModified'] = $true
+            [void]$Manifest.files.Remove($k)
+            $Manifest.files[$newKey] = $entry
+            $moved += $newKey
+        }
+        else {
+            $asideRel = "$newKey.legacy"
+            for ($i = 2; Test-Path -LiteralPath (Join-Path $Root $asideRel); $i++) { $asideRel = "$newKey.legacy$i" }
+            Move-Item -LiteralPath $abs -Destination (Join-Path $Root $asideRel)
+            [void]$Manifest.files.Remove($k)
+            $aside += $asideRel
+        }
+    }
+    $legacyAbs = Join-Path $Root $LegacyDir
+    if ((Test-Path -LiteralPath $legacyAbs) -and @(Get-ChildItem -LiteralPath $legacyAbs -File -Recurse -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+        Remove-Item -LiteralPath $legacyAbs -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($removed -gt 0) { Write-Info "Migrated: removed $removed unchanged managed entries from legacy $LegacyDir/" }
+    if ($moved.Count -gt 0) {
+        Write-Warn "Migrated: $($moved.Count) user-modified file(s) moved from $LegacyDir/ with your edits:"
+        $moved | ForEach-Object { Write-Warn "  $_" }
+    }
+    if ($aside.Count -gt 0) {
+        Write-Warn "$($aside.Count) user-modified file(s) of $LegacyDir/ saved beside a different file at the new path - merge them by hand:"
+        $aside | ForEach-Object { Write-Warn "  $_" }
+    }
+    if ($left.Count -gt 0) {
+        Write-Warn "$($left.Count) user-modified file(s) left in $LegacyDir/ (no longer read or managed) - carry your edits over and delete them:"
+        $left | ForEach-Object { Write-Warn "  $_" }
+    }
+}
+
 function Invoke-Update {
     param(
         [string]$Root,
@@ -5443,90 +6073,31 @@ function Invoke-Update {
     $activeTools = @($manifest.tools)
     $adapters = Load-Adapters -SourceRoot $sourceRoot -Tools $activeTools
 
+    # Every path managed before this run, legacy ones included: -ForcePaths
+    # patterns are checked against it in the report.
+    $keysBefore = @($manifest.files.Keys)
+
     Write-Section 'Migration: legacy .ai-rules/rules/ mirror'
-    $legacyKeys = @($manifest.files.Keys | Where-Object { $_ -like '.ai-rules/rules/*' })
-    $legacyDirty = @()
-    foreach ($k in $legacyKeys) {
-        $abs = Join-Path $Root $k
-        if (Test-Path $abs) {
-            $entry = $manifest.files[$k]
-            $expected = if ($entry -and $entry.installedHash) { $entry.installedHash } else { '' }
-            $actual = Get-FileSha256 $abs
-            if ($expected -and ($actual -ne $expected)) { $legacyDirty += $k }
-        }
-    }
-    $proceedLegacy = $true
-    if ($legacyDirty.Count -gt 0) {
-        Write-Warn "Legacy .ai-rules/rules/ contains user-modified files: $($legacyDirty.Count)"
-        $legacyDirty | ForEach-Object { Write-Warn "  $_" }
-        if (-not $NonInteractive -and -not $AssumeYes) {
-            $proceedLegacy = Read-YesNo 'Delete legacy .ai-rules/rules/ anyway? (your edits will be lost)' $false
-        }
-    }
-    if ($proceedLegacy -and $legacyKeys.Count -gt 0) {
-        foreach ($k in $legacyKeys) {
-            $abs = Join-Path $Root $k
-            if (Test-Path $abs) { Remove-Item -Force $abs -ErrorAction SilentlyContinue }
-            $manifest.files.Remove($k)
-        }
-        $legacyDir = Join-Path $Root '.ai-rules/rules'
-        if (Test-Path $legacyDir) {
-            $remaining = Get-ChildItem -File -Recurse $legacyDir -ErrorAction SilentlyContinue
-            if (-not $remaining -or $remaining.Count -eq 0) {
-                Remove-Item -Recurse -Force $legacyDir -ErrorAction SilentlyContinue
-                $parent = Join-Path $Root '.ai-rules'
-                if (Test-Path $parent) {
-                    $parentItems = Get-ChildItem $parent -ErrorAction SilentlyContinue
-                    if (-not $parentItems -or $parentItems.Count -eq 0) {
-                        Remove-Item -Recurse -Force $parent -ErrorAction SilentlyContinue
-                    }
-                }
-            }
-        }
-        Write-Info "Migrated: removed $($legacyKeys.Count) legacy .ai-rules/rules/ entries"
+    # No client reads this mirror, so a modified file stays where it is (there is
+    # no single place to move it to with several active tools).
+    Move-LegacyRules -Root $Root -Manifest $manifest -LegacyDir '.ai-rules/rules'
+    $legacyParent = Join-Path $Root '.ai-rules'
+    if ((Test-Path -LiteralPath $legacyParent) -and @(Get-ChildItem -LiteralPath $legacyParent -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+        Remove-Item -LiteralPath $legacyParent -Force -ErrorAction SilentlyContinue
     }
 
     # Claude Code (v2.0.64+) auto-loads every .md under .claude/rules/ without
     # `paths` frontmatter into context at session start, so the adapter now
-    # installs on-demand rules under .claude/rules-1c/. Remove OUR tracked
-    # files from the legacy directory; files the user placed there personally
-    # are never tracked in the manifest and are kept, and the directory itself
-    # is removed only when it ends up empty.
+    # installs on-demand rules under .claude/rules-1c/. OUR tracked files leave
+    # the legacy directory: clean copies are deleted, modified ones move to the
+    # new directory with their manifest entry. Files the user placed there
+    # personally are never tracked in the manifest and are kept, and the
+    # directory itself is removed only when it ends up empty.
     Write-Section 'Migration: legacy .claude/rules/ (auto-loaded by Claude Code)'
-    $claudeLegacyKeys = @($manifest.files.Keys | Where-Object { $_ -like '.claude/rules/*' })
-    $claudeLegacyDirty = @()
-    foreach ($k in $claudeLegacyKeys) {
-        $abs = Join-Path $Root $k
-        if (Test-Path $abs) {
-            $entry = $manifest.files[$k]
-            $expected = if ($entry -and $entry.installedHash) { $entry.installedHash } else { '' }
-            $actual = Get-FileSha256 $abs
-            if ($expected -and ($actual -ne $expected)) { $claudeLegacyDirty += $k }
-        }
-    }
-    $proceedClaudeLegacy = $true
-    if ($claudeLegacyDirty.Count -gt 0) {
-        Write-Warn "Legacy .claude/rules/ contains user-modified managed files: $($claudeLegacyDirty.Count)"
-        $claudeLegacyDirty | ForEach-Object { Write-Warn "  $_" }
-        if (-not $NonInteractive -and -not $AssumeYes) {
-            $proceedClaudeLegacy = Read-YesNo 'Delete legacy .claude/rules/ copies anyway? (your edits will be lost; fresh copies go to .claude/rules-1c/)' $false
-        }
-    }
-    if ($proceedClaudeLegacy -and $claudeLegacyKeys.Count -gt 0) {
-        foreach ($k in $claudeLegacyKeys) {
-            $abs = Join-Path $Root $k
-            if (Test-Path $abs) { Remove-Item -Force $abs -ErrorAction SilentlyContinue }
-            $manifest.files.Remove($k)
-        }
-        $claudeRulesDir = Join-Path $Root '.claude/rules'
-        if (Test-Path $claudeRulesDir) {
-            $remaining = Get-ChildItem -File -Recurse $claudeRulesDir -ErrorAction SilentlyContinue
-            if (-not $remaining -or $remaining.Count -eq 0) {
-                Remove-Item -Recurse -Force $claudeRulesDir -ErrorAction SilentlyContinue
-            }
-        }
-        Write-Info "Migrated: removed $($claudeLegacyKeys.Count) managed entries from legacy .claude/rules/ (on-demand rules now live in .claude/rules-1c/)"
-    }
+    Move-LegacyRules -Root $Root -Manifest $manifest -LegacyDir '.claude/rules' -NewDir '.claude/rules-1c'
+
+    Write-Section 'Migration: Codex prompts and .codex/skills/ (now .agents/skills/)'
+    Remove-LegacyCodexArtifacts -Root $Root -Manifest $manifest
 
     # Snapshot every path we currently track, before the per-update prune below
     # drops the non-userModified entries. Skill pruning consults this to avoid
@@ -5542,6 +6113,10 @@ function Invoke-Update {
         if (-not (Test-Path $abs)) { continue }
         $actual = Get-FileSha256 $abs
         $expected = $manifest.files[$rel].installedHash
+        if ($actual -ne $expected -and $manifest.files[$rel].source -eq 'content/mcp-servers.json') {
+            $manifest.files[$rel]['userModified'] = $true
+            continue
+        }
         if ($actual -ne $expected) { $dirty += $rel }
     }
     # Files force-updated this run ("take theirs"): never flagged userModified,
@@ -5579,7 +6154,10 @@ function Invoke-Update {
             # Non-interactive default: keep user edits.
             foreach ($d in $undecided) { $manifest.files[$d]['userModified'] = $true }
         }
-        $script:KeptThisRun = @($dirty | Where-Object { $manifest.files[$_] -and $manifest.files[$_].userModified })
+        # A forced file may still carry the flag of an earlier run until it is
+        # placed below; it is overwritten, so it is not "left at its version".
+        $script:KeptThisRun = @($dirty | Where-Object {
+                $manifest.files[$_] -and $manifest.files[$_].userModified -and -not (Test-ForcePath $_) })
     }
 
     # Retire the replaced desktop command before pruning its ownership record.
@@ -5631,16 +6209,14 @@ function Invoke-Update {
     # userModified on every update. The OpenSpec bundle has the same rule:
     # Invoke-OpenSpecArtifacts leaves a file it finds on disk without an entry
     # to the user, so a dropped entry froze the bundle after the first update.
-    # Adapter entry files (CLAUDE.md/QWEN.md/KODA.md) follow the same contract:
-    # Invoke-PlacePhase can refresh a pristine adapter entry only while its
-    # manifest record survives pruning; without it the existing file looks
-    # user-owned and is flagged userModified on every update.
+    # Adapter entry files (CLAUDE.md / QWEN.md / KODA.md) follow the same
+    # contract: without its record an unchanged stub looks user-owned.
     $newFiles = [ordered]@{}
     foreach ($k in $manifest.files.Keys) {
         # Per-server MCP ownership must survive pruning so update can replace
         # our servers while preserving pre-existing user servers with any id.
         if ($manifest.files[$k].userModified -or $k -eq $script:AgentsMdFileName -or
-            $manifest.files[$k].Contains('managedServers') -or
+            $manifest.files[$k].source -eq 'content/mcp-servers.json' -or
             ([string]$manifest.files[$k].source).StartsWith('content/openspec-bundle/') -or
             ([string]$manifest.files[$k].source).EndsWith('#entry')) { $newFiles[$k] = $manifest.files[$k] }
     }
@@ -5672,6 +6248,7 @@ function Invoke-Update {
     Place-DevEnv -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
     Invoke-LegacyInfobaseSettingsMigration -Root $Root -Manifest $manifest
     Ensure-EdtUsageSetting -Root $Root -Manifest $manifest
+    Ensure-CodeOwnerSetting -Root $Root -Manifest $manifest
     Ensure-SupportSettings -Root $Root -Manifest $manifest
 
     Write-Section 'OpenSpec project.md (update / 1C autodetect)'
@@ -5720,7 +6297,14 @@ function Invoke-Update {
     if ($kept.Count -gt 0) {
         Write-Warn "  $($kept.Count) file(s) were LEFT AT THEIR PREVIOUS VERSION because they are user-modified — they did NOT receive this update:"
         $kept | ForEach-Object { Write-Warn "    $_" }
-        Write-Warn '  To pull the shipped version for these files, re-run `update -Force` (all of them) or `update -ForcePaths <path>[,<path>...]` (specific files, comma-separated). Your current edits to those files will be replaced.'
+        Write-Warn '  To pull the shipped version for these files, re-run `update -Force` (all of them) or `update -ForcePaths "<path>[,<path>...]"` (specific files, comma-separated, also through `powershell -File`). Your current edits to those files will be replaced.'
+    }
+    if ($script:ForcePaths) {
+        $unmatched = Get-UnmatchedForcePaths -KnownPaths ($keysBefore + @($manifest.files.Keys))
+        if ($unmatched.Count -gt 0) {
+            Write-Warn "  -ForcePaths: $($unmatched.Count) pattern(s) matched no managed path, nothing was overwritten by them:"
+            $unmatched | ForEach-Object { Write-Warn "    $_" }
+        }
     }
     if (-not $hadEconomyCommand) { Write-EconomyModeAnnouncement }
     if (-not $hadRulesModelCommand) { Write-RulesModelAnnouncement -Root $Root }
@@ -5771,6 +6355,7 @@ function Invoke-Add {
     Place-DevEnv -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
     Invoke-LegacyInfobaseSettingsMigration -Root $Root -Manifest $manifest
     Ensure-EdtUsageSetting -Root $Root -Manifest $manifest
+    Ensure-CodeOwnerSetting -Root $Root -Manifest $manifest
     Ensure-SupportSettings -Root $Root -Manifest $manifest
     $extMcp = Resolve-ExternalMcpMode -ProjectRoot $Root
     if ($extMcp.Mode -eq 'external') {
@@ -5902,7 +6487,7 @@ function Invoke-Remove {
         switch ($ScopeTool) {
             'claude-code'   { $toolPrefixes = @('.claude/', 'CLAUDE.md', '.mcp.json') }
             'command-code'  { $toolPrefixes = @('.commandcode/', '.mcp.json') }
-            'codex'         { $toolPrefixes = @('.codex/') }
+            'codex'         { $toolPrefixes = @('.codex/', '.agents/skills/') }
             'opencode'      { $toolPrefixes = @('.opencode/', 'opencode.json') }
             'kilocode'      { $toolPrefixes = @('.kilo/', '.kilocode/') }
             'kimi'          { $toolPrefixes = @('.kimi-code/', '.kimi/') }
@@ -5948,6 +6533,10 @@ function Invoke-Remove {
                 }
             }
             $abs = Resolve-ManifestPath -Root $Root -Rel $rel
+            if (Test-EditedMcpConfig -Entry $entry -Path $abs) {
+                [void]$manifest.files.Remove($rel)
+                continue
+            }
             if (Test-MergedMcpEntry $entry) {
                 # Shared config (opencode.json / .kilo/kilo.json /
                 # `.qwen/settings.json`): strip the merge key only, never
@@ -5989,6 +6578,9 @@ function Invoke-Remove {
                 continue
             }
             $abs = Resolve-ManifestPath -Root $Root -Rel $rel
+            if (Test-EditedMcpConfig -Entry $entry -Path $abs) {
+                continue
+            }
             if (Test-MergedMcpEntry $entry) {
                 # Shared config (opencode.json / .kilo/kilo.json /
                 # `.qwen/settings.json`): strip the merge key only, never
@@ -6017,6 +6609,7 @@ function Invoke-Remove {
                 'qwen'         { $cleanupDirs += '.qwen' }
                 'cline'        { $cleanupDirs += '.cline'; $cleanupDirs += '.clinerules' }
                 'pi'           { $cleanupDirs += '.pi' }
+                'codex'        { $cleanupDirs += '.codex'; $cleanupDirs += '.agents/skills'; $cleanupDirs += '.agents' }
                 default        { $cleanupDirs += ".$t" }
             }
         }
@@ -6133,6 +6726,12 @@ if ($Tools -and $Tools.Count -eq 1 -and $Tools[0].Contains(',')) {
 }
 
 try {
+    if ($PSBoundParameters.ContainsKey('ForcePaths')) {
+        $script:ForcePaths = Resolve-ForcePathList -Paths $ForcePaths -Root $projectRoot
+        if ($Command -eq 'update' -and $Tool) {
+            Write-Warn "Argument '$Tool' is ignored: -ForcePaths takes one comma-separated list (`"a,b`"), not a space-separated one."
+        }
+    }
     switch ($Command) {
         'init'   { Invoke-Init   -Root $projectRoot -SourceRootRequested $Source -RequestedTools $Tools }
         'update' { Invoke-Update -Root $projectRoot -SourceRootRequested $Source }

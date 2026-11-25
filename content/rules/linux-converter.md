@@ -12,7 +12,7 @@ Load when `CONVERTER_PATH` is set or a deployment/export command runs on Linux. 
 
 ## Common workflow and Linux paths
 
-First follow the calling command's source-selection, partial/full-snapshot, dirty-export, infobase-role, repository and EDT gates. Keep one deployment owner. `/deploy-and-test` retains its UI policy and final report; `/update1cbase` retains its checks, retry budget and per-target outcomes; exports retain the synchronization contract of `getconfigfiles.md`.
+First follow the calling command's source-selection, partial/full-snapshot, dirty-export, infobase-role, repository and EDT gates. Keep one deployment owner. `/deploy-and-test` retains its UI policy and final report; `/update1cbase` retains its checks, retry budget and per-target outcomes; exports retain the synchronization contract in `content/rules/config-sync-contract.md`.
 
 On Linux the executable is `{PLATFORM_PATH}/1cv8` and the standalone utility is `{PLATFORM_PATH}/ibcmd`; on Windows retain the calling command's `bin` paths. For a Designer launch pass `/F<path>` or `/S<server\base>` as one argument with no space after the flag. Quote shell expansions, including server backslashes and paths with spaces. Use the common `designer-batch-checks.md` verdict, timeout and PID-scoped cleanup. Never copy a Windows command unchanged into Bash.
 

@@ -1,5 +1,5 @@
 ---
-description: Form-module code (`Form.Module.bsl`) — client-server interaction, event handlers wired into `Form.xml`, reserved names, async calls, form-data conversion. Load from `forms.md` when editing form-module logic or adding handlers.
+description: Form-module BSL (`Form.Module.bsl`) — client-server directives, wired event handlers, reserved names, async, form data. Load from `forms.md` for form-module logic.
 alwaysApply: false
 category: forms
 ---
@@ -97,4 +97,4 @@ In 1C form modules, local variables **must not** be named after standard form-el
 
 ## Module Structure
 
-The 5-region template for form modules — `module-structure.md → Form Module`; all 5 regions are mandatory even when empty.
+The region template for form modules — `module-structure.md → Form Module`; its regions are mandatory even when empty.

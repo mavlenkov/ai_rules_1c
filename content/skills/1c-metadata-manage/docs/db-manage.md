@@ -4,7 +4,7 @@ Comprehensive database management: registry (.v8-project.json) and platform oper
 
 ## Integration with configuration synchronization
 
-Read `content/rules/getconfigfiles.md → Configuration file synchronization contract` for transfer scope, object lists vs file lists, baseline handling and failure boundaries. `/loadfrom1cbase` orchestrates directory refresh (full / changes / partial via `/getconfigfiles`); `/update1cbase` orchestrates full / partial / Git load, checks and database apply; `/deploy-and-test` inherits that deployment sequence.
+Read `content/rules/config-sync-contract.md` for transfer scope, object lists vs file lists, baseline handling and failure boundaries. `/loadfrom1cbase` orchestrates directory refresh (full / changes / partial via `/getconfigfiles`); `/update1cbase` orchestrates full / partial / Git load, checks and database apply; `/deploy-and-test` inherits that deployment sequence.
 
 These scripts implement individual stages. When a database update is already requested, continue from a successful load through the required checks to `db-update`; do not stop to offer the already requested next stage. Keep load and apply separate (omit loader `-UpdateDB`) when the orchestrator must run extension applicability checks between them. Use one executor per stage and the same infobase, extension and source root throughout.
 
@@ -253,11 +253,12 @@ Applies main configuration changes to the database configuration (`/UpdateDBCfg`
 | `-Extension <name>` | Update extension |
 | `-AllExtensions` | Update all extensions |
 | `-Dynamic <on/off>` | `on` dynamic update, `off` turn it off. `auto` / `disable` (the `ibcmd` spellings) and `yes` / `no` are accepted too; `+` / `-` still work in-process, but a lone `-` never reaches the script through `powershell.exe -File` — PowerShell 5.1 exits silently |
+| `-SessionTerminate <disable/prompt/force>` | What to do with open sessions; `force` ends them (`/UpdateDBCfg -Dynamic+ -SessionTerminate force`, `ibcmd --session-terminate=force`); `prompt` asks the user, so not for an unattended run. Dev/test bases only. Without it the update stops on the exclusive-lock error while any session is open. Not accepted through `-AdditionalV8Arguments` / `-AdditionalIbcmdArguments` — the platform reads the key only right after `/UpdateDBCfg` |
 | `-Server` | Server-side update |
 | `-WarningsAsErrors` | Treat warnings as errors |
 | `-ApplyCheck` | After an extension update, run `/CheckCanApplyConfigurationExtensions`; a refusal exits 1. Off by default — see below |
 
-**Warning**: Non-dynamic update requires exclusive database access (all users must exit).
+**Warning**: Non-dynamic update requires exclusive database access (all users must exit, or pass `-SessionTerminate force` on a dev/test base).
 
 The update log is scanned after an exit-0 run: metadata rejections (`Неверное свойство объекта метаданных`, `Неизвестное имя типа`, …), a compatibility mode above the platform (`Для работы с конфигурацией необходима версия платформы не меньше …`) and the update's own `Ошибка [при] обновлени… конфигурации базы данных` exit **1** — the database configuration is not the one that was asked for.
 

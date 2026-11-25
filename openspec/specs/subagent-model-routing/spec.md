@@ -1,7 +1,8 @@
 # subagent-model-routing Specification
 
 ## Purpose
-TBD - created by archiving change multi-client-routing. Update Purpose after archive.
+Определяет, как установщик выбирает модель субагента по роли и клиенту и когда клиент использует свою модель по умолчанию.
+
 ## Requirements
 ### Requirement: Per-client разрешение модели субагента
 

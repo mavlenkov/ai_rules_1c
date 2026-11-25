@@ -7,8 +7,7 @@ argumentHint: "[full|changes|partial|all]"
 
 **Linux/converter branch (fork):** load `content/rules/linux-converter.md` when running on Linux or when `CONVERTER_PATH` is configured. It supplies platform paths and converter routing; all source-selection, safety, verification and reporting requirements below remain authoritative.
 
-
-Refresh configuration files from the infobase defined in `.dev.env`: full dump, incremental refresh or selected-object export. Read `content/rules/getconfigfiles.md → Configuration file synchronization contract` before choosing the scope. With `all` (or an explicit "with extensions" request), dump the **full snapshot** — main configuration plus every extension from `EXTENSION_NAMES`; see "Full-snapshot mode" below.
+Refresh configuration files from the infobase defined in `.dev.env`: full dump, incremental refresh or selected-object export. Read `content/rules/config-sync-contract.md` before choosing the scope. With `all` (or an explicit "with extensions" request), dump the **full snapshot** — main configuration plus every extension from `EXTENSION_NAMES`; see "Full-snapshot mode" below.
 
 This is the directory-refresh stage of the workflow shared with `/update1cbase`. It does not load files into the infobase or apply the database configuration.
 
@@ -78,7 +77,7 @@ Map `.dev.env` keys to Designer flags:
     {INFOBASE_FLAG} '{INFOBASE_PATH}' `
     /N '{IB_USER}' `
     /P '{IB_PASSWORD}' `
-    /DisableStartupMessages `
+    /DisableStartupMessages /DisableStartupDialogs `
     /DumpConfigToFiles '{EXPORT_PATH}' `
     -Format Hierarchical `
     -Extension {EXTENSION_NAME} `

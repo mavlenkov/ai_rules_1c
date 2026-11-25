@@ -1,4 +1,4 @@
-﻿# db-update v1.28 — Update 1C database configuration
+﻿# db-update v1.31 — Update 1C database configuration
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # Local (1c-rules): .dev.env first — PLATFORM_PATH (an install dir resolves to bin\1cv8.exe) before
 #   the v8path of the .v8-project.json record / root, PLATFORM_ARGS / IBCMD_ARGS before v8args /
@@ -9,6 +9,8 @@
 #   Extension applicability check is opt-in (-ApplyCheck): /update1cbase Step 2c is the gate.
 #   -Dynamic also takes auto / disable (Local fix 2026-10-20); log failure lines (Find-SilentRejections
 #   plus "Ошибка [при] обновлени… конфигурации базы данных") raise the exit code, not only with -StrictLog.
+#   -SessionTerminate disable|prompt|force (Local fix 2026-11-25): 1cv8 key right after /UpdateDBCfg [-Dynamic],
+#   ibcmd --session-terminate=; refused through the additional-argument parameters (the platform ignores it at the end).
 # NB: *nix-раскладку платформы (/opt/1cv8/<ver>/1cv8, без .exe) знает только .py-порт — PS на *nix не исполняется.
 <#
 .SYNOPSIS
@@ -45,6 +47,11 @@
 .PARAMETER Dynamic
     Динамическое обновление: on включить, off отключить (также auto / disable — написание ibcmd)
 
+.PARAMETER SessionTerminate
+    Что делать с открытыми сеансами: disable не завершать, prompt спросить, force завершить принудительно
+    (только для баз разработки и тестирования). Без ключа обновление упирается в ошибку монопольной блокировки,
+    пока открыт любой сеанс. 1cv8: -SessionTerminate сразу после /UpdateDBCfg; ibcmd: --session-terminate=
+
 .PARAMETER Server
     Обновление на стороне сервера
 
@@ -62,6 +69,9 @@
 
 .EXAMPLE
     .\db-update.ps1 -InfoBasePath "C:\Bases\MyDB" -Dynamic "+" -Extension "МоёРасширение"
+
+.EXAMPLE
+    .\db-update.ps1 -InfoBasePath "C:\Bases\MyDB" -Dynamic on -SessionTerminate force
 #>
 
 [CmdletBinding(PositionalBinding=$false)]
@@ -96,6 +106,11 @@ param(
     # 1c-rules: auto / disable — написание ibcmd (--dynamic=auto|disable), локальная правка 2026-10-20.
     [ValidateSet("on", "off", "yes", "no", "+", "-", "auto", "disable")]
     [string]$Dynamic,
+
+    # 1c-rules: сеансы: 1cv8 /UpdateDBCfg ... -SessionTerminate, ibcmd config apply --session-terminate=, локальная правка 2026-11-25.
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("disable", "prompt", "force")]
+    [string]$SessionTerminate,
 
     [Parameter(Mandatory=$false)]
     [switch]$Server,
@@ -244,15 +259,19 @@ function Get-RepositoryArgs {
     $a = @()
     if (-not $Repo -or -not $Repo.Path) { return $a }
     $a += "/ConfigurationRepositoryF`"$($Repo.Path)`""
-    if ($Repo.User) { $a += "/ConfigurationRepositoryN`"$($Repo.User)`"" }
-    if ($Repo.Password) { $a += "/ConfigurationRepositoryP`"$($Repo.Password)`"" }
+    if ($Repo.User) { $a += ("/ConfigurationRepositoryN" + (ConvertTo-QuotedText $Repo.User)) }
+    if ($Repo.Password) { $a += ("/ConfigurationRepositoryP" + (ConvertTo-QuotedText $Repo.Password)) }
     return $a
 }
 
 function Protect-Secrets {
     # Redact literal secret values from a display string (String.Replace is literal, not regex).
     param([string]$Text, [string[]]$Secrets)
-    foreach ($s in $Secrets) { if ($s) { $Text = $Text.Replace($s, '***') } }
+    # A secret with a quote reaches the command line doubled (ConvertTo-QuotedText), so both
+    # forms are redacted. Longest first: a shorter form replaced earlier could break a longer
+    # one that contains it and leave part of that secret visible. (No -Unique: it ignores case.)
+    $forms = @(foreach ($s in $Secrets) { if ($s) { $s; $s.Replace('"', '""') } }) | Sort-Object -Property Length -Descending
+    foreach ($f in $forms) { $Text = $Text.Replace($f, '***') }
     return $Text
 }
 
@@ -279,7 +298,7 @@ $script:V8OwnedKeys = @(
     '/F', '/S', '/N', '/P', '/Out', '/DisableStartupDialogs',
     '/UseTemplate', '/AddToList', '/Execute', '/C', '/URL', '/UC',
     '/DumpIB', '/RestoreIB', '/DumpCfg', '/LoadCfg',
-    '/DumpConfigToFiles', '/LoadConfigFromFiles', '/UpdateDBCfg',
+    '/DumpConfigToFiles', '/LoadConfigFromFiles', '/UpdateDBCfg', '-SessionTerminate',
     '/DumpExternalDataProcessorOrReportToFiles', '/LoadExternalDataProcessorOrReportFromFiles'
 )
 # Пакетные команды платформы. В одной командной строке DESIGNER выполняет ТОЛЬКО ПОСЛЕДНЮЮ,
@@ -296,7 +315,7 @@ $script:V8BatchKeys = @(
 $script:IbcmdOwnedKeys = @(
     '--db-path', '--data', '--out', '--file', '--load', '--restore',
     '--import', '--export', '--apply', '--force', '--create-database',
-    '--user', '--password'
+    '--user', '--password', '--session-terminate'
 )
 $script:V8SecretKeys = @('/P', '/UC', '/WSP', '/AWSP', '/ConfigurationRepositoryP')
 $script:IbcmdSecretKeys = @('--password', '--token', '--db-pwd')
@@ -338,6 +357,26 @@ function Get-ProjectExtraArgs {
         $dir = $parent
     }
     return @()
+}
+
+function ConvertTo-QuotedIfNeeded {
+    # Extra arguments come from the caller unquoted; the 1cv8 command line is joined
+    # verbatim, so a token with a space needs quotes of its own. Без кавычек платформа молча
+    # режет значение по пробелу (замер 2026-11-10: «/Out C:\a b\x.txt» пишет лог в «C:\a»).
+    param([string]$Token)
+    if ($Token -and ($Token.Contains(' ') -or $Token.Contains("`t")) -and -not $Token.Contains('"')) {
+        return '"' + $Token + '"'
+    }
+    return $Token
+}
+
+function ConvertTo-QuotedText {
+    # Free text (user, password, comment, label, list name) framed in quotes for the 1cv8
+    # command line. 1C reads a doubled quote inside the value as one; a lone quote ends the
+    # value, and the rest is dropped silently (замер 2026-11-14: «-comment» хранилища
+    # сохраняется до кавычки, exit 0). «\"» 1C не понимает.
+    param([string]$Value)
+    return '"' + $Value.Replace('"', '""') + '"'
 }
 
 function Assert-ExtraArgs {
@@ -870,7 +909,7 @@ function Invoke-ApplyCheck {
         $outFile = Join-Path $dir "check_log.txt"
         $resultFile = Join-Path $dir "check_result.txt"
         $a += "/Out", "`"$outFile`"", "/DumpResult", "`"$resultFile`"", "/DisableStartupDialogs"
-        $a += $ExtraArgs
+        $a += @($ExtraArgs | ForEach-Object { ConvertTo-QuotedIfNeeded $_ })
         $res = Invoke-PlatformProcess $v8 $a -PreQuoted
         $lines = @()
         if (Test-Path $outFile) {
@@ -923,7 +962,7 @@ function Get-ApplyCheckEnabled {
 $engine = if ((Split-Path $V8Path -Leaf) -match '^ibcmd') { "ibcmd" } else { "1cv8" }
 
 # --- Resolve additional arguments for the selected engine ---
-$argHints = @{ '/F' = '-InfoBasePath'; '/S' = '-InfoBaseServer + -InfoBaseRef'; '/N' = '-UserName'; '/P' = '-Password'; '--db-path' = '-InfoBasePath'; '--user' = '-UserName'; '--password' = '-Password' }
+$argHints = @{ '/F' = '-InfoBasePath'; '/S' = '-InfoBaseServer + -InfoBaseRef'; '/N' = '-UserName'; '/P' = '-Password'; '--db-path' = '-InfoBasePath'; '--user' = '-UserName'; '--password' = '-Password'; '-SessionTerminate' = '-SessionTerminate'; '--session-terminate' = '-SessionTerminate' }
 $extraArgs = @(Resolve-ExtraArgs $engine $AdditionalV8Arguments $AdditionalIbcmdArguments $argHints)
 
 # --- Validate connection ---
@@ -951,6 +990,7 @@ try {
         $arguments = @("infobase", "config", "apply", "--db-path=$InfoBasePath", "--force")
         if ($Dynamic -eq "+") { $arguments += "--dynamic=auto" }
         elseif ($Dynamic -eq "-") { $arguments += "--dynamic=disable" }
+        if ($SessionTerminate) { $arguments += "--session-terminate=$SessionTerminate" }
         if ($Extension) { $arguments += "--extension=$Extension" }
         if ($UserName) { $arguments += "--user=$UserName" }
         if ($Password) { $arguments += "--password=$Password" }
@@ -968,8 +1008,8 @@ try {
         # Проверку применимости умеет только 1cv8 — соединение для неё собираем в его форме.
         if ($exitCode -eq 0 -and ($Extension -or $AllExtensions) -and (Get-ApplyCheckEnabled -Disabled:$NoApplyCheck -Requested:$ApplyCheck)) {
             $acConn = @("/F", "`"$InfoBasePath`"")
-            if ($UserName) { $acConn += "/N`"$UserName`"" }
-            if ($Password) { $acConn += "/P`"$Password`"" }
+            if ($UserName) { $acConn += ("/N" + (ConvertTo-QuotedText $UserName)) }
+            if ($Password) { $acConn += ("/P" + (ConvertTo-QuotedText $Password)) }
             if ((Invoke-ApplyCheckReport $V8Path $acConn $Extension @()) -and ($StrictLog -or $ApplyCheck)) { $exitCode = 1 }
         }
         Write-PlatformOutput $output
@@ -987,8 +1027,8 @@ try {
         $connArgs += "/F", "`"$InfoBasePath`""
     }
 
-    if ($UserName) { $connArgs += "/N`"$UserName`"" }
-    if ($Password) { $connArgs += "/P`"$Password`"" }
+    if ($UserName) { $connArgs += ("/N" + (ConvertTo-QuotedText $UserName)) }
+    if ($Password) { $connArgs += ("/P" + (ConvertTo-QuotedText $Password)) }
 
     # База под хранилищем не примет НИ ОДНОЙ операции конфигуратора без этих реквизитов, а для
     # базы вне хранилища они безвредны — поэтому подставляем всегда, когда они известны.
@@ -1002,6 +1042,10 @@ try {
     # --- Options ---
     if ($Dynamic) {
         $arguments += "-Dynamic$Dynamic"
+    }
+    # 1c-rules: the platform reads -SessionTerminate only as an option of /UpdateDBCfg, i.e. before /Out.
+    if ($SessionTerminate) {
+        $arguments += "-SessionTerminate", $SessionTerminate
     }
     if ($Server) {
         $arguments += "-Server"
@@ -1024,7 +1068,7 @@ try {
     $resultFile = Join-Path $tempDir "batch_result.txt"
     $arguments += "/DumpResult", "`"$resultFile`""
     $arguments += "/DisableStartupDialogs"
-    $arguments += $extraArgs
+    $arguments += @($extraArgs | ForEach-Object { ConvertTo-QuotedIfNeeded $_ })
 
     # --- Execute ---
     Write-Host "Running: 1cv8.exe $(Protect-Secrets ((Format-ArgsForDisplay $arguments $engine) -join ' ') @($Password, $UserName, $__repo.Password))"

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline fork integration checks against real Bash/PowerShell entry points."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -70,7 +71,7 @@ def main():
         tools = "cursor,claude-code,opencode,codex,kimi,kilocode,qwen,koda"
         # OpenCode and Claude Code share the same installed skills directory.
         live_ib_skills = [target / directory / "skills/1c-live-ib/SKILL.md"
-                          for directory in (".cursor", ".claude", ".codex", ".kimi-code",
+                          for directory in (".cursor", ".claude", ".agents",
                                             ".kilo", ".qwen", ".koda")]
         command = ["bash", str(REPO / "scripts/install.sh"), str(target), "--tools", tools,
                    "--host", "127.0.0.1", "--publish-url", "http://127.0.0.1:1/TestBase/ru/"]
@@ -94,13 +95,16 @@ def main():
         check("readonly: true" in (target / ".cursor/agents/explorer.md").read_text(), "Cursor readonly intent lost")
         check((target / ".kodacli/mcp-setup.md").is_file(), "Koda setup missing")
         check((target / ".kodacli/settings.json").read_text() == koda_settings, "Koda settings changed")
-        kimi_skill = ".kimi-code/skills/openspec-propose/SKILL.md"
-        check((target / kimi_skill).read_bytes() == (REPO / "content/openspec-bundle/kimi" / kimi_skill).read_bytes(), "Kimi bundle is stale")
-        for path in [".kimi-code/skills/openspec-propose/SKILL.md",
-                     ".codex/skills/openspec-propose/SKILL.md",
-                     ".opencode/command/opsx-propose.md"]:
+        check(not (target / ".kimi-code/skills").exists(), "Duplicate skills in Kimi and Codex")
+        for path in [".agents/skills/openspec-propose/SKILL.md", ".opencode/command/opsx-propose.md"]:
             check((target / path).is_file(), "OpenSpec bundle missing: " + path)
-        # Update a previously installer-owned connection without changing its source catalog.
+        # An invocation override selects defaults for missing endpoints only.
+        other_host = command.copy()
+        other_host[other_host.index("--host") + 1] = "127.0.0.2"
+        run(other_host)
+        first_site = json.loads((target / ".cursor/mcp.json").read_text())["mcpServers"]["1c-syntax-checker-mcp"]
+        check("127.0.0.1:" in first_site["url"], "New site default rewrote an existing connection")
+        # Exercise later edits, including an old fork receipt claiming their ownership.
         config_path = target / ".cursor/mcp.json"
         config = json.loads(config_path.read_text())
         managed_id = "1c-syntax-checker-mcp"
@@ -115,12 +119,40 @@ def main():
         check(json.loads(config_path.read_text())["mcpServers"][managed_id] == connection,
               "Forced update replaced configured managed connection")
         check((target / ".codex/config.toml").read_text() == codex, "Codex changed on update")
+        run(command)
+        check(json.loads(config_path.read_text())["mcpServers"][managed_id] == connection,
+              "Repeat update adopted a user-edited managed endpoint")
+        # An old fork manifest could claim an existing custom connection as managed,
+        # with an installedHash matching the entire (already edited) config.
+        manifest_path = target / ".ai-rules.json"
+        manifest = json.loads(manifest_path.read_text())
+        entry = manifest["files"][".cursor/mcp.json"]
+        entry.pop("catalogManaged", None)
+        entry.pop("userModified", None)
+        entry["installedHash"] = hashlib.sha256(config_path.read_bytes()).hexdigest()
+        entry["managedServers"] = [managed_id]
+        # Older fork installations also tracked a pristine TOML containing the site's endpoints.
+        manifest["files"][".codex/config.toml"] = {
+            "source": "content/mcp-servers.json",
+            "installedHash": hashlib.sha256((target / ".codex/config.toml").read_bytes()).hexdigest(),
+        }
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False))
+        # The legacy manifest is upgraded even during an update without site overrides.
+        run([pwsh, "-NoProfile", "-File", str(REPO / "install.ps1"), "update",
+             "-ProjectRoot", str(target), "-Source", str(REPO), "-NonInteractive"])
+        check(json.loads(config_path.read_text())["mcpServers"][managed_id] == connection,
+              "Legacy ownership claim replaced a custom connection")
+        check((target / ".codex/config.toml").read_text() == codex, "Legacy whole-file TOML changed")
+        check(".codex/config.toml" not in json.loads(manifest_path.read_text())["files"],
+              "Legacy site TOML still claimed as managed")
+        check(managed_id not in json.loads(manifest_path.read_text())["files"][".cursor/mcp.json"]["managedServers"],
+              "Legacy ownership claim was not retired")
         # Invalid JSON must survive even an explicit forced regeneration request.
         config_path.write_text("{invalid fixture JSON")
         bad = subprocess.run([pwsh, "-NoProfile", "-File", str(REPO / "install.ps1"), "update",
                               "-ProjectRoot", str(target), "-Source", str(REPO), "-NonInteractive",
                               "-ForcePaths", ".cursor/mcp.json"], cwd=root, env=env, capture_output=True)
-        check(bad.returncode != 0 and config_path.read_text() == "{invalid fixture JSON",
+        check(bad.returncode == 0 and config_path.read_text() == "{invalid fixture JSON",
               "Invalid client config was overwritten")
         # Missing runtime must fail before creating any target files.
         empty = root / "empty project"

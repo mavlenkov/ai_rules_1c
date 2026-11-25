@@ -2,7 +2,7 @@
 
 Graph metadata server: scoped Neo4j graph, BSL call graph, forms, evidence, impact and project lifecycle. Structural/template tools are deterministic; `answer_metadata_question` and natural-language `search_metadata` require an LLM unless the deployment is in graph-only mode.
 
-> Load this file only if `1c-graph-metadata-mcp` is actually exposed in the current session. The published surface varies with `MCP_TOOL_PROFILE` and feature gates; `list_graph_capabilities` / `get_graph_tool_schema` are authoritative.
+> Load this file only if `1c-graph-metadata-mcp` is actually exposed in the current session. The published surface varies with `MCP_TOOL_PROFILE` (default `standard`) and feature gates; `list_graph_capabilities` / `get_graph_tool_schema` are authoritative.
 
 ## Contract and scope — read before calling
 
@@ -18,7 +18,7 @@ Graph metadata server: scoped Neo4j graph, BSL call graph, forms, evidence, impa
 ### Base configuration and extension layers
 
 1. When the server's extension catalog has ingested the relevant sources, the base and discovered extensions are ordered **layers of the same `project_id`**. Extension names are not project IDs. Call `list_graph_projects`, bind its returned base project to the current source roots, and keep that explicit scope on all project-data calls. Several projects with no verified root mapping require resolving the ambiguity, not list-order selection. A project search catalog does not establish ingestion: a base-only graph answers only within that coverage; uncovered contours follow `content/rules/multi-contour-search.md`.
-2. Never call `register_graph_project` once per extension and never invent a `project_id` from `EXTENSION_NAME`. That creates isolated project scopes and cannot build the base↔extension `EXTENDS` / `OVERRIDES` relationships required for effective-runtime answers. With `GRAPH_SCOPE_ENFORCED=true`, the server's project registry is in-memory: after every container start `list_graph_projects` is empty and project-data reads return `project_not_accessible` until `register_graph_project` (`mode=full`) is called again for the already-known base project. The Neo4j graph itself is still there. Register that one base project, not one project per extension.
+2. Never call `register_graph_project` once per extension and never invent a `project_id` from `EXTENSION_NAME`. That creates isolated project scopes and cannot build the base↔extension `EXTENDS` / `OVERRIDES` relationships required for effective-runtime answers. An empty `list_graph_projects` right after a container start — *Registry after a restart* below.
 3. For the indexed effective implementation, call `resolve_effective_entity(project_id, object_name, entity_kind, entity_name)`. Use `entity_kind="MetadataObject"` with no `entity_name` for an object; for a routine/form/module, pass its kind and its own `entity_name`. Inspect `data.layers`, `effective`, `superseded`, `wrapping`, `extending`, warnings and `ambiguous_order` rather than selecting the last search hit yourself. A claim about a running infobase additionally needs evidence tying those sources, active extensions and order to that named target; source analysis alone remains a source conclusion.
 4. For “what did one named extension change?”, call `compare_base_and_extension(project_id, object_name, extension_name)`. This is a layer comparison inside the selected base-project scope, not a cross-project comparison. A general search requires returned layer provenance before treating its hit as the selected extension; use only layer arguments supported by that tool. A result from another project or the base alone is not evidence of absence in the extension.
 5. The catalog order is purpose-first (`Исправление` → `Адаптация` → `Дополнение`) and manifest/name order within one purpose. If the response says the order was assumed or ambiguous, report that uncertainty; do not turn it into a proven runtime order.
@@ -26,7 +26,7 @@ Graph metadata server: scoped Neo4j graph, BSL call graph, forms, evidence, impa
 
 ### Tools not automatically project-scoped
 
-Discovery/health/contract tools (`get_metadata_prompt`, `get_indexing_status`, `health_graph`, `get_graph_capabilities`, `list_graph_capabilities`, `get_graph_tool_schema`, `metadata_report`), project lifecycle tools, plugin reload, and ordinary-form file tools receive only universal paging controls from the wrapper. A `project_id` shown in their own schema is a normal domain argument.
+Discovery/health/contract tools (`get_metadata_prompt`, `get_indexing_status`, `health_graph`, `get_graph_capabilities`, `list_graph_capabilities`, `get_graph_tool_schema`), project lifecycle tools, plugin reload, and ordinary-form file tools receive only universal paging controls from the wrapper. A `project_id` shown in their own schema is a normal domain argument.
 
 ## Recommended workflow
 
@@ -162,7 +162,7 @@ Identity formats differ by tool. Path endpoints and `affected_subgraph.roots` ac
 | `unpack_ordinary_form` | `form_path`, `workspace_path`, `overwrite=false`, `include="summary"`, `max_chars=4000` | Admin-profile file operation: unpack `Form.bin` |
 | `build_ordinary_form` | `workspace_path`, `output_path`, `overwrite=false`, `verify=true` | Admin-profile file operation: rebuild and logically verify `Form.bin` |
 
-An ordinary `Form.bin` is a binary container, not XML. Do not edit it directly. A rebuilt binary may differ in bytes because of timestamps; `verification.status == "match"` is the round-trip criterion.
+An ordinary `Form.bin` is a binary container, not XML. Do not edit it directly. The primary route is `content/skills/form-ordinary/SKILL.md`; this pair is its fallback. A rebuilt binary may differ in bytes because of timestamps; `verification.status == "match"` is the round-trip criterion.
 
 ## Observability, contract and safe templates
 
@@ -170,16 +170,15 @@ An ordinary `Form.bin` is a binary container, not XML. Do not edit it directly. 
 |---|---|
 | `health_graph` | Process, Neo4j, provider and per-lane readiness; pass `project_id` for exact lane state |
 | `get_indexing_status` | Background tasks plus `source_refresh` drift, skipped ticks and last refresh/error; `completed` alone does not certify current sources |
-| `get_graph_schema` | Node and edge kinds in the selected project |
-| `get_graph_stats` | Graph/evidence counters for the selected project; no domain `label` filter |
-| `list_graph_indexes` | Neo4j index state/population |
+| `get_graph_schema` | Node and edge kinds in the selected project; `admin` profile only |
+| `get_graph_stats` | Graph/evidence counters for the selected project; no domain `label` filter; `admin` profile only |
+| `list_graph_indexes` | Neo4j index state/population; `admin` profile only |
 | `get_graph_capabilities` | Local analysis vs delegated capabilities and graph-only degradation |
 | `list_graph_capabilities` | Published tools, contract version/profile/feature gates/limits, disabled lanes (e.g. business search) and the installation notices (`GRAPH_SCOPE_ENFORCED`, `REFERENCE_EVIDENCE_ENABLED`, active generation) — these are reported here once, not on every answer |
 | `get_graph_tool_schema` | Exact JSON Schema, annotations and example for one tool — after a schema rejection, or for a tool this file does not describe; not a preamble |
 | `get_metadata_prompt` | Graph schema, the JSON operation catalogue and the Cypher template list (~40 KB); read once per session at most, only when the tables above do not answer; does **not** authorize raw Cypher |
 | `run_graph_cypher_template` | Execute one allow-listed read-only `template_id`; values travel separately in `arguments`, and project-scope names are forbidden there |
 | `list_plugins` | Loaded plugins, hooks/tables/presets, failures and plugin epoch |
-| `metadata_report` | Tombstone explaining replacements for the removed monolithic report |
 
 In graph-only mode, structural graph/template/fulltext functions continue while LLM/vector-dependent lanes report explicit degradation. Do not call missing providers a total outage; inspect `health_graph` and capabilities.
 
@@ -191,17 +190,17 @@ A disabled business-search lane is absent from `tools/list` on current builds an
 |---|---|---|
 | `list_graph_projects` | none | Registered projects in this namespace |
 | `get_graph_project_status` | `project_id`, optional `operation_id`, `generation` | Active/staging generations, readiness and recorded operation progress |
-| `register_graph_project` | `project_id`, `configuration_root`, `operation_id`, `mode="full"` | Register a source; idempotent operation ID. After a container restart the in-memory registry is empty until this is called again for the same base project |
+| `register_graph_project` | `project_id`, `configuration_root`, `operation_id`, `mode="full"` | Register a source; idempotent operation ID |
 | `refresh_graph_project` | `project_id`, `operation_id`, `mode="incremental"`, optional `changed_paths`, `expected_generation` | Mode-dependent rebuild; read the mutation and failure boundaries below |
-| `refresh_extension_layers` | `operation_id`, optional `layers` (list of names) | Admin-only reread of this installation's extension catalog; no `project_id` selector |
+| `refresh_extension_layers` | `operation_id`, optional `layers` (list of names) | Reread of this installation's extension catalog (not in `read-only`); no `project_id` selector |
 | `delete_graph_project` | `project_id`, `operation_id` | Destructive scoped deletion |
 | `reload_plugins` | `operation_id` | Atomic plugin reload; derived-state hooks affect the next build and invalidate old cursors |
 
-`MCP_TOOL_PROFILE=admin` publishes lifecycle, plugin reload and ordinary-form write tools. `read-only` omits them from `tools/list`; do not attempt to call hidden tools. Plugins are enabled by default in current source. Call-scoped hooks affect the next call; derived-state hooks change the build fingerprint and require a new generation.
+`MCP_TOOL_PROFILE` defaults to `standard`: everything except the operator diagnostics `get_graph_schema`, `get_graph_stats` and `list_graph_indexes`, with `register_graph_project`, `refresh_graph_project` and `delete_graph_project` published only when `GRAPH_SCOPE_ENFORCED=true` (`refresh_graph_project` also with `SOURCE_UNIT_MANIFEST_ENABLED=true`) — without it they cannot succeed. `admin` publishes every tool. `read-only` omits lifecycle, plugin reload, `refresh_extension_layers` and the ordinary-form write tools. Do not attempt to call hidden tools; `list_graph_capabilities` names what this installation withholds and why. Plugins are enabled by default in current source. Call-scoped hooks affect the next call; derived-state hooks change the build fingerprint and require a new generation.
 
 Lifecycle tools own independent base-project sources. They do not turn separately registered projects into extension layers. If the deployment uses an extension catalog, ingest the catalog through the server deployment and query every layer under the returned base `project_id`.
 
-The project registry is not persisted. With `GRAPH_SCOPE_ENFORCED=true`, a container restart clears it even though the Neo4j data is intact: `list_graph_projects` reports `total: 0`, and reads fail with `project_not_accessible` until the client calls `register_graph_project` (`mode=full`) for the base project it already uses. Do that once per start for that base project. Do not register a separate project per extension, and do not invent `project_id` from `EXTENSION_NAME`. The server's `on_startup` hook does not refill the registry; this is a server limitation, not a reason to change the project id.
+**Registry after a restart** (`GRAPH_SCOPE_ENFORCED=true`). Images from 06.10.2026 on restore it at start: the installation's own `PROJECT_NAME` and every registered project come back from the recorded state, and the Neo4j data was never lost. A project built by an earlier image is recorded by its first `register_graph_project` (`mode=full`; over existing data nothing is rebuilt). When `list_graph_projects` still reports `total: 0` and reads fail with `project_not_accessible` after the start has finished, the image is older: call `register_graph_project` once per start for the base project already in use and tell the user to update the image. Never register a separate project per extension and never invent `project_id` from `EXTENSION_NAME`.
 
 ### Refresh boundaries and source freshness
 

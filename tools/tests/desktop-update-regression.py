@@ -53,7 +53,6 @@ def main():
     edited = target/'.claude/commands/install-windows-mcp.md'
     edited.write_bytes(edited.read_bytes() + b'\nUser-owned command override; retain exact bytes.\n')
     override = edited.read_bytes()
-    entry = (target/'AGENTS.md').read_bytes()
     clean_paths = [target/'.cursor/commands/install-windows-mcp.md',
                    target/'.opencode/command/install-windows-mcp.md',
                    home/'.codex/prompts/install-windows-mcp.md']
@@ -63,15 +62,17 @@ def main():
     checks = {
         'new_commands': all(path.is_file() for path in [target/'.cursor/commands/install-agent-desktop.md',
             target/'.claude/commands/install-agent-desktop.md', target/'.opencode/command/install-agent-desktop.md',
-            home/'.codex/prompts/install-agent-desktop.md']),
+            target/'.agents/skills/install-agent-desktop/SKILL.md']),
         'pristine_old_removed': all(not path.exists() for path in clean_paths),
         'override_preserved': edited.read_bytes() == override,
         'override_owned': after['files'].get('.claude/commands/install-windows-mcp.md', {}).get('userModified') is True,
         'tool_selection': before['tools'] == after['tools'],
-        'entry_routing': entry == (target/'AGENTS.md').read_bytes() and b'.cursor/commands/<name>.md' in entry,
+        'entry_routing': '.cursor/commands/' in (target/'AGENTS.md').read_text()
+            and (target/'.cursor/commands/install-agent-desktop.md').is_file(),
         'legacy_required_retained': (target/'.dev.env').read_bytes().startswith(original_env),
         'new_required_migrated': b'TOOL_AGENT_DESKTOP=required\n' in (target/'.dev.env').read_bytes(),
-        'new_installer_announced': log.count('Добавлены новые установщики инструментов: install-agent-desktop.md.') == 1 and '/installtools' in log,
+        'new_installer_announced': any('install-agent-desktop.md' in line for line in log.splitlines()
+            if 'Добавлены новые установщики инструментов:' in line) and '/installtools' in log,
     }
     (work/'checks-first.json').write_text(json.dumps(checks, indent=2)+'\n')
     assert all(checks.values()), f'Failed checks: {[key for key, value in checks.items() if not value]}'

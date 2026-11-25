@@ -1,5 +1,5 @@
 ---
-description: 1C:EDT branch of the ruleset — EDT project format, metadata / infobase gates, EDT-MCP routing, validation and DB update in an EDT workspace. Load when USE_EDT=true, the sources are in EDT format, or EDT-MCP tools are exposed.
+description: 1C:EDT branch of the ruleset — EDT project format, metadata / infobase gates, EDT-MCP routing, validation and DB update in an EDT workspace. Load when USE_EDT=true or the tree being edited is in EDT format (.mdo).
 alwaysApply: false
 category: tooling
 ---
@@ -13,7 +13,8 @@ This file is the **EDT branch** of the ruleset. Everything else in `content/rule
 `.dev.env` `USE_EDT` is the project's explicit statement about EDT (canon — `content/rules/dev-standards-env.md → USE_EDT — project uses 1C:EDT`):
 
 - **`USE_EDT=true`** → this file applies. Load it before the first metadata mutation, infobase operation, or source-format-sensitive action in the session.
-- **`USE_EDT=false` or missing** → this file does **not** apply. Do not propose EDT, do not offer EDT-MCP, do not reshape a task around EDT. An EDT installation found on the workstation, or an `edt-mcp` entry left in some client config, is **not** a project preference — only `USE_EDT` is.
+- **The tree being edited is in EDT format, whatever the flag says** (markers in the table below) → *The one thing that really changes: source format*, *Mutating metadata in an EDT-format tree*, *Model vs disk* and *Validation* apply. The installer may append `USE_EDT=false` without asking, so the flag is not proof of the format; it only decides whether EDT and EDT-MCP may be proposed.
+- **`USE_EDT=false`, or missing / empty / invalid (= unknown), with a Designer XML tree** → this file does **not** apply. Do not propose EDT, do not offer EDT-MCP, do not reshape a task around EDT, and do not ask about it in an ordinary task. An EDT installation found on the workstation, or an `edt-mcp` entry left in some client config, is **not** a project preference — only `USE_EDT` is.
 - **User says the project moved to EDT** (or explicitly asks for EDT work) → ask once, set `USE_EDT=true` without touching other keys, then continue under this file.
 
 `USE_EDT=true` without EDT-MCP is valid. Generic work continues; dependent steps use the alternatives below or remain unverified. Recommend `/install-edt-mcp` at most once per session when relevant and policy permits; never recommend it for `TOOL_EDT=off`.
@@ -27,7 +28,7 @@ EDT and Designer store the same configuration in **two different on-disk formats
 | Marker in the working tree | Format | Consequence |
 |---|---|---|
 | `Configuration.xml` at the root, `<Type>/<Name>.xml`, modules under `<Name>/Ext/…`, forms as `Forms/<Name>/Ext/Form.xml` | **Designer XML dump** | The whole ruleset applies **unchanged**. EDT is merely the human's editor; `1c-metadata-manage` remains the mutation gate. |
-| `.project` + `DT-INF/` + `src/Configuration.mdo`, objects as `src/<Type>/<Name>/<Name>.mdo`, forms as `…/Forms/<Name>/Form.form`, modules as sibling `*.bsl` | **EDT format (MDO)** | The XML toolchain of `1c-metadata-manage` does **not** address these files. Route metadata mutations per *Mutating metadata in an EDT-format tree* below. |
+| `.project` + `DT-INF/` + `src/Configuration/Configuration.mdo`, objects as `src/<Type>/<Name>/<Name>.mdo`, forms as `…/Forms/<Name>/Form.form`, modules as sibling `*.bsl` | **EDT format (MDO)** | The XML toolchain of `1c-metadata-manage` does **not** address these files. Route metadata mutations per *Mutating metadata in an EDT-format tree* below. |
 | Both present in one repo (XML dump plus a separate EDT workspace) | **Hybrid** | Name the authoritative one before editing, edit only there, and regenerate the other side through the documented conversion. Editing both by hand guarantees a silent divergence. |
 
 Hard rules for the EDT format:
